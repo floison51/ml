@@ -326,7 +326,7 @@ def model_batch(
         num_epochs, minibatch_size, print_cost = True, show_plot = False, extractImageErrors = False
     )
     
-def tuning( num_epochs ):
+def tuning( num_epochs, learning_rate ):
     beta_min = 0.000000000000001
     beta_max = 0.5
     
@@ -362,7 +362,7 @@ def tuning( num_epochs ):
         _, accuracyDev, accuracyTrain = model_batch( 
             nbUnits, X_train, Y_train, X_dev, Y_dev, 
             beta = beta, keep_prob = keep_prob,
-            num_epochs = num_epochs
+            num_epochs = num_epochs, learning_rate = learning_rate
         )
     
         # Store results
@@ -407,24 +407,26 @@ if __name__ == '__main__':
 #     tf.session(config=config)
     
     ## Units of layers
-    #nbUnits = [ 50, 24, 12, 1 ]
-    #learning_rate = 0.0001
-    #num_epochs = 1000
+    nbUnits = [ 50, 24, 12, 1 ]
+    learning_rate = 0.0001
+    num_epochs = 1000
     # Result from tuning
-    #beta = 0
-    #keep_prob = 1
+    beta = 0
+    keep_prob = 1
+    learning_rate = 0.0001
+    num_epochs = 1000
     
     #nbUnits = [ 100, 48, 1 ]
     # Result from tuning
     #beta = 1.6980624617370184e-15
     #keep_prob = 0.724123179663981
     
-    nbUnits = [ 25, 12, 1 ]
-    # Result from tuning
-    beta = 6.531654400821318e-14
-    keep_prob = 0.8213956561201344
-    learning_rate = 0.0001
-    num_epochs = 1500
+#     nbUnits = [ 25, 12, 1 ]
+#     # Result from tuning
+#     beta = 6.531654400821318e-14
+#     keep_prob = 0.8213956561201344
+#     learning_rate = 0.0001
+#     num_epochs = 1500
   
     # Loading the dataset
     X_train_orig, Y_train_orig, X_dev_orig, Y_dev_orig = load_dataset()
@@ -450,11 +452,11 @@ if __name__ == '__main__':
     print( "Units:")
     print( nbUnits )
     
-    #tuning( num_epochs = 1000 )
+    tuning( num_epochs = num_epochs, learning_rate = learning_rate )
     
-    model( 
-        nbUnits, X_train, Y_train, X_dev, Y_dev, 
-        beta = beta, keep_prob = keep_prob,
-        num_epochs = num_epochs, learning_rate = learning_rate
-    )
+#     model( 
+#         nbUnits, X_train, Y_train, X_dev, Y_dev, 
+#         beta = beta, keep_prob = keep_prob,
+#         num_epochs = num_epochs, learning_rate = learning_rate
+#     )
     
