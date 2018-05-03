@@ -26,10 +26,10 @@ from PIL import Image
 import h5py
 import numpy as np
 
-import wget
+#import wget
 import shutil
 
-from apiclient.discovery import build
+#from apiclient.discovery import build
 
 from argparse import ArgumentParser
 from argparse import RawDescriptionHelpFormatter
@@ -120,11 +120,19 @@ def getGoogleImageData():
 def transformImages( fromDir, toDir ):
     
     # get files
-    files = glob.glob( fromDir + '/cats/**/*.*', recursive=True)
+    files = glob.glob( fromDir + '/**/*.*', recursive=True)
     
     for oriImgFile in files:
         # Copy from image
-        toFile = toDir + "/cats/" + os.path.basename( oriImgFile )
+        # remove fromDir prefix
+        toFilePrefix = oriImgFile[ len( fromDir ) + 1 : ]
+        toFile = toDir + "/" + toFilePrefix
+        
+        ## Make target dir
+        toFileDir = os.path.dirname( toFile )
+        if ( not os.path.exists( toFileDir ) ) :
+            os.makedirs( toFileDir, exist_ok = True )
+            
         shutil.copyfile( oriImgFile, toFile )
         
         ## Load image 
@@ -133,33 +141,20 @@ def transformImages( fromDir, toDir ):
         flippedImage = img.transpose( Image.FLIP_LEFT_RIGHT )
         
         ## save it
-        toFlippedImage = toDir + "/cats/flipped-" + os.path.basename( oriImgFile ) + ".png"
+        toFlippedImage = toDir + "/" + toFilePrefix + "-flipped.png"
         flippedImage.save( toFlippedImage, 'png' )
         
-    files = glob.glob( fromDir + '/cats/**/*.*', recursive=True)
-    
-    files = glob.glob( fromDir + '/non-cats/**/*.*', recursive=True)
-    for oriImgFile in files:
-        # Copy from image
-        toFile = toDir + "/non-cats/" + os.path.basename( oriImgFile )
-        shutil.copyfile( oriImgFile, toFile )
-        
-        ## Load image 
-        img = Image.open( oriImgFile )
-        ## Flip verticaly image
-        flippedImage = img.transpose( Image.FLIP_LEFT_RIGHT )
-        
-        ## save it
-        toFlippedImage = toDir + "/non-cats/flipped-" + os.path.basename( oriImgFile ) + ".png"
-        flippedImage.save( toFlippedImage, 'png' )
 
 # Create dev and test sets
 
-def buildDataSet( baseDir, files, iStart, iEnd, outFileName ):
+def buildDataSet( dataDir, baseDir, files, iStart, iEnd, outFileName ):
     # images list
     imagesList = []
-# Y : cat or non-cat
-    Y = []
+# y : cat or non-cat
+    y = []
+# tags of images
+    tag = []
+    
 # From first image to dev test set percentage of full list
 #for i in range( iEndTestSet ):
     for i in range( iStart, iEnd ):
@@ -167,9 +162,15 @@ def buildDataSet( baseDir, files, iStart, iEnd, outFileName ):
         curImage = files[i]
         # get rid of basedir
         relCurImage = curImage[len(baseDir) + 1:]
-        # Cat?
         relCurImage = relCurImage.replace( '\\', '/' )
-        isCat = relCurImage.startswith("cats/")
+        relCurImageSegments = relCurImage.split( "/" )
+        
+        # Cat?
+        isCat = relCurImageSegments[ 0 ] == "cats"
+        
+        # tag
+        _tag = relCurImageSegments[ 1 ]
+        
         # load image
         img = Image.open(curImage)
         # Resize image
@@ -182,23 +183,28 @@ def buildDataSet( baseDir, files, iStart, iEnd, outFileName ):
             print("It's not a (NxNx3) image.")
         else:
             imagesList.append( pix )
-            Y.append( isCat ) # Image will be saved
+            y.append( isCat )                       # Image will be saved
+            tag.append( np.string_( _tag ) )    # Label of image
     
 # Store as binary stuff
-    absOutFile = "C:/Users/fran/eclipse-workspace/chats/data/prepared/" + outFileName
+    preparedDir = dataDir + "/prepared"
+    os.makedirs( preparedDir, exist_ok = True )
+    absOutFile = preparedDir + "/" + outFileName
     with h5py.File( absOutFile, "w") as dataset:
-        dataset["x"] = imagesList
-        dataset["y"] = Y
+        dataset["x"]        = imagesList
+        dataset["y"]        = y
+        dataset["tag"]      = tag
 
 def createTrainAndDevSets():
     
-    dataDir = "C:/Users/fran/eclipse-workspace/chats/data"
+    # current dir for data
+    dataDir = os.getcwd().replace( "\\", "/" )
+    
     # Base dir for cats and not cats images
     baseDir = dataDir + "/images"
     
-    transformedDir = dataDir + "/transformed"
-    
     ## transform images
+    transformedDir = dataDir + "/transformed"
     #transformImages( baseDir, transformedDir )
     
     # get files
@@ -211,11 +217,11 @@ def createTrainAndDevSets():
     iEndTrainingSet = int( len( files ) * TRAINING_TEST_SET_PC );
     
     print( "Build TRAINING data set" )
-    buildDataSet( transformedDir, files, 0, iEndTrainingSet, "train_signs.h5" )
+    buildDataSet( dataDir, transformedDir, files, 0, iEndTrainingSet, "train_signs.h5" )
     
     ## Build DEV data set
     buildDataSet( \
-        transformedDir, files, \
+        dataDir, transformedDir, files, \
         iEndTrainingSet + 1, len( files ) - 1, \
         "dev_signs.h5" \
     )

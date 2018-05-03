@@ -7,6 +7,7 @@ Created on 27 avr. 2018
 import h5py
 import os
 import numpy as np
+import sys
 
 from chats_utils import load_dataset
 
@@ -71,16 +72,20 @@ def backward_propagation( X, A, Y, m, learning_rate, parameters ):
     parameters[ "b" ] = b
     
     
-def compute_cost( A, Y, m ):
+def compute_cost( A, Y, WEIGHT, m ):
     
     LOGPROBS = - ( np.log( A ) * Y + np.log( 1- A ) * ( 1 - Y ) )
     
-    cost = 1./m * np.sum( LOGPROBS )
+    # Prise en compte des poids par image
+    cost = 1./m * np.sum( LOGPROBS * WEIGHT )
+    
     return cost
 
 
 def predict( X, Y, m, parameters, X_orig, errorsDir ):
     
+    os.makedirs( errorsDir, exist_ok = True )
+
     A = forward_propagation( X, parameters )
     
     # Transform to binary
@@ -98,9 +103,14 @@ def predict( X, Y, m, parameters, X_orig, errorsDir ):
         file_path = os.path.join( errorsDir, the_file )
         try:
             if os.path.isfile(file_path):
-                os.remove( file_path )
+                os.unlink( file_path )
         except Exception as e:
             print(e)
+    
+    # check delete
+    if ( len( os.listdir( errorsDir ) ) != 0 ) :
+        print( "Dir", errorsDir, "not empty." )
+        sys.exit( 1 )
         
     # Extract errors
     for i in range( 0, errors.shape[ 1 ] - 1 ): 
@@ -116,7 +126,7 @@ def predict( X, Y, m, parameters, X_orig, errorsDir ):
     return exactPc
 
 def model( 
-    X_train, Y_train, X_dev, Y_dev, 
+    X_train, Y_train, WEIGHT_train, X_dev, Y_dev, WEIGHT_dev,  
     learning_rate = 0.005, nbGradientDescent = 10000,
     print_cost = True, show_plot = True):
     
@@ -128,7 +138,7 @@ def model(
 
     # Forward propagation
     A = forward_propagation( X_train, parameters )
-    cost = compute_cost( A, Y_train, m )
+    cost = compute_cost( A, Y_train, WEIGHT_train, m )
     
     # Run gradient descent
     for i in range( nbGradientDescent ):
@@ -141,7 +151,7 @@ def model(
         
         # new forward prop and cost
         A = forward_propagation( X_train, parameters )
-        cost = compute_cost( A, Y_train, m )
+        cost = compute_cost( A, Y_train, WEIGHT_train, m )
         
         if print_cost == True and ( ( i % 100 ) == 0 ):
             costs.append( cost )
@@ -158,10 +168,12 @@ def model(
         plt.show()
 
     # Predictions
-    exactTrainPc = predict( X_train, Y_train, m, parameters, X_train_orig, "C:/temp/train-errors" )
+    errorDirTrain = os.getcwd().replace( "\\", "/" ) + "/errors/train"
+    exactTrainPc = predict( X_train, Y_train, m, parameters, X_train_orig, errorDirTrain )
     print( "Training accuracy :", str( exactTrainPc ) )
 
-    exactDevPc = predict( X_dev, Y_dev, m, parameters, X_dev_orig, "C:/temp/dev-errors" )
+    errorDirDev = os.getcwd().replace( "\\", "/" ) + "/errors/dev"
+    exactDevPc = predict( X_dev, Y_dev, m, parameters, X_dev_orig, errorDirDev )
     print( "Dev accuracy      :", str( exactDevPc ) )
 
         
@@ -171,7 +183,9 @@ if __name__ == '__main__':
     np.random.seed( 1 )
     
     # Loading the dataset
-    X_train_orig, Y_train_orig, X_dev_orig, Y_dev_orig = load_dataset()
+    X_train_orig, Y_train_orig, WEIGHT_train_orig, \
+    X_dev_orig  , Y_dev_orig,   WEIGHT_dev_orig =  \
+        load_dataset()
 
     # Flatten the training and test images :de (476,64,64,3) � ( 12288, 476 ) = ( 64*64*3, 476 )
     X_train_flatten = X_train_orig.reshape( X_train_orig.shape[0], -1 ).T
@@ -194,9 +208,10 @@ if __name__ == '__main__':
     print ( "Y_test shape : " + str( Y_dev.shape ) )
     
     parameters = model( 
-        X_train, Y_train, X_dev, Y_dev,
-        learning_rate = 0.003
-        #nbGradientDescent = 1000, 
+        X_train, Y_train, WEIGHT_train_orig,
+        X_dev,   Y_dev,   WEIGHT_dev_orig,
+        learning_rate = 0.003,
+        #nbGradientDescent = 100, 
         #show_plot = False
     )
 

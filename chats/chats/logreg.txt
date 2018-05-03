@@ -1,0 +1,118 @@
+Metrixs Logistic Regression:
+
+Data set:
+
+number of training examples = 1993
+number of dev examples      = 497
+X_train shape: (12288, 1993)
+Y_train shape: (1, 1993)
+X_test shape : (12288, 497)
+Y_test shape : (1, 497)
+
+learning_rate = 0.003
+nbGradientDescent = 10000
+
+Cost after iteration 0: 0.6931471805599453
+Cost after iteration 100: 0.85388637914057
+Cost after iteration 200: 0.8105209218775281
+Cost after iteration 300: 0.7791808640912911
+Cost after iteration 400: 0.7540033990819159
+Cost after iteration 500: 0.7327732630049419
+Cost after iteration 600: 0.7142663948975048
+Cost after iteration 700: 0.6977312898924226
+Cost after iteration 800: 0.6826789778006198
+Cost after iteration 900: 0.6687783138105952
+Cost after iteration 1000: 0.6557980483115183
+Cost after iteration 1100: 0.6435724351151005
+Cost after iteration 1200: 0.631979798268786
+Cost after iteration 1300: 0.620928730145147
+Cost after iteration 1400: 0.6103490005241
+Cost after iteration 1500: 0.6001854670280447
+Cost after iteration 1600: 0.5903939384351607
+Cost after iteration 1700: 0.5809383275950702
+Cost after iteration 1800: 0.5717886657214754
+Cost after iteration 1900: 0.5629196978467668
+Cost after iteration 2000: 0.5543098744106146
+Cost after iteration 2100: 0.5459406160732398
+Cost after iteration 2200: 0.5377957698578009
+Cost after iteration 2300: 0.5298612021525622
+Cost after iteration 2400: 0.5221244928325846
+Cost after iteration 2500: 0.5145747081330605
+Cost after iteration 2600: 0.5072022404416395
+Cost after iteration 2700: 0.49999871320493033
+Cost after iteration 2800: 0.4929569616117875
+Cost after iteration 2900: 0.48607111965720606
+Cost after iteration 3000: 0.4793368820158862
+Cost after iteration 3100: 0.4727520887743808
+Cost after iteration 3200: 0.4663179610600239
+Cost after iteration 3300: 0.46004174536280845
+Cost after iteration 3400: 0.45394258510232627
+Cost after iteration 3500: 0.448064988314526
+Cost after iteration 3600: 0.4425090141145909
+Cost after iteration 3700: 0.43748330762571713
+Cost after iteration 3800: 0.43330595563489255
+Cost after iteration 3900: 0.43008978771023376
+Cost after iteration 4000: 0.4274192978567869
+Cost after iteration 4100: 0.42489351931174
+Cost after iteration 4200: 0.42241665517461274
+Cost after iteration 4300: 0.4199806288665604
+Cost after iteration 4400: 0.41758384772398
+Cost after iteration 4500: 0.41522497795825375
+Cost after iteration 4600: 0.4129027841442429
+Cost after iteration 4700: 0.4106161112535628
+Cost after iteration 4800: 0.40836387281228026
+Cost after iteration 4900: 0.4061450422364473
+Cost after iteration 5000: 0.4039586462147988
+Cost after iteration 5100: 0.40180375947618546
+Cost after iteration 5200: 0.3996795005313479
+Cost after iteration 5300: 0.39758502812324903
+Cost after iteration 5400: 0.39551953820745794
+Cost after iteration 5500: 0.3934822613390561
+Cost after iteration 5600: 0.39147246037844163
+Cost after iteration 5700: 0.3894894284525228
+Cost after iteration 5800: 0.3875324871244083
+Cost after iteration 5900: 0.38560098473634213
+Cost after iteration 6000: 0.38369429489894563
+Cost after iteration 6100: 0.3818118151058323
+Cost after iteration 6200: 0.3799529654570643
+Cost after iteration 6300: 0.3781171874781885
+Cost after iteration 6400: 0.3763039430240354
+Cost after iteration 6500: 0.374512713258339
+Cost after iteration 6600: 0.3727429977016661
+Cost after iteration 6700: 0.3709943133412706
+Cost after iteration 6800: 0.36926619379737646
+Cost after iteration 6900: 0.3675581885411065
+Cost after iteration 7000: 0.3658698621598549
+Cost after iteration 7100: 0.36420079366638275
+Cost after iteration 7200: 0.3625505758483131
+Cost after iteration 7300: 0.3609188146550441
+Cost after iteration 7400: 0.35930512861938796
+Cost after iteration 7500: 0.35770914831149075
+Cost after iteration 7600: 0.35613051582281346
+Cost after iteration 7700: 0.3545688842781368
+Cost after iteration 7800: 0.3530239173737349
+Cost after iteration 7900: 0.3514952889400012
+Cost after iteration 8000: 0.34998268252695675
+Cost after iteration 8100: 0.348485791011187
+Cost after iteration 8200: 0.3470043162228652
+Cost after iteration 8300: 0.3455379685916207
+Cost after iteration 8400: 0.3440864668101036
+Cost after iteration 8500: 0.3426495375141748
+Cost after iteration 8600: 0.34122691497873403
+Cost after iteration 8700: 0.33981834082826
+Cost after iteration 8800: 0.3384235637612081
+Cost after iteration 8900: 0.3370423392874636
+Cost after iteration 9000: 0.3356744294781068
+Cost after iteration 9100: 0.3343196027267931
+Cost after iteration 9200: 0.33297763352209947
+Cost after iteration 9300: 0.3316483022302291
+Cost after iteration 9400: 0.33033139488750835
+Cost after iteration 9500: 0.3290267030021404
+Cost after iteration 9600: 0.3277340233647228
+Cost after iteration 9700: 0.3264531578670582
+Cost after iteration 9800: 0.32518391332882246
+Cost after iteration 9900: 0.3239261013316788
+
+Final cost: 0.3226795380604533
+Training accuracy : 0.9152032112393377
+Dev accuracy      : 0.676056338028169
