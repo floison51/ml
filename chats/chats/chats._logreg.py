@@ -50,15 +50,15 @@ def forward_propagation( X, parameters ):
     
     return A;
 
-def backward_propagation( X, A, Y, m, learning_rate, parameters ):
+def backward_propagation( X, A, Y, WEIGHT, m, learning_rate, parameters ):
     
     # get parameters
     W = parameters[ "W" ]
     b = parameters[ "b"]
     
     # Derivate by W
-    dZ = A - Y
-    dW = 1. / m * np.dot( X, dZ.T )
+    dZ = ( A - Y ) * WEIGHT
+    dW = 1. / m * np.dot( X, dZ.T ) 
     
     # derivate by b
     db = 1. / m * np.sum( dZ )
@@ -74,10 +74,13 @@ def backward_propagation( X, A, Y, m, learning_rate, parameters ):
     
 def compute_cost( A, Y, WEIGHT, m ):
     
-    LOGPROBS = - ( np.log( A ) * Y + np.log( 1- A ) * ( 1 - Y ) )
+    #if ( WEIGHT == None ) :
+    #    LOGPROBS = - ( np.log( A ) * Y + np.log( 1- A ) * ( 1 - Y ) )
+    #else :
+        # Prise en compte des poids par image
+    LOGPROBS = - ( np.log( A ) * Y + np.log( 1- A ) * ( 1 - Y ) ) * WEIGHT
     
-    # Prise en compte des poids par image
-    cost = 1./m * np.sum( LOGPROBS * WEIGHT )
+    cost = 1./m * np.sum( LOGPROBS ) 
     
     return cost
 
@@ -89,14 +92,14 @@ def predict( X, Y, m, parameters, X_orig, errorsDir ):
     A = forward_propagation( X, parameters )
     
     # Transform to binary
-    Y_predict = ( A >= 0.5 ).astype(int)
+    Y_predict = ( A >= 0.5 ).astype( int)
     
     # XOR : count errors
-    errors = np.logical_xor( Y_predict, Y ).astype(int)
-    nbErrors = np.sum( errors )
+    oks = np.equal( Y_predict, Y ).astype(int)
+    nbOks = np.sum( oks )
     
     # percentage
-    exactPc = 1 - nbErrors / Y.shape[ 1 ]
+    exactPc = nbOks / Y.shape[ 1 ]
     
     # Delete files in error dir
     for the_file in os.listdir( errorsDir ):
@@ -107,15 +110,15 @@ def predict( X, Y, m, parameters, X_orig, errorsDir ):
         except Exception as e:
             print(e)
     
-    # check delete
+    # check deleted
     if ( len( os.listdir( errorsDir ) ) != 0 ) :
         print( "Dir", errorsDir, "not empty." )
         sys.exit( 1 )
         
     # Extract errors
-    for i in range( 0, errors.shape[ 1 ] - 1 ): 
+    for i in range( 0, oks.shape[ 1 ] ): 
         # Is an error?
-        if ( errors[ 0, i ] ) :
+        if ( not oks[ 0, i ] ) :
             # extract image
             X_errorImg = X_orig[ i ]
             errorImg = Image.fromarray( X_errorImg, 'RGB' )
@@ -126,7 +129,8 @@ def predict( X, Y, m, parameters, X_orig, errorsDir ):
     return exactPc
 
 def model( 
-    X_train, Y_train, WEIGHT_train, X_dev, Y_dev, WEIGHT_dev,  
+    X_train, Y_train, WEIGHT_train, 
+    X_dev, Y_dev, 
     learning_rate = 0.005, nbGradientDescent = 10000,
     print_cost = True, show_plot = True):
     
@@ -147,7 +151,7 @@ def model(
             print( "Cost after iteration " + str( i ) + ": " + str( cost ) )
             
         # backward propagation
-        backward_propagation( X_train, A, Y_train, m, learning_rate, parameters )
+        backward_propagation( X_train, A, Y_train, WEIGHT_train, m, learning_rate, parameters )
         
         # new forward prop and cost
         A = forward_propagation( X_train, parameters )
@@ -182,10 +186,12 @@ if __name__ == '__main__':
     ## Make randpm repeatable    
     np.random.seed( 1 )
     
+    isLoadWeights = False
+    
     # Loading the dataset
-    X_train_orig, Y_train_orig, WEIGHT_train_orig, \
-    X_dev_orig  , Y_dev_orig,   WEIGHT_dev_orig =  \
-        load_dataset()
+    X_train_orig, Y_train_orig, WEIGHT_train, \
+    X_dev_orig  , Y_dev_orig =  \
+        load_dataset( isLoadWeights )
 
     # Flatten the training and test images :de (476,64,64,3) � ( 12288, 476 ) = ( 64*64*3, 476 )
     X_train_flatten = X_train_orig.reshape( X_train_orig.shape[0], -1 ).T
@@ -202,14 +208,17 @@ if __name__ == '__main__':
     
     print ( "number of training examples = " + str( X_train.shape[1] ) )
     print ( "number of dev examples      = " + str( X_dev.shape[1] ) )
-    print ( "X_train shape: " + str( X_train.shape ) )
-    print ( "Y_train shape: " + str( Y_train.shape ) )
-    print ( "X_test shape : " + str( X_dev.shape ) )
-    print ( "Y_test shape : " + str( Y_dev.shape ) )
+    print ( "X_train shape:", str( X_train.shape ) )
+    print ( "Y_train shape:", str( Y_train.shape ) )
+    print ( "X_test shape :", str( X_dev.shape ) )
+    print ( "Y_test shape :", str( Y_dev.shape ) )
+    print ( "isLoadWeights:", isLoadWeights )
+    if ( isLoadWeights ) :
+        print ( "Weights_train shape :", WEIGHT_train.shape )
     
     parameters = model( 
-        X_train, Y_train, WEIGHT_train_orig,
-        X_dev,   Y_dev,   WEIGHT_dev_orig,
+        X_train, Y_train, WEIGHT_train,
+        X_dev,   Y_dev,
         learning_rate = 0.003,
         #nbGradientDescent = 100, 
         #show_plot = False

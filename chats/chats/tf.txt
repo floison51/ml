@@ -1,0 +1,29 @@
+Metrixs Tensorflow Logistic Regression:
+
+Data set:
+
+number of training examples = 1993
+number of dev examples      = 497
+X_train shape: (12288, 1993)
+Y_train shape: (1, 1993)
+X_test shape : (12288, 497)
+Y_test shape : (1, 497)
+
+
+## Test avec jeu réduit
+number of training examples = 497
+number of test examples = 1993
+X_train shape: (12288, 497)
+Y_train shape: (1, 497)
+X_test shape: (12288, 1993)
+Y_test shape: (1, 1993)
+isLoadWeights: False
+Units:
+[1]
+Train Accuracy: 1.0
+Dev Accuracy: 0.58203715
+
+## Avec poids
+Chiens et loups : 100
+Train Accuracy: 1.0
+Dev Accuracy: 0.58203715

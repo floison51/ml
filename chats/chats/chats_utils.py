@@ -13,7 +13,7 @@ import sys
 
 from PIL import Image
 
-def load_dataset():
+def load_dataset( isLoadWeights ):
 
     # Base dir for cats and not cats images
     baseDir = os.getcwd()
@@ -21,31 +21,38 @@ def load_dataset():
     train_dataset = h5py.File( baseDir + '/data/prepared/train_signs.h5', "r")
     train_set_x_orig = np.array(train_dataset["x"][:]) # your train set features
     train_set_y_orig = np.array(train_dataset["y"][:]) # your train set labels
-    train_set_tag_orig = np.array(train_dataset["tag"][:]) # images tags
 
     dev_dataset = h5py.File( baseDir + '/data/prepared/dev_signs.h5', "r")
     dev_set_x_orig = np.array( dev_dataset["x"][:] ) # your test set features
     dev_set_y_orig = np.array( dev_dataset["y"][:] ) # your test set labels
-    dev_set_tag_orig = np.array(dev_dataset["tag"][:]) # images tags
 
+    train_set_x = train_set_x_orig
+    dev_set_x   = dev_set_x_orig
+    
     # passer de (476,) (risque) a  (1,476)
-    train_set_y_orig = train_set_y_orig.reshape((1, train_set_y_orig.shape[0]))
-    dev_set_y_orig   = dev_set_y_orig.reshape((1, dev_set_y_orig.shape[0]))
-
-    train_set_tag_orig = train_set_tag_orig.reshape((1, train_set_tag_orig.shape[0]))
-    dev_set_tag_orig   = dev_set_tag_orig.reshape((1, dev_set_tag_orig.shape[0]))
+    train_set_y = train_set_y_orig.reshape((1, train_set_y_orig.shape[0]))
+    dev_set_y   = dev_set_y_orig.reshape((1, dev_set_y_orig.shape[0]))
 
     ## replace Boolean by (1,0) values
-    train_set_y_orig = train_set_y_orig.astype( int )
-    dev_set_y_orig   = dev_set_y_orig.astype( int )
+    train_set_y = train_set_y.astype( int )
+    dev_set_y   = dev_set_y.astype( int )
 
-    ## Convert tags to weights
-    train_set_weight_orig = getWeights( train_set_tag_orig )
-    dev_set_weight_orig   = getWeights( dev_set_tag_orig )
+    # Image tags
+    # Default weight is 1 (int)
+    # If weight is loaded, it is a (1,mx)
+    train_set_weight = 1
+    
+    if isLoadWeights :
+    
+        train_set_tag_orig = np.array(train_dataset["tag"][:]) # images tags
+        # passer de (476,) (risque) a  (1,476)
+        train_set_tag      = train_set_tag_orig.reshape((1, train_set_tag_orig.shape[0]))
+        ## Convert tags to weights
+        train_set_weight   = getWeights( train_set_tag )
 
     return \
-       train_set_x_orig, train_set_y_orig, train_set_weight_orig, \
-       dev_set_x_orig  , dev_set_y_orig  , dev_set_weight_orig
+       train_set_x, train_set_y, train_set_weight, \
+       dev_set_x  , dev_set_y
 
 def getWeights( tags ):
     

@@ -124,7 +124,7 @@ def forward_propagation( X, parameters, nbUnits, n_x, KEEP_PROB ):
     # For last layer (output layer): no dropout and return only Z    
     return Z
 
-def compute_cost( Z_last, Y, beta, parameters, nbUnits, n_x ):
+def compute_cost( Z_last, Y, WEIGHT, beta, parameters, nbUnits, n_x ):
     """
     Computes the cost
     
@@ -143,9 +143,15 @@ def compute_cost( Z_last, Y, beta, parameters, nbUnits, n_x ):
     # to fit the tensorflow requirement for tf.nn.softmax_cross_entropy_with_logits(...,...)
     logits = tf.transpose( Z_last )
     labels = tf.transpose( Y )
+    pos_weight = tf.transpose( WEIGHT )
     
-    ### START CODE HERE ### (1 line of code)
-    raw_cost = tf.reduce_mean( tf.nn.sigmoid_cross_entropy_with_logits(logits = logits, labels = labels))
+    raw_cost1 = tf.nn.sigmoid_cross_entropy_with_logits(logits = logits, labels = labels )
+    raw_cost  = tf.multiply( raw_cost1, pos_weight )
+
+    # Use image weights to reduce false positives 
+#     raw_cost = tf.reduce_mean( 
+#         tf.nn.weighted_cross_entropy_with_logits(logits = logits, targets = labels, pos_weight = WEIGHT )
+#     )
     
     # Loss function using L2 Regularization
     regularizer = None
@@ -168,7 +174,8 @@ def compute_cost( Z_last, Y, beta, parameters, nbUnits, n_x ):
     return cost
 
 def model( 
-    nbUnits, X_train, Y_train, X_dev, Y_dev, 
+    nbUnits, X_train, Y_train, WEIGHT_train, 
+    X_dev, Y_dev, 
     learning_rate = 0.0001, beta = 0, keep_prob = [1,1,1],
     num_epochs = 1900, minibatch_size = 32, 
     print_cost = True, show_plot = True, extractImageErrors = True
@@ -214,7 +221,7 @@ def model(
     
     # Cost function: Add cost function to tensorflow graph
     ### START CODE HERE ### (1 line)
-    cost = compute_cost( Z_last, Y, beta, parameters, nbUnits, n_x )
+    cost = compute_cost( Z_last, Y, WEIGHT_train, beta, parameters, nbUnits, n_x )
     ### END CODE HERE ###
     
     # Backpropagation: Define the tensorflow optimizer. Use an AdamOptimizer.
@@ -289,28 +296,31 @@ def model(
         if ( extractImageErrors ) :
             
             # Dump bad images
+            errorDirTrain = os.getcwd().replace( "\\", "/" ) + "/errors/train"
             dumpBadImages( 
                 correct_prediction.eval( {X: X_train, Y: Y_train, KEEP_PROB: 1 } ),
                 X_train_orig,
-                "C:/temp/train-tf-errors"
+                errorDirTrain
             )
+            
+            errorDirDev = os.getcwd().replace( "\\", "/" ) + "/errors/dev"
             dumpBadImages( 
                 correct_prediction.eval( {X: X_dev, Y: Y_dev, KEEP_PROB: 1 } ),
                 X_dev_orig,
-                "C:/temp/dev-tf-errors"
+                errorDirDev
             )
         
         # Serialize parameters        
-        paramsFileName = "saved/params-Beta" + str( beta ) + "-keepProb"  + str( keep_prob )+ ".bin"
-        print( "Serialize parameters to " + paramsFileName )
-        
-        with open( paramsFileName, "wb" ) as fpOut:
-            for key, value in parameters.items():
-                # Key
-                bKey = bytearray( key, "UTF-8" )
-                fpOut.write( bKey )
-                # Array
-                np.save( fpOut, value )
+#         paramsFileName = "saved/params-Beta" + str( beta ) + "-keepProb"  + str( keep_prob )+ ".bin"
+#         print( "Serialize parameters to " + paramsFileName )
+#         
+#         with open( paramsFileName, "wb" ) as fpOut:
+#             for key, value in parameters.items():
+#                 # Key
+#                 bKey = bytearray( key, "UTF-8" )
+#                 fpOut.write( bKey )
+#                 # Array
+#                 np.save( fpOut, value )
     
     
         return parameters, accuracyDev, accuracyTrain
@@ -405,16 +415,24 @@ if __name__ == '__main__':
 #     config.intra_op_parallelism_threads = 16
 #     config.inter_op_parallelism_threads = 16
 #     tf.session(config=config)
-    
+
     ## Units of layers
-    nbUnits = [ 50, 24, 12, 1 ]
-    learning_rate = 0.0001
-    num_epochs = 1000
+    nbUnits = [ 1 ]
+    num_epochs = 1500
+    isLoadWeights = True
+
     # Result from tuning
     beta = 0
     keep_prob = 1
     learning_rate = 0.0001
-    num_epochs = 1000
+    
+    ## Units of layers
+#     nbUnits = [ 50, 24, 12, 1 ]
+#     num_epochs = 1000
+#     # Result from tuning
+#     beta = 0
+#     keep_prob = 1
+#     learning_rate = 0.0001
     
     #nbUnits = [ 100, 48, 1 ]
     # Result from tuning
@@ -429,7 +447,9 @@ if __name__ == '__main__':
 #     num_epochs = 1500
   
     # Loading the dataset
-    X_train_orig, Y_train_orig, X_dev_orig, Y_dev_orig = load_dataset()
+    X_train_orig, Y_train_orig, WEIGHT_train, \
+    X_dev_orig  , Y_dev_orig = \
+        load_dataset( isLoadWeights )
 
     # Flatten the training and test images
     X_train_flatten = X_train_orig.reshape(X_train_orig.shape[0], -1).T
@@ -447,16 +467,21 @@ if __name__ == '__main__':
     print ("Y_train shape: " + str(Y_train.shape))
     print ("X_test shape: " + str(X_dev.shape))
     print ("Y_test shape: " + str(Y_dev.shape))
+    print ( "isLoadWeights:", isLoadWeights )
+    if ( isLoadWeights ) :
+        print ( "Weights_train shape :", WEIGHT_train.shape )
     
     # Run model
     print( "Units:")
     print( nbUnits )
     
-    tuning( num_epochs = num_epochs, learning_rate = learning_rate )
+#    tuning( num_epochs = num_epochs, learning_rate = learning_rate )
     
-#     model( 
-#         nbUnits, X_train, Y_train, X_dev, Y_dev, 
-#         beta = beta, keep_prob = keep_prob,
-#         num_epochs = num_epochs, learning_rate = learning_rate
-#     )
+    model( 
+        nbUnits, 
+        X_train, Y_train, WEIGHT_train,
+        X_dev, Y_dev, 
+        beta = beta, keep_prob = keep_prob,
+        num_epochs = num_epochs, learning_rate = learning_rate
+    )
     

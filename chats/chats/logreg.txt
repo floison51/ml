@@ -116,3 +116,21 @@ Cost after iteration 9900: 0.3239261013316788
 Final cost: 0.3226795380604533
 Training accuracy : 0.9152032112393377
 Dev accuracy      : 0.676056338028169
+
+## Test avec jeu réduit
+number of training examples = 497
+number of dev examples      = 1993
+X_train shape: (12288, 497)
+Y_train shape: (1, 497)
+X_test shape : (12288, 1993)
+Y_test shape : (1, 1993)
+isLoadWeights: False
+Final cost: 0.10196355982655866
+Training accuracy : 1.0
+Dev accuracy      : 0.5900652282990466
+
+## Avec poids
+Chiens et loups : 100
+Final cost: 0.13947500260183796
+Training accuracy : 0.9879275653923542
+Dev accuracy      : 0.5644756648268942
