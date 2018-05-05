@@ -20,6 +20,9 @@ import sys
 # For Jupyther notebook
 # %matplotlib inline
 
+# Tensorboard log dir
+tensorBoardLogDir = os.getcwd().replace( "\\", "/" ) + "/temp/tf-board/chats"
+
 def variable_summaries( var ):
   """Attach a lot of summaries to a Tensor (for TensorBoard visualization)."""
   with tf.name_scope('summaries'):
@@ -85,7 +88,7 @@ def initialize_parameters( nbUnits, n_x ):
     for i in range( 0, len( nbUnits0 ) - 1 ):
 
         # Adding a name scope ensures logical grouping of the layers in the graph.
-        with tf.name_scope( "Layer " + str( i+1 ) ):
+        with tf.name_scope( "Layer" + str( i+1 ) ):
             # This Variable will hold the state of the weights for the layer
             with tf.name_scope( 'weights' ):
                 W_cur = tf.get_variable( "W" + str( i + 1 ), [ nbUnits0[ i + 1 ], nbUnits0[ i ] ], initializer = tf.contrib.layers.xavier_initializer(seed = 1))
@@ -124,7 +127,7 @@ def forward_propagation( X, parameters, nbUnits, n_x, KEEP_PROB ):
 
     for i in range( 1, len( nbUnits0 ) ):
         # Adding a name scope ensures logical grouping of the layers in the graph.
-        with tf.name_scope( "Layer " + str( i ) ):
+        with tf.name_scope( "Layer" + str( i ) ):
             # apply DropOut to hidden layer
             curInput_drop_out = curInput
             if i < len( nbUnits0 ) - 1 :
@@ -142,8 +145,7 @@ def forward_propagation( X, parameters, nbUnits, n_x, KEEP_PROB ):
             ## Activation function for hidden layers
             if i < len( nbUnits0 ) - 1 :
                 A = tf.nn.relu( Z )
-
-            tf.summary.histogram( 'A', A   )
+                tf.summary.histogram( 'A', A   )
 
             ## Change cur input to A(layer)
             curInput = A
@@ -215,12 +217,44 @@ def compute_cost( Z_last, Y, WEIGHT, beta, parameters, nbUnits, n_x ):
 
     return cost
 
+def runEpoch(
+    epoch, sess, feed_dict,
+    optimizer, cost,
+    train_writer, dev_writer, mergedSummaries,
+    isTensorboard
+):
+
+    # No mini-batch
+    if ( ( epoch % 100 == 99 ) and isTensorboard ):  # Record execution stats
+        run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
+        run_metadata = tf.RunMetadata()
+        summary, _ , curCost = sess.run(
+            [mergedSummaries,optimizer,cost], feed_dict=feed_dict,
+            options=run_options,run_metadata=run_metadata
+        )
+        train_writer.add_run_metadata( run_metadata, 'step%03d' % epoch )
+        train_writer.add_summary( summary, epoch )
+    else :
+        
+        if ( isTensorboard ) :
+            #run without meta data
+            summary, _ , curCost = sess.run(
+                [mergedSummaries,optimizer,cost], feed_dict=feed_dict
+            )
+            train_writer.add_summary( summary, epoch )
+        else :
+            _ , epoch_cost = sess.run(
+                [optimizer,cost], feed_dict=feed_dict
+            )
+     
+    return curCost           
+    
 def model(
     nbUnits, X_train, Y_train, TAG_train, WEIGHT_train,
     X_dev, Y_dev, TAG_dev,
     start_learning_rate = 0.0001, beta = 0, keep_prob = [1,1,1],
     num_epochs = 1900, minibatch_size = 32,
-    print_cost = True, show_plot = True, extractImageErrors = True, tensorboard = True
+    print_cost = True, show_plot = True, extractImageErrors = True, isTensorboard = True
 ):
     """
     Implements a three-layer tensorflow neural network: LINEAR->RELU->LINEAR->RELU->LINEAR->SIGMOID.
@@ -290,17 +324,16 @@ def model(
 
     # Merge all the summaries and write them out to /tmp/mnist_logs (by default)
     mergedSummaries = tf.summary.merge_all()
-    
-    train_writer = tf.summary.FileWriter( FLAGS.summaries_dir + '/train', sess.graph )
-    dev_writer = tf.summary.FileWriter( FLAGS.summaries_dir + '/dev', sess.graph )
-
-    init = tf.global_variables_initializer()
 
     # Start the session to compute the tensorflow graph
     with tf.Session() as sess:
 
+        train_writer = tf.summary.FileWriter( tensorBoardLogDir + '/train', sess.graph )
+        dev_writer   = tf.summary.FileWriter( tensorBoardLogDir + '/dev', sess.graph )
+
         # Run the initialization
-        sess.run(init)
+        init = tf.global_variables_initializer()
+        sess.run( init )
 
         # Do the training loop
         for epoch in range( num_epochs ):
@@ -308,61 +341,50 @@ def model(
             epoch_cost = 0.                       # Defines a cost related to an epoch
 
             if ( minibatch_size < 0 ) :
-                # No mini-batch
-                summary, _ , epoch_cost = sess.run( [mergedSummaries,optimizer,cost], feed_dict={ X: X_train, Y: Y_train, KEEP_PROB: keep_prob } )
-                if tensorboard :
-                    test_writer.add_summary( summary, i )
-                    
-                if print_cost == True and epoch % 100 == 0:
-                    print ("Cost after iteration %i: %f" % (epoch, epoch_cost))
-
-                if print_cost == True and epoch % 5 == 0:
-                    costs.append(epoch_cost)
-
-                if i % 100 == 99:  # Record execution stats
-                    run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
-                    run_metadata = tf.RunMetadata()
-                    summary, _ = sess.run([merged, train_step],
-                                          feed_dict=feed_dict(True),
-                                          options=run_options,
-                                          run_metadata=run_metadata)
-                    train_writer.add_run_metadata(run_metadata, 'step%03d' % i)
-                    train_writer.add_summary(summary, i)
-                    
+                
+                # No mini-batch : do a gradient descent for whole data
+                epoch_cost = runEpoch( 
+                    epoch, sess, 
+                    { X: X_train, Y: Y_train, KEEP_PROB: keep_prob },
+                    optimizer, cost, 
+                    train_writer, dev_writer, mergedSummaries,
+                    isTensorboard
+                )
+                
             else:
                 #Minibatch mode
                 num_minibatches = int(m / minibatch_size) # number of minibatches of size minibatch_size in the train set
                 seed = seed + 1
-                minibatches = random_mini_batches(X_train, Y_train, minibatch_size, seed)
+                minibatches = random_mini_batches( X_train, Y_train, minibatch_size, seed )
 
                 for minibatch in minibatches:
 
                     # Select a minibatch
                     (minibatch_X, minibatch_Y) = minibatch
 
-                    # IMPORTANT: The line that runs the graph on a minibatch.
-                    # Run the session to execute the "optimizer" and the "cost", the feedict should contain a minibatch for (X,Y).
-                    ### START CODE HERE ### (1 line)
-                    summary,_ , minibatch_cost = sess.run( [mergedSummaries,optimizer,cost], feed_dict={ X: minibatch_X, Y: minibatch_Y, KEEP_PROB: keep_prob } )
-                    ### END CODE HERE ###
-
-                    # print( "Minibatch 0 cost:",  minibatch_cost )
-                    # sys.exit( "bye" )
+                    minibatch_cost = runEpoch( 
+                        epoch, sess,
+                        { X: minibatch_X, Y: minibatch_Y, KEEP_PROB: keep_prob }, 
+                        optimizer, cost, 
+                        train_writer, dev_writer, mergedSummaries,
+                        isTensorboard
+                    )
 
                     epoch_cost += minibatch_cost / num_minibatches
 
-                # Print the cost every epoch
-                if print_cost == True and epoch % 100 == 0:
-                    print ("Cost after epoch %i: %f" % (epoch, epoch_cost))
-                if tensorboard == True and epoch % 100 == 0:
-                    test_writer.add_summary( summary, i )
-                if print_cost == True and epoch % 5 == 0:
-                    costs.append(epoch_cost)
+            if print_cost == True and epoch % 100 == 0:
+                print ("Cost after iteration %i: %f" % (epoch, epoch_cost) )
+        
+            if print_cost == True and epoch % 5 == 0:
+                costs.append( epoch_cost )
 
         # Close tensorboard streams
         train_writer.close()
-        test_writer.close()
-        
+        dev_writer.close()
+
+        # Final cost
+        print( "Final cost:", epoch_cost )
+
         # plot the cost
         plt.plot(np.squeeze(costs))
         plt.ylabel('cost')
@@ -490,13 +512,12 @@ if __name__ == '__main__':
 
     print( "TensorFlow version:", tf.__version__ )
     # Tensorboard output dir
-    FLAGS.log_dir = "temp/tensorboard"
-    print( "TensorBoard dir:", FLAGS.log_dir )
+    print( "TensorBoard dir:", tensorBoardLogDir )
 
     # clean TF log dir
-    if tf.gfile.Exists(FLAGS.log_dir):
-        tf.gfile.DeleteRecursively(FLAGS.log_dir)
-        tf.gfile.MakeDirs(FLAGS.log_dir)
+    if tf.gfile.Exists( tensorBoardLogDir ):
+        tf.gfile.DeleteRecursively( tensorBoardLogDir )
+        tf.gfile.MakeDirs( tensorBoardLogDir )
 
     # Make sure random is predictible...
     np.random.seed( 1 )
@@ -562,6 +583,12 @@ if __name__ == '__main__':
     print ("Y_train shape: " + str(Y_train.shape))
     print ("X_test shape: " + str(X_dev.shape))
     print ("Y_test shape: " + str(Y_dev.shape))
+    print ()
+    print ("Learning rate  :", str( learning_rate ) )
+    print ("Num epoch      :", str( num_epochs ) )
+    print ("Minibatch size :", str( minibatch_size ) )
+    print ("Beta           :", str( beta ) )
+    print ("keep_prob      :", str( keep_prob ) )
     print ( "isLoadWeights:", isLoadWeights )
     if ( isLoadWeights ) :
         print ( "Weights_train shape :", WEIGHT_train.shape )
