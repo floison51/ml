@@ -20,20 +20,31 @@ import sys
 # For Jupyther notebook
 # %matplotlib inline
 
-#global var X_train_orig, Y_train_orig, X_test_orig, Y_test_orig, classes;
+def variable_summaries( var ):
+  """Attach a lot of summaries to a Tensor (for TensorBoard visualization)."""
+  with tf.name_scope('summaries'):
+    mean = tf.reduce_mean(var)
+    tf.summary.scalar('mean', mean)
+    with tf.name_scope('stddev'):
+      stddev = tf.sqrt(tf.reduce_mean(tf.square(var - mean)))
+    tf.summary.scalar('stddev', stddev)
+    tf.summary.scalar('max', tf.reduce_max(var))
+    tf.summary.scalar('min', tf.reduce_min(var))
+    tf.summary.histogram('histogram', var)
+
 
 def create_placeholders(n_x, n_y):
     """
     Creates the placeholders for the tensorflow session.
-    
+
     Arguments:
     n_x -- scalar, size of an image vector (num_px * num_px = 64 * 64 * 3 = 12288)
     n_y -- scalar, number of classes (from 0 to 5, so -> 6)
-    
+
     Returns:
     X -- placeholder for the data input, of shape [n_x, None] and dtype "float"
     Y -- placeholder for the input labels, of shape [n_y, None] and dtype "float"
-    
+
     Tips:
     - You will use None because it let's us be flexible on the number of examples you will for the placeholders.
       In fact, the number of examples during test/train is different.
@@ -44,7 +55,7 @@ def create_placeholders(n_x, n_y):
     Y = tf.placeholder( tf.float32, shape=( n_y, None ), name = "Y" )
     KEEP_PROB = tf.placeholder( tf.float32, name = "KEEP_PROB" )
     ### END CODE HERE ###
-    
+
     return X, Y, KEEP_PROB
 
 def initialize_parameters( nbUnits, n_x ):
@@ -56,33 +67,42 @@ def initialize_parameters( nbUnits, n_x ):
                         b2 : [12, 1]
                         W3 : [1, 12]
                         b3 : [1, 1]
-    
+
     Returns:
     parameters -- a dictionary of tensors containing W1, b1, W2, b2, W3, b3
     """
-    
+
     tf.set_random_seed(1)                   # so that your "random" numbers match ours
-    
+
     ## Add Level 0 : X
     # example : 12228, 100, 24, 1
     nbUnits0 = [ n_x ] + nbUnits
-    
+
     # parameters
     parameters = {}
-    
+
     # browse layers
     for i in range( 0, len( nbUnits0 ) - 1 ):
-        W_cur = tf.get_variable( "W" + str( i + 1 ), [ nbUnits0[ i + 1 ], nbUnits0[ i ] ], initializer = tf.contrib.layers.xavier_initializer(seed = 1))
-        b_cur = tf.get_variable( "b" + str( i + 1 ), [ nbUnits0[ i + 1 ], 1             ], initializer = tf.zeros_initializer())
+
+        # Adding a name scope ensures logical grouping of the layers in the graph.
+        with tf.name_scope( "Layer " + str( i+1 ) ):
+            # This Variable will hold the state of the weights for the layer
+            with tf.name_scope( 'weights' ):
+                W_cur = tf.get_variable( "W" + str( i + 1 ), [ nbUnits0[ i + 1 ], nbUnits0[ i ] ], initializer = tf.contrib.layers.xavier_initializer(seed = 1))
+                variable_summaries( W_cur )
+            with tf.name_scope( 'bias' ):
+                b_cur = tf.get_variable( "b" + str( i + 1 ), [ nbUnits0[ i + 1 ], 1             ], initializer = tf.zeros_initializer())
+                variable_summaries( b_cur )
+
         parameters[ "W" + str( i + 1 ) ] = W_cur
         parameters[ "b" + str( i + 1 ) ] = b_cur
-         
+
     return parameters
 
 def forward_propagation( X, parameters, nbUnits, n_x, KEEP_PROB ):
     """
     Implements the forward propagation for the model: LINEAR -> RELU -> LINEAR -> RELU -> LINEAR -> SOFTMAX
-    
+
     Arguments:
     X -- input dataset placeholder, of shape (input size, number of examples)
     parameters -- python dictionary containing your parameters "W1", "b1", "W2", "b2", "W3", "b3"
@@ -91,98 +111,120 @@ def forward_propagation( X, parameters, nbUnits, n_x, KEEP_PROB ):
     Returns:
     Z3 -- the output of the last LINEAR unit
     """
-    
+
     ## Add Level 0 : X
     # example : 12228, 100, 24, 1
     nbUnits0 = [ n_x ] + nbUnits
-    
-    
+
+
     Z = None
     A = None
-    
+
     curInput = X
-    
+
     for i in range( 1, len( nbUnits0 ) ):
-        # apply DropOut to hidden layer
-        curInput_drop_out = curInput
-        if i < len( nbUnits0 ) - 1 :
-            curInput_drop_out = tf.nn.dropout( curInput, KEEP_PROB )
-        
-        ## Get W and b for current layer
-        W_layer = parameters[ "W" + str( i ) ]
-        b_layer = parameters[ "b" + str( i ) ]
-        ## Linear part
-        Z = tf.add( tf.matmul( W_layer, curInput_drop_out  ), b_layer )
-        
-        ## Activation function for hidden layers
-        if i < len( nbUnits0 ) - 1 :
-            A = tf.nn.relu( Z )
-        
-        ## Change cur input to A(layer)
-        curInput = A
-        
-    # For last layer (output layer): no dropout and return only Z    
+        # Adding a name scope ensures logical grouping of the layers in the graph.
+        with tf.name_scope( "Layer " + str( i ) ):
+            # apply DropOut to hidden layer
+            curInput_drop_out = curInput
+            if i < len( nbUnits0 ) - 1 :
+                curInput_drop_out = tf.nn.dropout( curInput, KEEP_PROB )
+
+            ## Get W and b for current layer
+            W_layer = parameters[ "W" + str( i ) ]
+            b_layer = parameters[ "b" + str( i ) ]
+
+            ## Linear part
+            with tf.name_scope( 'Z' ):
+                Z = tf.add( tf.matmul( W_layer, curInput_drop_out  ), b_layer )
+                tf.summary.histogram( 'Z', Z )
+
+            ## Activation function for hidden layers
+            if i < len( nbUnits0 ) - 1 :
+                A = tf.nn.relu( Z )
+
+            tf.summary.histogram( 'A', A   )
+
+            ## Change cur input to A(layer)
+            curInput = A
+
+    # For last layer (output layer): no dropout and return only Z
     return Z
 
 def compute_cost( Z_last, Y, WEIGHT, beta, parameters, nbUnits, n_x ):
     """
     Computes the cost
-    
+
     Arguments:
     Z3 -- output of forward propagation (output of the last LINEAR unit), of shape (6, number of examples)
     Y -- "true" labels vector placeholder, same shape as Z3
-    
+
     Returns:
     cost - Tensor of the cost function
     """
-    
+
     ## Add Level 0 : X
     # example : 12228, 100, 24, 1
     nbUnits0 = [ n_x ] + nbUnits
-    
-    # to fit the tensorflow requirement for tf.nn.softmax_cross_entropy_with_logits(...,...)
-    logits = tf.transpose( Z_last )
-    labels = tf.transpose( Y )
-    pos_weight = tf.transpose( WEIGHT )
-    
-    raw_cost1 = tf.nn.sigmoid_cross_entropy_with_logits(logits = logits, labels = labels )
-    raw_cost  = tf.multiply( raw_cost1, pos_weight )
 
-    # Use image weights to reduce false positives 
-#     raw_cost = tf.reduce_mean( 
-#         tf.nn.weighted_cross_entropy_with_logits(logits = logits, targets = labels, pos_weight = WEIGHT )
-#     )
-    
-    # Loss function using L2 Regularization
-    regularizer = None
-    
-    if ( beta != 0 ) :
-        losses = []
-        for i in range( 1, len( nbUnits0 ) ) :
-            W_cur = parameters[ 'W' + str( i ) ]
-            losses.append( tf.nn.l2_loss( W_cur ) )
-            
-        regularizer = tf.add_n( losses )
-           
-    cost = None
-    
-    if ( regularizer != None ) :
-        cost = tf.reduce_mean( raw_cost + beta * regularizer )
-    else :
-        cost = tf.reduce_mean( raw_cost )
-        
+    with tf.name_scope('cross_entropy'):
+
+        # to fit the tensorflow requirement for tf.nn.softmax_cross_entropy_with_logits(...,...)
+        logits = tf.transpose( Z_last )
+        labels = tf.transpose( Y )
+
+        raw_cost = None
+
+        with tf.name_scope( 'total' ):
+            if ( WEIGHT == 1 ) :
+                raw_cost = \
+                    tf.reduce_mean(
+                        tf.nn.sigmoid_cross_entropy_with_logits( logits = logits, labels = labels
+                    )
+                )
+
+            else :
+                # Use image weights to reduce false positives
+                # pos_weight = tf.transpose( WEIGHT )
+                raw_cost = \
+                    tf.reduce_mean(
+                        tf.nn.weighted_cross_entropy_with_logits(logits = logits, targets = labels, pos_weight = WEIGHT )
+                    )
+
+            tf.summary.scalar( 'raw_cost', raw_cost)
+
+            # Loss function using L2 Regularization
+            regularizer = None
+
+            if ( beta != 0 ) :
+                losses = []
+                for i in range( 1, len( nbUnits0 ) ) :
+                    W_cur = parameters[ 'W' + str( i ) ]
+                    losses.append( tf.nn.l2_loss( W_cur ) )
+
+                regularizer = tf.add_n( losses )
+
+            cost = None
+
+            if ( regularizer != None ) :
+                cost = tf.reduce_mean( raw_cost + beta * regularizer )
+            else :
+                cost = raw_cost
+
+            tf.summary.scalar( 'cost', cost)
+
     return cost
 
-def model( 
-    nbUnits, X_train, Y_train, WEIGHT_train, 
-    X_dev, Y_dev, 
-    learning_rate = 0.0001, beta = 0, keep_prob = [1,1,1],
-    num_epochs = 1900, minibatch_size = 32, 
-    print_cost = True, show_plot = True, extractImageErrors = True
-    ):
+def model(
+    nbUnits, X_train, Y_train, TAG_train, WEIGHT_train,
+    X_dev, Y_dev, TAG_dev,
+    start_learning_rate = 0.0001, beta = 0, keep_prob = [1,1,1],
+    num_epochs = 1900, minibatch_size = 32,
+    print_cost = True, show_plot = True, extractImageErrors = True, tensorboard = True
+):
     """
     Implements a three-layer tensorflow neural network: LINEAR->RELU->LINEAR->RELU->LINEAR->SIGMOID.
-    
+
     Arguments:
     X_train -- training set, of shape (input size = 12288, number of training examples = 1080)
     Y_train -- test set, of shape (output size = 6, number of training examples = 1080)
@@ -192,18 +234,18 @@ def model(
     num_epochs -- number of epochs of the optimization loop
     minibatch_size -- size of a minibatch
     print_cost -- True to print the cost every 100 epochs
-    
+
     Returns:
     parameters -- parameters learnt by the model. They can then be used to predict.
     """
-    
+
     ops.reset_default_graph()                         # to be able to rerun the model without overwriting tf variables
     tf.set_random_seed(1)                             # to keep consistent results
     seed = 3                                          # to keep consistent results
     (n_x, m) = X_train.shape                          # (n_x: input size, m : number of examples in the train set)
     n_y = Y_train.shape[0]                            # n_y : output size
     costs = []                                        # To keep track of the cost
-    
+
     # Create Placeholders of shape (n_x, n_y)
     ### START CODE HERE ### (1 line)
     X, Y, KEEP_PROB = create_placeholders( n_x, n_y )
@@ -213,61 +255,114 @@ def model(
     ### START CODE HERE ### (1 line)
     parameters = initialize_parameters( nbUnits, n_x )
     ### END CODE HERE ###
-    
+
     # Forward propagation: Build the forward propagation in the tensorflow graph
     ### START CODE HERE ### (1 line)
     Z_last = forward_propagation( X, parameters, nbUnits, n_x, KEEP_PROB )
     ### END CODE HERE ###
-    
+
     # Cost function: Add cost function to tensorflow graph
     ### START CODE HERE ### (1 line)
     cost = compute_cost( Z_last, Y, WEIGHT_train, beta, parameters, nbUnits, n_x )
     ### END CODE HERE ###
-    
-    # Backpropagation: Define the tensorflow optimizer. Use an AdamOptimizer.
-    ### START CODE HERE ### (1 line)
+
+    # Back-propagation: Define the tensorflow optimizer. Use an AdamOptimizer.
+    # Decaying learning rate
+    global_step = tf.Variable( 0 )  # count the number of steps taken.
+    learning_rate = tf.train.exponential_decay(
+        start_learning_rate, global_step, 1000, 0.96, staircase=True
+    )
+
+    # fixed learning rate
+    learning_rate = start_learning_rate
     optimizer = tf.train.AdamOptimizer( learning_rate ).minimize( cost )
-    ### END CODE HERE ###
+
+    with tf.name_scope('accuracy'):
+        # To calculate the correct predictions
+        prediction = tf.round( tf.sigmoid( Z_last ) )
+        with tf.name_scope('correct_prediction'):
+            correct_prediction = tf.equal( prediction, Y )
+        with tf.name_scope('accuracy'):
+            # Calculate accuracy on the test set
+            accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
+
+    tf.summary.scalar('accuracy', accuracy)
+
+    # Merge all the summaries and write them out to /tmp/mnist_logs (by default)
+    mergedSummaries = tf.summary.merge_all()
     
-    # Initialize all the variables
+    train_writer = tf.summary.FileWriter( FLAGS.summaries_dir + '/train', sess.graph )
+    dev_writer = tf.summary.FileWriter( FLAGS.summaries_dir + '/dev', sess.graph )
+
     init = tf.global_variables_initializer()
 
     # Start the session to compute the tensorflow graph
     with tf.Session() as sess:
-        
+
         # Run the initialization
         sess.run(init)
-        
+
         # Do the training loop
-        for epoch in range(num_epochs):
+        for epoch in range( num_epochs ):
 
             epoch_cost = 0.                       # Defines a cost related to an epoch
-            num_minibatches = int(m / minibatch_size) # number of minibatches of size minibatch_size in the train set
-            seed = seed + 1
-            minibatches = random_mini_batches(X_train, Y_train, minibatch_size, seed)
 
-            for minibatch in minibatches:
+            if ( minibatch_size < 0 ) :
+                # No mini-batch
+                summary, _ , epoch_cost = sess.run( [mergedSummaries,optimizer,cost], feed_dict={ X: X_train, Y: Y_train, KEEP_PROB: keep_prob } )
+                if tensorboard :
+                    test_writer.add_summary( summary, i )
+                    
+                if print_cost == True and epoch % 100 == 0:
+                    print ("Cost after iteration %i: %f" % (epoch, epoch_cost))
 
-                # Select a minibatch
-                (minibatch_X, minibatch_Y) = minibatch
-                
-                # IMPORTANT: The line that runs the graph on a minibatch.
-                # Run the session to execute the "optimizer" and the "cost", the feedict should contain a minibatch for (X,Y).
-                ### START CODE HERE ### (1 line)
-                _ , minibatch_cost = sess.run( [optimizer,cost], feed_dict={ X: minibatch_X, Y: minibatch_Y, KEEP_PROB: keep_prob } )
-                ### END CODE HERE ###
-                
-                # print( "Minibatch 0 cost:",  minibatch_cost )
-                # sys.exit( "bye" )
-                
-                epoch_cost += minibatch_cost / num_minibatches
+                if print_cost == True and epoch % 5 == 0:
+                    costs.append(epoch_cost)
 
-            # Print the cost every epoch
-            if print_cost == True and epoch % 100 == 0:
-                print ("Cost after epoch %i: %f" % (epoch, epoch_cost))
-            if print_cost == True and epoch % 5 == 0:
-                costs.append(epoch_cost)
-                
+                if i % 100 == 99:  # Record execution stats
+                    run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
+                    run_metadata = tf.RunMetadata()
+                    summary, _ = sess.run([merged, train_step],
+                                          feed_dict=feed_dict(True),
+                                          options=run_options,
+                                          run_metadata=run_metadata)
+                    train_writer.add_run_metadata(run_metadata, 'step%03d' % i)
+                    train_writer.add_summary(summary, i)
+                    
+            else:
+                #Minibatch mode
+                num_minibatches = int(m / minibatch_size) # number of minibatches of size minibatch_size in the train set
+                seed = seed + 1
+                minibatches = random_mini_batches(X_train, Y_train, minibatch_size, seed)
+
+                for minibatch in minibatches:
+
+                    # Select a minibatch
+                    (minibatch_X, minibatch_Y) = minibatch
+
+                    # IMPORTANT: The line that runs the graph on a minibatch.
+                    # Run the session to execute the "optimizer" and the "cost", the feedict should contain a minibatch for (X,Y).
+                    ### START CODE HERE ### (1 line)
+                    summary,_ , minibatch_cost = sess.run( [mergedSummaries,optimizer,cost], feed_dict={ X: minibatch_X, Y: minibatch_Y, KEEP_PROB: keep_prob } )
+                    ### END CODE HERE ###
+
+                    # print( "Minibatch 0 cost:",  minibatch_cost )
+                    # sys.exit( "bye" )
+
+                    epoch_cost += minibatch_cost / num_minibatches
+
+                # Print the cost every epoch
+                if print_cost == True and epoch % 100 == 0:
+                    print ("Cost after epoch %i: %f" % (epoch, epoch_cost))
+                if tensorboard == True and epoch % 100 == 0:
+                    test_writer.add_summary( summary, i )
+                if print_cost == True and epoch % 5 == 0:
+                    costs.append(epoch_cost)
+
+        # Close tensorboard streams
+        train_writer.close()
+        test_writer.close()
+        
         # plot the cost
         plt.plot(np.squeeze(costs))
         plt.ylabel('cost')
@@ -280,40 +375,27 @@ def model(
         parameters = sess.run(parameters)
         print ("Parameters have been trained!")
 
-        # Calculate the correct predictions
-        prediction = tf.round( tf.sigmoid( Z_last ) )
-        correct_prediction = tf.equal( prediction, Y )
-
-        # Calculate accuracy on the test set
-        accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
-
         accuracyTrain = accuracy.eval({X: X_train, Y: Y_train, KEEP_PROB: 1 } )
         print ( "Train Accuracy:", accuracyTrain )
-        
+
         accuracyDev = accuracy.eval({X: X_dev, Y: Y_dev, KEEP_PROB: 1 } )
         print ( "Dev Accuracy:", accuracyDev )
 
+        ## Errors
+
         if ( extractImageErrors ) :
-            
-            # Dump bad images
-            errorDirTrain = os.getcwd().replace( "\\", "/" ) + "/errors/train"
-            dumpBadImages( 
-                correct_prediction.eval( {X: X_train, Y: Y_train, KEEP_PROB: 1 } ),
-                X_train_orig,
-                errorDirTrain
-            )
-            
-            errorDirDev = os.getcwd().replace( "\\", "/" ) + "/errors/dev"
-            dumpBadImages( 
-                correct_prediction.eval( {X: X_dev, Y: Y_dev, KEEP_PROB: 1 } ),
-                X_dev_orig,
-                errorDirDev
-            )
-        
-        # Serialize parameters        
+
+            # Lists of OK for training
+            oks_train = correct_prediction.eval( {X: X_train, Y: Y_train, KEEP_PROB: 1 } )
+            statsExtractErrors( "train", X_orig = X_train_orig, oks = oks_train, TAG = TAG_train )
+
+            oks_dev = correct_prediction.eval( {X: X_dev, Y: Y_dev, KEEP_PROB: 1 } )
+            statsExtractErrors( "dev", X_orig= X_dev_orig, oks = oks_dev, TAG = TAG_dev )
+
+        # Serialize parameters
 #         paramsFileName = "saved/params-Beta" + str( beta ) + "-keepProb"  + str( keep_prob )+ ".bin"
 #         print( "Serialize parameters to " + paramsFileName )
-#         
+#
 #         with open( paramsFileName, "wb" ) as fpOut:
 #             for key, value in parameters.items():
 #                 # Key
@@ -321,94 +403,104 @@ def model(
 #                 fpOut.write( bKey )
 #                 # Array
 #                 np.save( fpOut, value )
-    
-    
+
+
         return parameters, accuracyDev, accuracyTrain
 
-def model_batch( 
-    nbUnits, X_train, Y_train, X_test, Y_test, learning_rate = 0.0001, 
+def model_batch(
+    nbUnits, X_train, Y_train, X_test, Y_test, learning_rate = 0.0001,
     beta = 0, keep_prob = [1,1,1],
     num_epochs = 1900, minibatch_size = 32):
-    
-    return model( 
-        nbUnits, X_train, Y_train, X_test, Y_test, learning_rate, 
+
+    return model(
+        nbUnits, X_train, Y_train, X_test, Y_test, learning_rate,
         beta, keep_prob,
         num_epochs, minibatch_size, print_cost = True, show_plot = False, extractImageErrors = False
     )
-    
+
 def tuning( num_epochs, learning_rate ):
     beta_min = 0.000000000000001
     beta_max = 0.5
-    
+
     keep_prob_min = 0.5
     keep_prob_max = 1
-    
+
     # store results
     tuning = {}
-    
+
     # max accuracyDev
     maxAccuracyDev = -1;
-    
+
     maxHyperParams = {}
-    
+
     nbTuning = 20
-    
+
     for j in range( 1, nbTuning ) :
-        
+
         print( "*****************************" )
         print( "Tune round", str( j ), "/", str( nbTuning ) )
         print( "*****************************" )
-        
+
         # calculate beta
         logBeta = random.uniform( math.log10( beta_min ), math.log10( beta_max ) )
         beta = math.pow( 10, logBeta )
         print( "Beta = " + str( beta ))
-        
+
         # calculate keep_prob
         logKeep_prob = random.uniform( math.log10( keep_prob_min ), math.log10( keep_prob_max ) )
         keep_prob = math.pow( 10, logKeep_prob )
         print( "keep_prob = " + str( keep_prob ))
-        
-        _, accuracyDev, accuracyTrain = model_batch( 
-            nbUnits, X_train, Y_train, X_dev, Y_dev, 
+
+        _, accuracyDev, accuracyTrain = model_batch(
+            nbUnits, X_train, Y_train, X_dev, Y_dev,
             beta = beta, keep_prob = keep_prob,
             num_epochs = num_epochs, learning_rate = learning_rate
         )
-    
+
         # Store results
-        tuning[ j ] = { 
-            "beta": beta, "keep_prob": keep_prob, 
+        tuning[ j ] = {
+            "beta": beta, "keep_prob": keep_prob,
             "accuracyDev": accuracyDev, "accuracyTrain": accuracyTrain
         }
-    
+
         # Max
         if ( accuracyDev > maxAccuracyDev ) :
             maxAccuracyDev = accuracyDev
             maxHyperParams = tuning[ j ]
-            
+
         # print max
         print( "Max DEV accuracy:", maxAccuracyDev )
         print( "Max hyper params:" )
         print( maxHyperParams )
-        
-            
+
+
     # Print tuning
     print( "Tuning:" )
     print( tuning )
-    
+
     print( "Max hyper params:" )
     print( maxHyperParams )
 
 
 if __name__ == '__main__':
-    
+
     print( "***************************************************************" )
     print( "Cat's recognition with TensorFlow - using parameterized network" )
     print( "***************************************************************" )
 
+    print( "TensorFlow version:", tf.__version__ )
+    # Tensorboard output dir
+    FLAGS.log_dir = "temp/tensorboard"
+    print( "TensorBoard dir:", FLAGS.log_dir )
+
+    # clean TF log dir
+    if tf.gfile.Exists(FLAGS.log_dir):
+        tf.gfile.DeleteRecursively(FLAGS.log_dir)
+        tf.gfile.MakeDirs(FLAGS.log_dir)
+
     # Make sure random is predictible...
     np.random.seed( 1 )
-    
+
     ## Init tensorflow multi-threading
     # When TF 1.8 available...
 #     config = tf.ConfigProto()
@@ -418,14 +510,17 @@ if __name__ == '__main__':
 
     ## Units of layers
     nbUnits = [ 1 ]
-    num_epochs = 1500
-    isLoadWeights = True
+    # No mini-batch
+    minibatch_size = -1
+    num_epochs = 10000
+
+    isLoadWeights = False
+    learning_rate = 0.003
 
     # Result from tuning
     beta = 0
     keep_prob = 1
-    learning_rate = 0.0001
-    
+
     ## Units of layers
 #     nbUnits = [ 50, 24, 12, 1 ]
 #     num_epochs = 1000
@@ -433,22 +528,22 @@ if __name__ == '__main__':
 #     beta = 0
 #     keep_prob = 1
 #     learning_rate = 0.0001
-    
+
     #nbUnits = [ 100, 48, 1 ]
     # Result from tuning
     #beta = 1.6980624617370184e-15
     #keep_prob = 0.724123179663981
-    
+
 #     nbUnits = [ 25, 12, 1 ]
 #     # Result from tuning
 #     beta = 6.531654400821318e-14
 #     keep_prob = 0.8213956561201344
 #     learning_rate = 0.0001
 #     num_epochs = 1500
-  
+
     # Loading the dataset
-    X_train_orig, Y_train_orig, WEIGHT_train, \
-    X_dev_orig  , Y_dev_orig = \
+    X_train_orig, Y_train_orig, TAG_train, WEIGHT_train, \
+    X_dev_orig  , Y_dev_orig, TAG_dev= \
         load_dataset( isLoadWeights )
 
     # Flatten the training and test images
@@ -457,7 +552,7 @@ if __name__ == '__main__':
     # Normalize image vectors
     X_train = X_train_flatten/255.
     X_dev = X_dev_flatten/255.
-    
+
     Y_train = Y_train_orig
     Y_dev = Y_dev_orig
 
@@ -470,18 +565,18 @@ if __name__ == '__main__':
     print ( "isLoadWeights:", isLoadWeights )
     if ( isLoadWeights ) :
         print ( "Weights_train shape :", WEIGHT_train.shape )
-    
+
     # Run model
     print( "Units:")
     print( nbUnits )
-    
+
 #    tuning( num_epochs = num_epochs, learning_rate = learning_rate )
-    
-    model( 
-        nbUnits, 
-        X_train, Y_train, WEIGHT_train,
-        X_dev, Y_dev, 
+
+    model(
+        nbUnits,
+        X_train, Y_train, TAG_train, WEIGHT_train,
+        X_dev, Y_dev, TAG_dev,
         beta = beta, keep_prob = keep_prob,
-        num_epochs = num_epochs, learning_rate = learning_rate
+        num_epochs = num_epochs, start_learning_rate = learning_rate,
+        minibatch_size=minibatch_size
     )
-    

@@ -9,7 +9,7 @@ import os
 import numpy as np
 import sys
 
-from chats_utils import load_dataset
+from chats_utils import load_dataset, statsExtractErrors
 
 from PIL import Image
 
@@ -77,7 +77,7 @@ def compute_cost( A, Y, WEIGHT, m ):
     #if ( WEIGHT == None ) :
     #    LOGPROBS = - ( np.log( A ) * Y + np.log( 1- A ) * ( 1 - Y ) )
     #else :
-        # Prise en compte des poids par image
+    # Prise en compte des poids par image
     LOGPROBS = - ( np.log( A ) * Y + np.log( 1- A ) * ( 1 - Y ) ) * WEIGHT
     
     cost = 1./m * np.sum( LOGPROBS ) 
@@ -85,54 +85,31 @@ def compute_cost( A, Y, WEIGHT, m ):
     return cost
 
 
-def predict( X, Y, m, parameters, X_orig, errorsDir ):
+def predict( key, X, Y, TAG, m, parameters, X_orig, extractImageErrors ):
     
-    os.makedirs( errorsDir, exist_ok = True )
-
     A = forward_propagation( X, parameters )
     
     # Transform to binary
     Y_predict = ( A >= 0.5 ).astype( int)
     
-    # XOR : count errors
+    # count errors
     oks = np.equal( Y_predict, Y ).astype(int)
     nbOks = np.sum( oks )
     
     # percentage
     exactPc = nbOks / Y.shape[ 1 ]
     
-    # Delete files in error dir
-    for the_file in os.listdir( errorsDir ):
-        file_path = os.path.join( errorsDir, the_file )
-        try:
-            if os.path.isfile(file_path):
-                os.unlink( file_path )
-        except Exception as e:
-            print(e)
-    
-    # check deleted
-    if ( len( os.listdir( errorsDir ) ) != 0 ) :
-        print( "Dir", errorsDir, "not empty." )
-        sys.exit( 1 )
-        
     # Extract errors
-    for i in range( 0, oks.shape[ 1 ] ): 
-        # Is an error?
-        if ( not oks[ 0, i ] ) :
-            # extract image
-            X_errorImg = X_orig[ i ]
-            errorImg = Image.fromarray( X_errorImg, 'RGB' )
-            
-            ## dump image
-            errorImg.save( errorsDir + '/error-' + str( i ) + ".png", 'png' )
+    if ( extractImageErrors ) :
+        statsExtractErrors( key, X_orig = X_orig, oks = oks, TAG = TAG )
     
     return exactPc
 
 def model( 
-    X_train, Y_train, WEIGHT_train, 
-    X_dev, Y_dev, 
+    X_train, Y_train, TAG_train, WEIGHT_train,
+    X_dev, Y_dev, TAG_dev,
     learning_rate = 0.005, nbGradientDescent = 10000,
-    print_cost = True, show_plot = True):
+    print_cost = True, show_plot = True, extractImageErrors = True):
     
     (n_x, m) = X_train.shape  # (n_x: input size, m : number of examples in the train set)
     costs = [] # To keep track of the cost
@@ -172,12 +149,16 @@ def model(
         plt.show()
 
     # Predictions
-    errorDirTrain = os.getcwd().replace( "\\", "/" ) + "/errors/train"
-    exactTrainPc = predict( X_train, Y_train, m, parameters, X_train_orig, errorDirTrain )
+    exactTrainPc = predict( 
+        "train",
+        X_train, Y_train, TAG_train, m, parameters, X_train_orig, extractImageErrors 
+    )
     print( "Training accuracy :", str( exactTrainPc ) )
 
-    errorDirDev = os.getcwd().replace( "\\", "/" ) + "/errors/dev"
-    exactDevPc = predict( X_dev, Y_dev, m, parameters, X_dev_orig, errorDirDev )
+    exactDevPc = predict( 
+        "dev",
+        X_dev, Y_dev, TAG_dev, m, parameters, X_dev_orig, extractImageErrors 
+    )
     print( "Dev accuracy      :", str( exactDevPc ) )
 
         
@@ -189,8 +170,8 @@ if __name__ == '__main__':
     isLoadWeights = False
     
     # Loading the dataset
-    X_train_orig, Y_train_orig, WEIGHT_train, \
-    X_dev_orig  , Y_dev_orig =  \
+    X_train_orig, Y_train_orig, TAG_train, WEIGHT_train, \
+    X_dev_orig  , Y_dev_orig, TAG_dev =  \
         load_dataset( isLoadWeights )
 
     # Flatten the training and test images :de (476,64,64,3) � ( 12288, 476 ) = ( 64*64*3, 476 )
@@ -217,10 +198,10 @@ if __name__ == '__main__':
         print ( "Weights_train shape :", WEIGHT_train.shape )
     
     parameters = model( 
-        X_train, Y_train, WEIGHT_train,
-        X_dev,   Y_dev,
+        X_train, Y_train, TAG_train, WEIGHT_train,
+        X_dev  , Y_dev  , TAG_dev,
         learning_rate = 0.003,
-        #nbGradientDescent = 100, 
+        nbGradientDescent = 10000, 
         #show_plot = False
     )
 

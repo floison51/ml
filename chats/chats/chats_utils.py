@@ -12,6 +12,9 @@ import os
 import sys
 
 from PIL import Image
+from collections import OrderedDict
+
+import matplotlib.pyplot as plt
 
 def load_dataset( isLoadWeights ):
 
@@ -28,7 +31,7 @@ def load_dataset( isLoadWeights ):
 
     train_set_x = train_set_x_orig
     dev_set_x   = dev_set_x_orig
-    
+
     # passer de (476,) (risque) a  (1,476)
     train_set_y = train_set_y_orig.reshape((1, train_set_y_orig.shape[0]))
     dev_set_y   = dev_set_y_orig.reshape((1, dev_set_y_orig.shape[0]))
@@ -38,37 +41,40 @@ def load_dataset( isLoadWeights ):
     dev_set_y   = dev_set_y.astype( int )
 
     # Image tags
+    train_set_tag_orig = np.array(train_dataset["tag"][:]) # images tags
+    dev_set_tag_orig   = np.array(dev_dataset["tag"][:]) # images tags
+    # passer de (476,) (risque) a  (1,476)
+    train_set_tag      = train_set_tag_orig.reshape((1, train_set_tag_orig.shape[0]))
+    dev_set_tag        = dev_set_tag_orig.reshape((1, dev_set_tag_orig.shape[0]))
+
     # Default weight is 1 (int)
     # If weight is loaded, it is a (1,mx)
     train_set_weight = 1
-    
+
     if isLoadWeights :
-    
-        train_set_tag_orig = np.array(train_dataset["tag"][:]) # images tags
-        # passer de (476,) (risque) a  (1,476)
-        train_set_tag      = train_set_tag_orig.reshape((1, train_set_tag_orig.shape[0]))
+
         ## Convert tags to weights
         train_set_weight   = getWeights( train_set_tag )
 
     return \
-       train_set_x, train_set_y, train_set_weight, \
-       dev_set_x  , dev_set_y
+       train_set_x, train_set_y, train_set_tag, train_set_weight, \
+       dev_set_x  , dev_set_y  , dev_set_tag
 
 def getWeights( tags ):
-    
+
     weights = []
-    
+
     for n_tag in tags[ 0 ] :
-        
+
         tag = str( n_tag )
-        
+
         weight = 1
         if ( tag == "b'chats'" ) :
             weight = 1
         elif ( tag == "b'chiens'" ) :
-            weight = 100
+            weight = -100
         elif ( tag == "b'loups'" ) :
-            weight = 100
+            weight = -100
         elif ( tag == "b'velos'" ) :
             weight = 1
         elif ( tag == "b'gens'" ) :
@@ -82,15 +88,15 @@ def getWeights( tags ):
         else :
             print( "Unsupported image tag", tag )
             sys.exit( 1 )
-        
+
         weights.append( weight )
-        
+
     # convert to numpty array
     n_weights = np.array( weights )
     # passer de (476,) (risque) a  (1,476)
     n_weights = n_weights.reshape( ( 1, n_weights.shape[0] ) )
 
-    return n_weights 
+    return n_weights
 
 def random_mini_batches(X, Y, mini_batch_size = 64, seed = 0):
     """
@@ -187,7 +193,7 @@ def forward_propagation_for_predict(X, parameters):
 
     return Z3
 
-def dumpBadImages( correct, X_orig, errorsDir ):
+def dumpBadImages( correct, X_orig, TAG, errorsDir ):
     # Delete files in error dir
     for the_file in os.listdir( errorsDir ):
         file_path = os.path.join( errorsDir, the_file )
@@ -197,10 +203,25 @@ def dumpBadImages( correct, X_orig, errorsDir ):
         except Exception as e:
             print(e)
 
+    # Dico of errors by label
+    mapErrorNbByTag = {}
+
     # Extract errors
     for i in range( 0, correct.shape[ 1 ] - 1 ):
         # Is an error?
         if ( not( correct[ 0, i ] ) ) :
+
+            # Add nb
+            label = str( TAG[ 0, i ] )
+            try:
+                nb = mapErrorNbByTag[ label ]
+            except KeyError as e:
+                ## Init nb
+                nb = 0
+
+            nb += 1
+            mapErrorNbByTag[ label ] = nb
+
             # extract image
             X_errorImg = X_orig[ i ]
             errorImg = Image.fromarray( X_errorImg, 'RGB' )
@@ -208,3 +229,50 @@ def dumpBadImages( correct, X_orig, errorsDir ):
             ## dump image
             errorImg.save( errorsDir + '/error-' + str( i ) + ".png", 'png' )
 
+    # return dico
+    return mapErrorNbByTag
+
+def statsExtractErrors( key, X_orig, oks, TAG ) :
+
+    errorsDir = os.getcwd().replace( "\\", "/" ) + "/errors/" + key
+
+    os.makedirs( errorsDir, exist_ok = True )
+
+    # Delete files in error dir
+    for the_file in os.listdir( errorsDir ):
+
+        file_path = os.path.join( errorsDir, the_file )
+        try:
+            if os.path.isfile(file_path):
+                os.unlink( file_path )
+        except Exception as e:
+            print(e)
+
+    # check deleted
+    if ( len( os.listdir( errorsDir ) ) != 0 ) :
+        print( "Dir", errorsDir, "not empty." )
+        sys.exit( 1 )
+
+    # Dump bad images
+    mapErrorNbByTag = dumpBadImages(
+        oks,
+        X_orig,
+        TAG,
+        errorsDir
+    )
+
+    # Sort by value
+    mapErrorNbByTagSorted = \
+        OrderedDict( 
+            sorted( mapErrorNbByTag.items(), key=lambda t: t[1], reverse=True )
+    )
+        
+    ## Error repartition by label
+    print( "Nb errors by tag for", key, ": ", mapErrorNbByTagSorted )
+
+    ## Graph
+    x = np.arange( len( mapErrorNbByTagSorted ) )
+    plt.bar( x, mapErrorNbByTagSorted.values() )
+    plt.xticks( x, mapErrorNbByTagSorted.keys( ) )
+    plt.title( "Error repartition for " + key )
+    plt.show()

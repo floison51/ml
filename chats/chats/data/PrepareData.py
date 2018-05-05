@@ -44,9 +44,9 @@ TESTRUN = 0
 PROFILE = 0
 
 # Constants
-#TRAINING_TEST_SET_PC = 0.80
+TRAINING_TEST_SET_PC = 0.80
 # Small traning set to rapid iterations
-TRAINING_TEST_SET_PC = 0.20
+#TRAINING_TEST_SET_PC = 0.20
 
 RESIZE_PX = 64
 

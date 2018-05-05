@@ -117,6 +117,15 @@ Final cost: 0.3226795380604533
 Training accuracy : 0.9152032112393377
 Dev accuracy      : 0.676056338028169
 
+Avec nb iteration = 30000
+isLoadWeights: False
+Final cost: 0.18592192018316692
+Nb errors by tag for train :  {"b'chiens'": 9, "b'chats'": 27, "b'loups'": 11, "b'fleurs'": 5}
+Training accuracy : 0.9739086803813347
+Nb errors by tag for dev :  {"b'fleurs'": 13, "b'voitures'": 3, "b'loups'": 19, "b'chiens'": 38, "b'chats'": 74, "b'velos'": 10, "b'gens'": 2, "b'villes'": 11}
+Dev accuracy      : 0.6579476861167002
+
+#########################################################################
 ## Test avec jeu réduit
 number of training examples = 497
 number of dev examples      = 1993

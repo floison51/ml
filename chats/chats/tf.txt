@@ -24,6 +24,37 @@ Train Accuracy: 1.0
 Dev Accuracy: 0.58203715
 
 ## Avec poids
-Chiens et loups : 100
+TF weighted entropy loss pos_weight = 100
+Train Accuracy: 0.99597585
+Dev Accuracy: 0.567988
+
+pos_weight = -10
+Cout diverge vers negatif
+Train Accuracy: 0.53521127
+Dev Accuracy: 0.5087807
+
+Inversion logits 1-A, 1-Y
+pos_weight = 100
 Train Accuracy: 1.0
-Dev Accuracy: 0.58203715
+Dev Accuracy: 0.59006524
+
+Inversion logits 1-A, 1-Y
+weight par photo
+Train Accuracy: 1.0
+Dev Accuracy: 0.590567
+
+********************************************************************
+Data Set:
+TensorFlow version: 1.7.0
+number of training examples = 1993
+number of test examples = 497
+X_train shape: (12288, 1993)
+Y_train shape: (1, 1993)
+X_test shape: (12288, 497)
+Y_test shape: (1, 497)
+isLoadWeights: False
+decay = false
+Units:
+[1]
+
+
