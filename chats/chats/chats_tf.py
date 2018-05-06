@@ -540,17 +540,28 @@ if __name__ == '__main__':
 #     tf.session(config=config)
 
     ## Units of layers
-    nbUnits = [ 1 ]
-    # No mini-batch
-    minibatch_size = 64
-    num_epochs = 2500
+#     nbUnits = [ 1 ]
+#     # Mini-batch
+#     minibatch_size = 64
+#     num_epochs = 2500
+# 
+#     isLoadWeights = False
+#     learning_rate = 0.003
 
+    ## Units of layers
+    nbUnits = [ 100, 48, 1 ]
+    # Mini-batch
+    minibatch_size = 64
+    num_epochs = 2000 
     isLoadWeights = False
-    learning_rate = 0.003
+    learning_rate = 0.001
+    beta = 1.6980624617370184e-15
+    keep_prob = 0.724123179663981
+    # {'beta': 1.6980624617370184e-15, 'keep_prob': 0.724123179663981, 'accuracyDev': 0.8095238, 'accuracyTrain': 0.99946064}
 
     # Result from tuning
-    beta = 0
-    keep_prob = 1
+    #beta = 0
+    #keep_prob = 1
 
     ## Units of layers
 #     nbUnits = [ 50, 24, 12, 1 ]
