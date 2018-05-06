@@ -217,23 +217,23 @@ def compute_cost( Z_last, Y, WEIGHT, beta, parameters, nbUnits, n_x ):
 
     return cost
 
-def runEpoch(
-    epoch, sess, feed_dict,
+def runIteration(
+    iteration, num_minibatches, sess, feed_dict,
     optimizer, cost,
     train_writer, dev_writer, mergedSummaries,
     isTensorboard
 ):
 
     # No mini-batch
-    if ( ( epoch % 100 == 99 ) and isTensorboard ):  # Record execution stats
+    if ( isTensorboard and ( iteration % ( 100 * num_minibatches ) == 100 * num_minibatches - 1 ) ):  # Record execution stats
         run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
         run_metadata = tf.RunMetadata()
         summary, _ , curCost = sess.run(
             [mergedSummaries,optimizer,cost], feed_dict=feed_dict,
             options=run_options,run_metadata=run_metadata
         )
-        train_writer.add_run_metadata( run_metadata, 'step%03d' % epoch )
-        train_writer.add_summary( summary, epoch )
+        train_writer.add_run_metadata( run_metadata, 'step%03d' % iteration )
+        train_writer.add_summary( summary, iteration )
     else :
         
         if ( isTensorboard ) :
@@ -241,7 +241,7 @@ def runEpoch(
             summary, _ , curCost = sess.run(
                 [mergedSummaries,optimizer,cost], feed_dict=feed_dict
             )
-            train_writer.add_summary( summary, epoch )
+            train_writer.add_summary( summary, iteration )
         else :
             _ , epoch_cost = sess.run(
                 [optimizer,cost], feed_dict=feed_dict
@@ -303,13 +303,18 @@ def model(
     # Back-propagation: Define the tensorflow optimizer. Use an AdamOptimizer.
     # Decaying learning rate
     global_step = tf.Variable( 0 )  # count the number of steps taken.
-    learning_rate = tf.train.exponential_decay(
-        start_learning_rate, global_step, 1000, 0.96, staircase=True
-    )
+    with tf.name_scope('cross_entropy'):
+        with tf.name_scope( 'total' ):
+            learning_rate = tf.train.exponential_decay(
+                start_learning_rate, global_step, 10000, 0.96, staircase=True
+            )
+            tf.summary.scalar( 'learning_rate', learning_rate )
 
     # fixed learning rate
-    learning_rate = start_learning_rate
-    optimizer = tf.train.AdamOptimizer( learning_rate ).minimize( cost )
+#     learning_rate = start_learning_rate
+
+    # Adam optimizer
+    optimizer = tf.train.AdamOptimizer( learning_rate ).minimize( cost, global_step = global_step )
 
     with tf.name_scope('accuracy'):
         # To calculate the correct predictions
@@ -335,6 +340,9 @@ def model(
         init = tf.global_variables_initializer()
         sess.run( init )
 
+        # current iteration
+        iteration = 0
+        
         # Do the training loop
         for epoch in range( num_epochs ):
 
@@ -343,13 +351,15 @@ def model(
             if ( minibatch_size < 0 ) :
                 
                 # No mini-batch : do a gradient descent for whole data
-                epoch_cost = runEpoch( 
-                    epoch, sess, 
+                epoch_cost = runIteration( 
+                    epoch, 1, sess, 
                     { X: X_train, Y: Y_train, KEEP_PROB: keep_prob },
                     optimizer, cost, 
                     train_writer, dev_writer, mergedSummaries,
                     isTensorboard
                 )
+                
+                iteration += 1
                 
             else:
                 #Minibatch mode
@@ -361,9 +371,9 @@ def model(
 
                     # Select a minibatch
                     (minibatch_X, minibatch_Y) = minibatch
-
-                    minibatch_cost = runEpoch( 
-                        epoch, sess,
+                    
+                    minibatch_cost = runIteration( 
+                        iteration, num_minibatches, sess,
                         { X: minibatch_X, Y: minibatch_Y, KEEP_PROB: keep_prob }, 
                         optimizer, cost, 
                         train_writer, dev_writer, mergedSummaries,
@@ -371,9 +381,10 @@ def model(
                     )
 
                     epoch_cost += minibatch_cost / num_minibatches
+                    iteration += 1
 
             if print_cost == True and epoch % 100 == 0:
-                print ("Cost after iteration %i: %f" % (epoch, epoch_cost) )
+                print ("Cost after epoch %i, iteration %i: %f" % (epoch, iteration, epoch_cost) )
         
             if print_cost == True and epoch % 5 == 0:
                 costs.append( epoch_cost )
@@ -532,8 +543,8 @@ if __name__ == '__main__':
     ## Units of layers
     nbUnits = [ 1 ]
     # No mini-batch
-    minibatch_size = -1
-    num_epochs = 10000
+    minibatch_size = 64
+    num_epochs = 2500
 
     isLoadWeights = False
     learning_rate = 0.003

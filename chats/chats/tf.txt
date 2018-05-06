@@ -167,3 +167,144 @@ Dev Accuracy: 0.61770624
 Nb errors by tag for train :  OrderedDict()
 Nb errors by tag for dev :  OrderedDict([("b'chats'", 79), ("b'chiens'", 37), ("b'loups'", 25), ("b'villes'", 15), ("b'velos'", 15), ("b'fleurs'", 12), ("b'gens'", 4), ("b'voitures'", 3)])
 
+**************************************************************
+Mini-batch size = 64
+Decay : false
+
+TensorFlow version: 1.7.0
+TensorBoard dir: C:/Users/frup82455/git/ml/chats/chats/temp/tf-board/chats
+number of training examples = 1993
+number of test examples = 497
+X_train shape: (12288, 1993)
+Y_train shape: (1, 1993)
+X_test shape: (12288, 497)
+Y_test shape: (1, 497)
+
+Learning rate  : 0.003
+Num epoch      : 2500
+Minibatch size : 64
+Beta           : 0
+keep_prob      : 1
+isLoadWeights: False
+Units:
+[1]
+WARNING:tensorflow:From D:\appli\python\anaconda3\envs\ml\lib\site-packages\tensorflow\contrib\learn\python\learn\datasets\base.py:198: retry (from tensorflow.contrib.learn.python.learn.datasets.base) is deprecated and will be removed in a future version.
+Instructions for updating:
+Use the retry module or similar alternatives.
+2018-05-06 09:09:15.239695: I tensorflow/core/platform/cpu_feature_guard.cc:140] Your CPU supports instructions that this TensorFlow binary was not compiled to use: AVX AVX2
+Cost after epoch 0, iteration 32: 1.520194
+Cost after epoch 100, iteration 3232: 0.190547
+Cost after epoch 200, iteration 6432: 0.091046
+Cost after epoch 300, iteration 9632: 0.049297
+Cost after epoch 400, iteration 12832: 0.020967
+Cost after epoch 500, iteration 16032: 0.013640
+Cost after epoch 600, iteration 19232: 0.658226
+Cost after epoch 700, iteration 22432: 0.007146
+Cost after epoch 800, iteration 25632: 0.005906
+Cost after epoch 900, iteration 28832: 0.004390
+Cost after epoch 1000, iteration 32032: 0.003563
+Cost after epoch 1100, iteration 35232: 0.002891
+Cost after epoch 1200, iteration 38432: 0.002404
+Cost after epoch 1300, iteration 41632: 0.002063
+Cost after epoch 1400, iteration 44832: 0.001907
+Cost after epoch 1500, iteration 48032: 0.001548
+Cost after epoch 1600, iteration 51232: 0.001457
+Cost after epoch 1700, iteration 54432: 0.001148
+Cost after epoch 1800, iteration 57632: 0.001329
+Cost after epoch 1900, iteration 60832: 0.000862
+Cost after epoch 2000, iteration 64032: 0.000752
+Cost after epoch 2100, iteration 67232: 0.000681
+Cost after epoch 2200, iteration 70432: 0.000583
+Cost after epoch 2300, iteration 73632: 0.000711
+Cost after epoch 2400, iteration 76832: 0.000484
+Final cost: 0.00045398959416836015
+Parameters have been trained!
+Train Accuracy: 1.0
+Dev Accuracy: 0.6197183
+Nb errors by tag for train :  OrderedDict()
+Nb errors by tag for dev :  OrderedDict([("b'chats'", 77), ("b'chiens'", 35), ("b'loups'", 26), ("b'velos'", 16), ("b'villes'", 15), ("b'fleurs'", 13), ("b'gens'", 4), ("b'voitures'", 3)])
+
+Decay 10000 x 0.96
+Cost after epoch 0, iteration 32: 1.520194
+Cost after epoch 100, iteration 3232: 0.190547
+Cost after epoch 200, iteration 6432: 0.091046
+Cost after epoch 300, iteration 9632: 0.049297
+Cost after epoch 400, iteration 12832: 0.020741
+Cost after epoch 500, iteration 16032: 0.016058
+Cost after epoch 600, iteration 19232: 0.009680
+Cost after epoch 700, iteration 22432: 0.007961
+Cost after epoch 800, iteration 25632: 0.005873
+Cost after epoch 900, iteration 28832: 0.004822
+Cost after epoch 1000, iteration 32032: 0.003723
+Cost after epoch 1100, iteration 35232: 0.003277
+Cost after epoch 1200, iteration 38432: 0.002638
+Cost after epoch 1300, iteration 41632: 0.002187
+Cost after epoch 1400, iteration 44832: 0.001837
+Cost after epoch 1500, iteration 48032: 0.001578
+Cost after epoch 1600, iteration 51232: 0.001643
+Cost after epoch 1700, iteration 54432: 0.001231
+Cost after epoch 1800, iteration 57632: 0.001032
+Cost after epoch 1900, iteration 60832: 0.000897
+Cost after epoch 2000, iteration 64032: 0.000803
+Cost after epoch 2100, iteration 67232: 0.000723
+Cost after epoch 2200, iteration 70432: 0.000635
+Cost after epoch 2300, iteration 73632: 0.000572
+Cost after epoch 2400, iteration 76832: 0.000821
+Final cost: 0.0004642058216455964
+
+Train Accuracy: 1.0
+Dev Accuracy: 0.62374246
+Nb errors by tag for train :  OrderedDict()
+Nb errors by tag for dev :  OrderedDict([("b'chats'", 78), ("b'chiens'", 35), ("b'loups'", 25), ("b'villes'", 15), ("b'velos'", 15), ("b'fleurs'", 12), ("b'gens'", 4), ("b'voitures'", 3)])
+
+###################################################################
+Augmentation données
++ ~80 chats
++ 90%/10% train/dev test set
+
+TensorFlow version: 1.7.0
+TensorBoard dir: C:/Users/frup82455/git/ml/chats/chats/temp/tf-board/chats
+number of training examples = 2387
+number of test examples = 265
+X_train shape: (12288, 2387)
+Y_train shape: (1, 2387)
+X_test shape: (12288, 265)
+Y_test shape: (1, 265)
+
+Learning rate  : 0.003
+Num epoch      : 2500
+Minibatch size : 64
+Beta           : 0
+keep_prob      : 1
+isLoadWeights: False
+Units:
+[1]
+
+Final cost: 0.0008129786874633281
+Parameters have been trained!
+Train Accuracy: 1.0
+Dev Accuracy: 0.6301887
+Nb errors by tag for train :  OrderedDict()
+Nb errors by tag for dev :  OrderedDict([("b'chats'", 33), ("b'chiens'", 20), ("b'loups'", 16), ("b'fleurs'", 11), ("b'villes'", 8), ("b'velos'", 7), ("b'voitures'", 2)])
+
+###################################################################
+Augmentation données
++ ~180 chats
+
+TensorFlow version: 1.7.0
+TensorBoard dir: C:/Users/frup82455/git/ml/chats/chats/temp/tf-board/chats
+number of training examples = 2572
+number of test examples = 284
+X_train shape: (12288, 2572)
+Y_train shape: (1, 2572)
+X_test shape: (12288, 284)
+Y_test shape: (1, 284)
+
+Learning rate  : 0.003
+Num epoch      : 2500
+Minibatch size : 64
+Beta           : 0
+keep_prob      : 1
+isLoadWeights: False
+Units:
+[1]

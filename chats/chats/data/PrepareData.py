@@ -44,9 +44,9 @@ TESTRUN = 0
 PROFILE = 0
 
 # Constants
-TRAINING_TEST_SET_PC = 0.80
+TRAINING_TEST_SET_PC = 0.90
 # Small traning set to rapid iterations
-#TRAINING_TEST_SET_PC = 0.20
+#TRAINING_TEST_SET_PC = 0.10
 
 RESIZE_PX = 64
 
@@ -207,7 +207,7 @@ def createTrainAndDevSets():
     
     ## transform images
     transformedDir = dataDir + "/transformed"
-    #transformImages( baseDir, transformedDir )
+    transformImages( baseDir, transformedDir )
     
     # get files
     files = glob.glob( transformedDir + '/**/*.*', recursive=True)
