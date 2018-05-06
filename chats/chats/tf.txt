@@ -308,3 +308,101 @@ keep_prob      : 1
 isLoadWeights: False
 Units:
 [1]
+
+Train Accuracy: 1.0
+Dev Accuracy: 0.6317568
+Nb errors by tag for train :  OrderedDict()
+Nb errors by tag for dev :  OrderedDict([("b'chats'", 40), ("b'loups'", 16), ("b'chiens'", 15), ("b'fleurs'", 13), ("b'velos'", 10), ("b'villes'", 7), ("b'voitures'", 4), ("b'gens'", 3)])
+
+###################################################################
+Augmentation données
++ ~100 chats
+TensorFlow version: 1.7.0
+TensorBoard dir: C:/Users/frup82455/git/ml/chats/chats/temp/tf-board/chats
+number of training examples = 2776
+number of test examples = 308
+X_train shape: (12288, 2776)
+Y_train shape: (1, 2776)
+X_test shape: (12288, 308)
+Y_test shape: (1, 308)
+
+Learning rate  : 0.003
+Num epoch      : 2500
+Minibatch size : 64
+Beta           : 0
+keep_prob      : 1
+isLoadWeights: False
+Units:
+[1]
+WARNING:tensorflow:From D:\appli\python\anaconda3\envs\ml\lib\site-packages\tensorflow\contrib\learn\python\learn\datasets\base.py:198: retry (from tensorflow.contrib.learn.python.learn.datasets.base) is deprecated and will be removed in a future version.
+Instructions for updating:
+Use the retry module or similar alternatives.
+2018-05-06 11:45:34.620612: I tensorflow/core/platform/cpu_feature_guard.cc:140] Your CPU supports instructions that this TensorFlow binary was not compiled to use: AVX AVX2
+Cost after epoch 0, iteration 44: 1.329640
+Cost after epoch 2400, iteration 105644: 0.001315
+Final cost: 0.0012143004704591666
+Parameters have been trained!
+Train Accuracy: 1.0
+Dev Accuracy: 0.6396104
+Nb errors by tag for train :  OrderedDict()
+Nb errors by tag for dev :  OrderedDict([("b'chats'", 35), ("b'chiens'", 28), ("b'loups'", 15), ("b'fleurs'", 12), ("b'velos'", 11), ("b'villes'", 5), ("b'gens'", 2), ("b'voitures'", 2)])
+
+*****************************************
+More chats
+
+TensorFlow version: 1.7.0
+TensorBoard dir: C:/Users/frup82455/git/ml/chats/chats/temp/tf-board/chats
+number of training examples = 3049
+number of test examples = 337
+X_train shape: (12288, 3049)
+Y_train shape: (1, 3049)
+X_test shape: (12288, 337)
+Y_test shape: (1, 337)
+
+Learning rate  : 0.003
+Num epoch      : 2500
+Minibatch size : 64
+Beta           : 0
+keep_prob      : 1
+isLoadWeights: False
+Units:
+[1]
+
+Cost after epoch 0, iteration 48: 2.277431
+Cost after epoch 2400, iteration 115248: 0.001278
+Final cost: 0.0011583609640241621
+Parameters have been trained!
+Train Accuracy: 1.0
+Dev Accuracy: 0.6795252
+Nb errors by tag for train :  OrderedDict()
+Nb errors by tag for dev :  OrderedDict([("b'chats'", 47), ("b'chiens'", 22), ("b'loups'", 15), ("b'fleurs'", 9), ("b'velos'", 7), ("b'gens'", 4), ("b'villes'", 3), ("b'voitures'", 1)])
+
+*****************************************
+More chiens
+
+TensorFlow version: 1.7.0
+TensorBoard dir: C:/Users/frup82455/git/ml/chats/chats/temp/tf-board/chats
+number of training examples = 3405
+number of test examples = 375
+X_train shape: (12288, 3405)
+Y_train shape: (1, 3405)
+X_test shape: (12288, 375)
+Y_test shape: (1, 375)
+
+Learning rate  : 0.003
+Num epoch      : 2500
+Minibatch size : 64
+Beta           : 0
+keep_prob      : 1
+isLoadWeights: False
+Units:
+[1]
+Cost after epoch 0, iteration 54: 1.453842
+Cost after epoch 2400, iteration 129654: 0.002100
+Final cost: 0.0019175878721552915
+Parameters have been trained!
+Train Accuracy: 1.0
+Dev Accuracy: 0.6106667
+Nb errors by tag for train :  OrderedDict()
+Nb errors by tag for dev :  OrderedDict([("b'chats'", 55), ("b'chiens'", 35), ("b'loups'", 17), ("b'velos'", 13), ("b'fleurs'", 11), ("b'voitures'", 6), ("b'villes'", 5), ("b'gens'", 4)])
+

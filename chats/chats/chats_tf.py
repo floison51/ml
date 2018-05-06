@@ -178,12 +178,11 @@ def compute_cost( Z_last, Y, WEIGHT, beta, parameters, nbUnits, n_x ):
         raw_cost = None
 
         with tf.name_scope( 'total' ):
-            if ( WEIGHT == 1 ) :
+            if ( ( type( WEIGHT ) == int ) and ( WEIGHT == 1 ) ) :
                 raw_cost = \
                     tf.reduce_mean(
-                        tf.nn.sigmoid_cross_entropy_with_logits( logits = logits, labels = labels
+                        tf.nn.sigmoid_cross_entropy_with_logits( logits = logits, labels = labels )
                     )
-                )
 
             else :
                 # Use image weights to reduce false positives
@@ -609,7 +608,7 @@ if __name__ == '__main__':
     print( nbUnits )
 
 #    tuning( num_epochs = num_epochs, learning_rate = learning_rate )
-
+    
     model(
         nbUnits,
         X_train, Y_train, TAG_train, WEIGHT_train,

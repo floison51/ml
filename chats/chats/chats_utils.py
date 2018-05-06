@@ -70,7 +70,7 @@ def getWeights( tags ):
 
         weight = 1
         if ( tag == "b'chats'" ) :
-            weight = 1
+            weight = 100
         elif ( tag == "b'chiens'" ) :
             weight = -100
         elif ( tag == "b'loups'" ) :

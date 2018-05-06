@@ -156,6 +156,8 @@ def buildDataSet( dataDir, baseDir, files, iStart, iEnd, outFileName ):
     y = []
 # tags of images
     tag = []
+# path of images
+    path = []
     
 # From first image to dev test set percentage of full list
 #for i in range( iEndTestSet ):
@@ -165,6 +167,7 @@ def buildDataSet( dataDir, baseDir, files, iStart, iEnd, outFileName ):
         # get rid of basedir
         relCurImage = curImage[len(baseDir) + 1:]
         relCurImage = relCurImage.replace( '\\', '/' )
+        
         relCurImageSegments = relCurImage.split( "/" )
         
         # Cat?
@@ -180,15 +183,25 @@ def buildDataSet( dataDir, baseDir, files, iStart, iEnd, outFileName ):
         # populate lists
         pix = np.array(resizedImg)
         # pix.spahe = (64, 64, 3 ) pour éviter les images monochromes
-        if (len(pix.shape) < 3):
+        if (pix.shape != ( RESIZE_PX, RESIZE_PX, 3 ) ):
             print("Skipping image", curImage)
             print("It's not a (NxNx3) image.")
         else:
             imagesList.append( pix )
             y.append( isCat )                       # Image will be saved
             tag.append( np.string_( _tag ) )    # Label of image
+            path.append( np.string_( relCurImage ) )
     
 # Store as binary stuff
+
+    # Check dims
+    for i in range( len( imagesList ) ) :
+        image = imagesList[ i ]
+        imageShape = image.shape
+        if ( imageShape != ( 64, 64, 3 ) ) :
+            print( "Wrong image:", path[ i ] )
+            sys.exit( 1 )
+        
     preparedDir = dataDir + "/prepared"
     os.makedirs( preparedDir, exist_ok = True )
     absOutFile = preparedDir + "/" + outFileName
@@ -196,6 +209,7 @@ def buildDataSet( dataDir, baseDir, files, iStart, iEnd, outFileName ):
         dataset["x"]        = imagesList
         dataset["y"]        = y
         dataset["tag"]      = tag
+        dataset["path"]     = path
 
 def createTrainAndDevSets():
     
