@@ -10,6 +10,7 @@ import tensorflow as tf
 import math
 import os
 import sys
+import shutil
 
 from PIL import Image
 from collections import OrderedDict
@@ -216,7 +217,7 @@ def dumpBadImages( correct, X_orig, PATH, TAG, errorsDir ):
     # Dico of errors by label
     mapErrorNbByTag = {}
 
-    imgBase = os.getcwd().replace( "\\", "/" ) + "/data/image"
+    imgBase = os.getcwd().replace( "\\", "/" ) + "/data/transformed"
     
     # Extract errors
     for i in range( 0, correct.shape[ 1 ] - 1 ):
@@ -234,17 +235,24 @@ def dumpBadImages( correct, X_orig, PATH, TAG, errorsDir ):
             nb += 1
             mapErrorNbByTag[ label ] = nb
 
-            # extract image
-            X_errorImg = X_orig[ i ]
-            errorImg = Image.fromarray( X_errorImg, 'RGB' )
+            # extract 64x64x3 image
+            #X_errorImg = X_orig[ i ]
+            #errorImg = Image.fromarray( X_errorImg, 'RGB' )
 
             ## dump image
-            errorImg.save( errorsDir + '/error-' + str( i ) + ".png", 'png' )
+            #errorImg.save( errorsDir + '/error-' + str( i ) + ".png", 'png' )
             
             # Get original image
-            imgRelPath = PATH[ i ]
+            # str: b'truc'
+            imgRelPath = str( PATH[ i ] )
+            # b'truc'
+            imgRelPath = imgRelPath[ 2: ]
+            # truc
+            imgRelPath = imgRelPath[ : -1 ]
+
             imgPath = imgBase + "/" + imgRelPath
-            toFile = errorsDir + "/" + str( i ) + os.path.basename( imgRelPath )
+            
+            toFile = errorsDir + "/" + label + "-" + str( i ) + "-" + os.path.basename( imgRelPath )
             shutil.copyfile( imgPath, toFile )
 
     # return dico
@@ -290,8 +298,8 @@ def statsExtractErrors( key, X_orig, oks, PATH, TAG ) :
     
     for labelError in mapErrorNbByTagSorted.items() :
         label = labelError[ 0 ]
-        percentage = labelError[ 1 ] / nsSamples
-        mapErrorPercentNbByTag[ label ] = percentage
+        percentage = labelError[ 1 ] / nbSamples
+        mapErrorPercentNbByTag[ label ] = "{0:.0f}%".format( percentage * 100 )
         
     # Sort by value
     mapErrorNbPercentByTagSorted = \

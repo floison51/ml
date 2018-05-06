@@ -234,7 +234,7 @@ def runIteration(
         train_writer.add_run_metadata( run_metadata, 'step%03d' % iteration )
         train_writer.add_summary( summary, iteration )
     else :
-        
+
         if ( isTensorboard ) :
             #run without meta data
             summary, _ , curCost = sess.run(
@@ -245,9 +245,9 @@ def runIteration(
             _ , epoch_cost = sess.run(
                 [optimizer,cost], feed_dict=feed_dict
             )
-     
-    return curCost           
-    
+
+    return curCost
+
 def model(
     nbUnits, X_train, Y_train, PATH_train, TAG_train, WEIGHT_train,
     X_dev, Y_dev, PATH_dev, TAG_dev,
@@ -341,25 +341,34 @@ def model(
 
         # current iteration
         iteration = 0
-        
+
+        ## optimisation may overshoot locally
+        ## To avoid returning an overshoot, we detect it and run extra epochs if needed
+        finalizationMode = False
+        current_num_epochs = num_epochs
+        iEpoch = 0
+        minCost = 99999999999999
+        minCostFinalization = 99999999999999
+        finished = False
+
         # Do the training loop
-        for epoch in range( num_epochs ):
+        while ( not finished and ( iEpoch <= current_num_epochs ) ) :
 
             epoch_cost = 0.                       # Defines a cost related to an epoch
 
             if ( minibatch_size < 0 ) :
-                
+
                 # No mini-batch : do a gradient descent for whole data
-                epoch_cost = runIteration( 
-                    epoch, 1, sess, 
+                epoch_cost = runIteration(
+                    epoch, 1, sess,
                     { X: X_train, Y: Y_train, KEEP_PROB: keep_prob },
-                    optimizer, cost, 
+                    optimizer, cost,
                     train_writer, dev_writer, mergedSummaries,
                     isTensorboard
                 )
-                
+
                 iteration += 1
-                
+
             else:
                 #Minibatch mode
                 num_minibatches = int(m / minibatch_size) # number of minibatches of size minibatch_size in the train set
@@ -370,11 +379,11 @@ def model(
 
                     # Select a minibatch
                     (minibatch_X, minibatch_Y) = minibatch
-                    
-                    minibatch_cost = runIteration( 
+
+                    minibatch_cost = runIteration(
                         iteration, num_minibatches, sess,
-                        { X: minibatch_X, Y: minibatch_Y, KEEP_PROB: keep_prob }, 
-                        optimizer, cost, 
+                        { X: minibatch_X, Y: minibatch_Y, KEEP_PROB: keep_prob },
+                        optimizer, cost,
                         train_writer, dev_writer, mergedSummaries,
                         isTensorboard
                     )
@@ -382,12 +391,35 @@ def model(
                     epoch_cost += minibatch_cost / num_minibatches
                     iteration += 1
 
-            if print_cost == True and epoch % 100 == 0:
-                print ("Cost after epoch %i, iteration %i: %f" % (epoch, iteration, epoch_cost) )
-        
-            if print_cost == True and epoch % 5 == 0:
+            if print_cost == True and iEpoch % 100 == 0:
+                print ("Cost after epoch %i, iteration %i: %f" % ( iEpoch, iteration, epoch_cost ) )
+
+            if print_cost == True and iEpoch % 5 == 0:
                 costs.append( epoch_cost )
 
+            # Record min cost
+            minCost = min( minCost, epoch_cost )
+
+            # Next epoch
+            iEpoch += 1
+
+            # Close to finish?
+            if ( not finalizationMode and ( iEpoch > current_num_epochs ) ) :
+                # Activate finalization mode
+                finalizationMode = True
+                # local overshoot?
+                if ( epoch_cost > minCost ) :
+                    # Yes, run some extra epochs
+                    print( "WARNING: local cost overshoot detected, adding maximum 100 epochs to leave local cost overshoot" )
+                    current_num_epochs += 100
+                    minCostFinalization = minCost
+
+            if ( finalizationMode ) :
+                # Check overshoot is finished
+                if ( epoch_cost <= minCostFinalization ) :
+                    # finished
+                    finished = True
+                    
         # Close tensorboard streams
         train_writer.close()
         dev_writer.close()
@@ -399,7 +431,7 @@ def model(
         plt.plot(np.squeeze(costs))
         plt.ylabel('cost')
         plt.xlabel('iterations (per tens)')
-        plt.title("Learning rate =" + str(learning_rate))
+        plt.title("Start learning rate =" + str( start_learning_rate ) )
         if ( show_plot ) :
             plt.show()
 
@@ -540,28 +572,28 @@ if __name__ == '__main__':
 #     tf.session(config=config)
 
     ## Units of layers
-#     nbUnits = [ 1 ]
-#     # Mini-batch
-#     minibatch_size = 64
-#     num_epochs = 2500
-# 
-#     isLoadWeights = False
-#     learning_rate = 0.003
-
-    ## Units of layers
-    nbUnits = [ 100, 48, 1 ]
+    nbUnits = [ 1 ]
     # Mini-batch
     minibatch_size = 64
-    num_epochs = 2000 
-    isLoadWeights = False
-    learning_rate = 0.001
-    beta = 1.6980624617370184e-15
-    keep_prob = 0.724123179663981
-    # {'beta': 1.6980624617370184e-15, 'keep_prob': 0.724123179663981, 'accuracyDev': 0.8095238, 'accuracyTrain': 0.99946064}
+    num_epochs = 2000
 
-    # Result from tuning
-    #beta = 0
-    #keep_prob = 1
+    isLoadWeights = False
+    learning_rate = 0.003
+
+    beta = 0
+    keep_prob = 1
+
+
+#     ## Units of layers
+#     nbUnits = [ 100, 48, 1 ]
+#     # Mini-batch
+#     minibatch_size = 64
+#     num_epochs = 2000
+#     isLoadWeights = False
+#     learning_rate = 0.001
+#     beta = 1.6980624617370184e-15
+#     keep_prob = 0.724123179663981
+#     # {'beta': 1.6980624617370184e-15, 'keep_prob': 0.724123179663981, 'accuracyDev': 0.8095238, 'accuracyTrain': 0.99946064}
 
     ## Units of layers
 #     nbUnits = [ 50, 24, 12, 1 ]
@@ -619,7 +651,7 @@ if __name__ == '__main__':
     print( nbUnits )
 
 #    tuning( num_epochs = num_epochs, learning_rate = learning_rate )
-    
+
     model(
         nbUnits,
         X_train, Y_train, PATH_train, TAG_train, WEIGHT_train,
