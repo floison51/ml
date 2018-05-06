@@ -56,9 +56,13 @@ def load_dataset( isLoadWeights ):
         ## Convert tags to weights
         train_set_weight   = getWeights( train_set_tag )
 
+    # Image relative pathes
+    train_imgPath = np.array( train_dataset[ "path" ][:] )
+    dev_imgPath   = np.array( dev_dataset  [ "path" ][:] )
+    
     return \
-       train_set_x, train_set_y, train_set_tag, train_set_weight, \
-       dev_set_x  , dev_set_y  , dev_set_tag
+       train_set_x, train_set_y, train_imgPath, train_set_tag, train_set_weight, \
+       dev_set_x  , dev_set_y  , dev_imgPath  , dev_set_tag
 
 def getWeights( tags ):
 
@@ -193,19 +197,27 @@ def forward_propagation_for_predict(X, parameters):
 
     return Z3
 
-def dumpBadImages( correct, X_orig, TAG, errorsDir ):
+def dumpBadImages( correct, X_orig, PATH, TAG, errorsDir ):
+    
     # Delete files in error dir
     for the_file in os.listdir( errorsDir ):
         file_path = os.path.join( errorsDir, the_file )
         try:
             if os.path.isfile(file_path):
-                os.remove( file_path )
+                os.unlink( file_path )
         except Exception as e:
             print(e)
 
+    # check deleted
+    if ( len( os.listdir( errorsDir ) ) != 0 ) :
+        print( "Dir", errorsDir, "not empty." )
+        sys.exit( 1 )
+    
     # Dico of errors by label
     mapErrorNbByTag = {}
 
+    imgBase = os.getcwd().replace( "\\", "/" ) + "/data/image"
+    
     # Extract errors
     for i in range( 0, correct.shape[ 1 ] - 1 ):
         # Is an error?
@@ -228,11 +240,17 @@ def dumpBadImages( correct, X_orig, TAG, errorsDir ):
 
             ## dump image
             errorImg.save( errorsDir + '/error-' + str( i ) + ".png", 'png' )
+            
+            # Get original image
+            imgRelPath = PATH[ i ]
+            imgPath = imgBase + "/" + imgRelPath
+            toFile = errorsDir + "/" + str( i ) + os.path.basename( imgRelPath )
+            shutil.copyfile( imgPath, toFile )
 
     # return dico
     return mapErrorNbByTag
 
-def statsExtractErrors( key, X_orig, oks, TAG ) :
+def statsExtractErrors( key, X_orig, oks, PATH, TAG ) :
 
     errorsDir = os.getcwd().replace( "\\", "/" ) + "/errors/" + key
 
@@ -254,12 +272,7 @@ def statsExtractErrors( key, X_orig, oks, TAG ) :
         sys.exit( 1 )
 
     # Dump bad images
-    mapErrorNbByTag = dumpBadImages(
-        oks,
-        X_orig,
-        TAG,
-        errorsDir
-    )
+    mapErrorNbByTag = dumpBadImages( oks, X_orig, PATH, TAG, errorsDir )
 
     # Sort by value
     mapErrorNbByTagSorted = \
@@ -270,6 +283,25 @@ def statsExtractErrors( key, X_orig, oks, TAG ) :
     ## Error repartition by label
     print( "Nb errors by tag for", key, ": ", mapErrorNbByTagSorted )
 
+    # Build %age map
+    nbSamples = oks.shape[ 1 ] 
+    
+    mapErrorPercentNbByTag = {}
+    
+    for labelError in mapErrorNbByTagSorted.items() :
+        label = labelError[ 0 ]
+        percentage = labelError[ 1 ] / nsSamples
+        mapErrorPercentNbByTag[ label ] = percentage
+        
+    # Sort by value
+    mapErrorNbPercentByTagSorted = \
+        OrderedDict( 
+            sorted( mapErrorPercentNbByTag.items(), key=lambda t: t[1], reverse=True )
+    )
+        
+    ## Error repartition by label
+    print( "% errors by tag for", key, ": ", mapErrorPercentNbByTag )
+        
     ## Graph
     x = np.arange( len( mapErrorNbByTagSorted ) )
     plt.bar( x, mapErrorNbByTagSorted.values() )

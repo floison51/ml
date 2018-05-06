@@ -249,8 +249,8 @@ def runIteration(
     return curCost           
     
 def model(
-    nbUnits, X_train, Y_train, TAG_train, WEIGHT_train,
-    X_dev, Y_dev, TAG_dev,
+    nbUnits, X_train, Y_train, PATH_train, TAG_train, WEIGHT_train,
+    X_dev, Y_dev, PATH_dev, TAG_dev,
     start_learning_rate = 0.0001, beta = 0, keep_prob = [1,1,1],
     num_epochs = 1900, minibatch_size = 32,
     print_cost = True, show_plot = True, extractImageErrors = True, isTensorboard = True
@@ -419,10 +419,10 @@ def model(
 
             # Lists of OK for training
             oks_train = correct_prediction.eval( {X: X_train, Y: Y_train, KEEP_PROB: 1 } )
-            statsExtractErrors( "train", X_orig = X_train_orig, oks = oks_train, TAG = TAG_train )
+            statsExtractErrors( "train", X_orig = X_train_orig, oks = oks_train, PATH = PATH_train, TAG = TAG_train )
 
             oks_dev = correct_prediction.eval( {X: X_dev, Y: Y_dev, KEEP_PROB: 1 } )
-            statsExtractErrors( "dev", X_orig= X_dev_orig, oks = oks_dev, TAG = TAG_dev )
+            statsExtractErrors( "dev", X_orig= X_dev_orig, oks = oks_dev, PATH = PATH_dev, TAG = TAG_dev )
 
         # Serialize parameters
 #         paramsFileName = "saved/params-Beta" + str( beta ) + "-keepProb"  + str( keep_prob )+ ".bin"
@@ -573,8 +573,8 @@ if __name__ == '__main__':
 #     num_epochs = 1500
 
     # Loading the dataset
-    X_train_orig, Y_train_orig, TAG_train, WEIGHT_train, \
-    X_dev_orig  , Y_dev_orig, TAG_dev= \
+    X_train_orig, Y_train_orig, PATH_train, TAG_train, WEIGHT_train, \
+    X_dev_orig  , Y_dev_orig, PATH_dev, TAG_dev= \
         load_dataset( isLoadWeights )
 
     # Flatten the training and test images
@@ -611,8 +611,8 @@ if __name__ == '__main__':
     
     model(
         nbUnits,
-        X_train, Y_train, TAG_train, WEIGHT_train,
-        X_dev, Y_dev, TAG_dev,
+        X_train, Y_train, PATH_train, TAG_train, WEIGHT_train,
+        X_dev, Y_dev, PATH_dev, TAG_dev,
         beta = beta, keep_prob = keep_prob,
         num_epochs = num_epochs, start_learning_rate = learning_rate,
         minibatch_size=minibatch_size
