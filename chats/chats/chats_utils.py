@@ -11,11 +11,15 @@ import math
 import os
 import sys
 import shutil
+import socket
+import platform
 
 from PIL import Image
 from collections import OrderedDict
 
 import matplotlib.pyplot as plt
+
+import const.constants as const;
 
 def load_dataset( isLoadWeights ):
 
@@ -60,7 +64,7 @@ def load_dataset( isLoadWeights ):
     # Image relative pathes
     train_imgPath = np.array( train_dataset[ "path" ][:] )
     dev_imgPath   = np.array( dev_dataset  [ "path" ][:] )
-    
+
     return \
        train_set_x, train_set_y, train_imgPath, train_set_tag, train_set_weight, \
        dev_set_x  , dev_set_y  , dev_imgPath  , dev_set_tag
@@ -199,7 +203,7 @@ def forward_propagation_for_predict(X, parameters):
     return Z3
 
 def dumpBadImages( correct, X_orig, PATH, TAG, errorsDir ):
-    
+
     # Delete files in error dir
     for the_file in os.listdir( errorsDir ):
         file_path = os.path.join( errorsDir, the_file )
@@ -213,12 +217,12 @@ def dumpBadImages( correct, X_orig, PATH, TAG, errorsDir ):
     if ( len( os.listdir( errorsDir ) ) != 0 ) :
         print( "Dir", errorsDir, "not empty." )
         sys.exit( 1 )
-    
+
     # Dico of errors by label
     mapErrorNbByTag = {}
 
     imgBase = os.getcwd().replace( "\\", "/" ) + "/data/transformed"
-    
+
     # Extract errors
     for i in range( 0, correct.shape[ 1 ] - 1 ):
         # Is an error?
@@ -241,7 +245,7 @@ def dumpBadImages( correct, X_orig, PATH, TAG, errorsDir ):
 
             ## dump image
             #errorImg.save( errorsDir + '/error-' + str( i ) + ".png", 'png' )
-            
+
             # Get original image
             # str: b'truc'
             imgRelPath = str( PATH[ i ] )
@@ -251,14 +255,14 @@ def dumpBadImages( correct, X_orig, PATH, TAG, errorsDir ):
             imgRelPath = imgRelPath[ : -1 ]
 
             imgPath = imgBase + "/" + imgRelPath
-            
+
             toFile = errorsDir + "/" + label + "-" + str( i ) + "-" + os.path.basename( imgRelPath )
             shutil.copyfile( imgPath, toFile )
 
     # return dico
     return mapErrorNbByTag
 
-def statsExtractErrors( key, X_orig, oks, PATH, TAG ) :
+def statsExtractErrors( key, X_orig, oks, PATH, TAG, show_plot=True ) :
 
     errorsDir = os.getcwd().replace( "\\", "/" ) + "/errors/" + key
 
@@ -284,35 +288,45 @@ def statsExtractErrors( key, X_orig, oks, PATH, TAG ) :
 
     # Sort by value
     mapErrorNbByTagSorted = \
-        OrderedDict( 
+        OrderedDict(
             sorted( mapErrorNbByTag.items(), key=lambda t: t[1], reverse=True )
     )
-        
+
     ## Error repartition by label
     print( "Nb errors by tag for", key, ": ", mapErrorNbByTagSorted )
 
     # Build %age map
-    nbSamples = oks.shape[ 1 ] 
-    
+    nbSamples = oks.shape[ 1 ]
+
     mapErrorPercentNbByTag = {}
-    
+
     for labelError in mapErrorNbByTagSorted.items() :
         label = labelError[ 0 ]
         percentage = labelError[ 1 ] / nbSamples
         mapErrorPercentNbByTag[ label ] = "{0:.0f}%".format( percentage * 100 )
-        
+
     # Sort by value
     mapErrorNbPercentByTagSorted = \
-        OrderedDict( 
+        OrderedDict(
             sorted( mapErrorPercentNbByTag.items(), key=lambda t: t[1], reverse=True )
     )
-        
+
     ## Error repartition by label
     print( "% errors by tag for", key, ": ", mapErrorPercentNbByTag )
-        
+
     ## Graph
-    x = np.arange( len( mapErrorNbByTagSorted ) )
-    plt.bar( x, mapErrorNbByTagSorted.values() )
-    plt.xticks( x, mapErrorNbByTagSorted.keys( ) )
-    plt.title( "Error repartition for " + key )
-    plt.show()
+    if ( show_plot ) :
+        x = np.arange( len( mapErrorNbByTagSorted ) )
+        plt.bar( x, mapErrorNbByTagSorted.values() )
+        plt.xticks( x, mapErrorNbByTagSorted.keys( ) )
+        plt.title( "Error repartition for " + key )
+        plt.show()
+    
+    return mapErrorNbByTagSorted, mapErrorPercentNbByTag
+
+def getSystemInfo( tensorFlowVersion ) :
+    systemInfo = {}
+    hostname = socket.gethostname()
+    systemInfo[ const.KEY_HOSTNAME ] = hostname
+    systemInfo[ const.KEY_OS_NAME ]  = platform.system() + " " + platform.release()
+    systemInfo[ const.KEY_TENSOR_FLOW_VERSION ] = hostname

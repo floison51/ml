@@ -20,11 +20,13 @@ import db.db as db
 import random
 import sys
 
+import time
+
 # For Jupyther notebook
 # %matplotlib inline
 
 # Tensorboard log dir
-APP_KEY = "chats" 
+APP_KEY = "chats"
 TENSORBOARD_LOG_DIR = os.getcwd().replace( "\\", "/" ) + "/run/tf-board/" + APP_KEY
 DB_DIR              = os.getcwd().replace( "\\", "/" ) + "/run/db/" + APP_KEY
 
@@ -66,7 +68,7 @@ def create_placeholders(n_x, n_y):
 
     return X, Y, KEEP_PROB
 
-def initialize_parameters( nbUnits, n_x, isTensorboardFull ):
+def initialize_parameters( structure, n_x, isTensorboardFull ):
     """
     Initializes parameters to build a neural network with tensorflow. The shapes are:
                         W1 : [25, 12288]
@@ -84,24 +86,24 @@ def initialize_parameters( nbUnits, n_x, isTensorboardFull ):
 
     ## Add Level 0 : X
     # example : 12228, 100, 24, 1
-    nbUnits0 = [ n_x ] + nbUnits
+    structure0 = [ n_x ] + structure
 
     # parameters
     parameters = {}
 
     # browse layers
-    for i in range( 0, len( nbUnits0 ) - 1 ):
+    for i in range( 0, len( structure0 ) - 1 ):
 
         # Adding a name scope ensures logical grouping of the layers in the graph.
         with tf.name_scope( "Layer" + str( i+1 ) ):
             # This Variable will hold the state of the weights for the layer
             with tf.name_scope( 'weights' ):
-                W_cur = tf.get_variable( "W" + str( i + 1 ), [ nbUnits0[ i + 1 ], nbUnits0[ i ] ], initializer = tf.contrib.layers.xavier_initializer(seed = 1))
+                W_cur = tf.get_variable( "W" + str( i + 1 ), [ structure0[ i + 1 ], structure0[ i ] ], initializer = tf.contrib.layers.xavier_initializer(seed = 1))
                 if isTensorboardFull :
                     variable_summaries( W_cur )
-                    
+
             with tf.name_scope( 'bias' ):
-                b_cur = tf.get_variable( "b" + str( i + 1 ), [ nbUnits0[ i + 1 ], 1             ], initializer = tf.zeros_initializer())
+                b_cur = tf.get_variable( "b" + str( i + 1 ), [ structure0[ i + 1 ], 1             ], initializer = tf.zeros_initializer())
                 if isTensorboardFull :
                     variable_summaries( b_cur )
 
@@ -110,7 +112,7 @@ def initialize_parameters( nbUnits, n_x, isTensorboardFull ):
 
     return parameters
 
-def forward_propagation( X, parameters, nbUnits, n_x, KEEP_PROB, isTensorboardFull ):
+def forward_propagation( X, parameters, structure, n_x, KEEP_PROB, isTensorboardFull ):
     """
     Implements the forward propagation for the model: LINEAR -> RELU -> LINEAR -> RELU -> LINEAR -> SOFTMAX
 
@@ -125,7 +127,7 @@ def forward_propagation( X, parameters, nbUnits, n_x, KEEP_PROB, isTensorboardFu
 
     ## Add Level 0 : X
     # example : 12228, 100, 24, 1
-    nbUnits0 = [ n_x ] + nbUnits
+    structure0 = [ n_x ] + structure
 
 
     Z = None
@@ -133,12 +135,12 @@ def forward_propagation( X, parameters, nbUnits, n_x, KEEP_PROB, isTensorboardFu
 
     curInput = X
 
-    for i in range( 1, len( nbUnits0 ) ):
+    for i in range( 1, len( structure0 ) ):
         # Adding a name scope ensures logical grouping of the layers in the graph.
         with tf.name_scope( "Layer" + str( i ) ):
             # apply DropOut to hidden layer
             curInput_drop_out = curInput
-            if i < len( nbUnits0 ) - 1 :
+            if i < len( structure0 ) - 1 :
                 curInput_drop_out = tf.nn.dropout( curInput, KEEP_PROB )
 
             ## Get W and b for current layer
@@ -152,7 +154,7 @@ def forward_propagation( X, parameters, nbUnits, n_x, KEEP_PROB, isTensorboardFu
                     tf.summary.histogram( 'Z', Z )
 
             ## Activation function for hidden layers
-            if i < len( nbUnits0 ) - 1 :
+            if i < len( structure0 ) - 1 :
                 A = tf.nn.relu( Z )
                 if isTensorboardFull :
                     tf.summary.histogram( 'A', A   )
@@ -163,7 +165,7 @@ def forward_propagation( X, parameters, nbUnits, n_x, KEEP_PROB, isTensorboardFu
     # For last layer (output layer): no dropout and return only Z
     return Z
 
-def compute_cost( Z_last, Y, WEIGHT, beta, parameters, nbUnits, n_x ):
+def compute_cost( Z_last, Y, WEIGHT, beta, parameters, structure, n_x ):
     """
     Computes the cost
 
@@ -177,7 +179,7 @@ def compute_cost( Z_last, Y, WEIGHT, beta, parameters, nbUnits, n_x ):
 
     ## Add Level 0 : X
     # example : 12228, 100, 24, 1
-    nbUnits0 = [ n_x ] + nbUnits
+    structure0 = [ n_x ] + structure
 
     with tf.name_scope('cross_entropy'):
 
@@ -209,7 +211,7 @@ def compute_cost( Z_last, Y, WEIGHT, beta, parameters, nbUnits, n_x ):
 
             if ( beta != 0 ) :
                 losses = []
-                for i in range( 1, len( nbUnits0 ) ) :
+                for i in range( 1, len( structure0 ) ) :
                     W_cur = parameters[ 'W' + str( i ) ]
                     losses.append( tf.nn.l2_loss( W_cur ) )
 
@@ -259,10 +261,11 @@ def runIteration(
     return curCost
 
 def model(
+    conn, idRun, structure,
     X_train, Y_train, PATH_train, TAG_train, WEIGHT_train,
     X_dev, Y_dev, PATH_dev, TAG_dev,
     hyperParams,
-    print_cost = True, show_plot = True, extractImageErrors = True, 
+    print_cost = True, show_plot = True, extractImageErrors = True,
     isTensorboard = True, isTensorboardFull = False
 ):
     """
@@ -290,13 +293,12 @@ def model(
     costs = []                                        # To keep track of the cost
 
     # Get hyper parameters from dico
-    nbUnits     = hyperParams[ const.KEY_NB_UNITS ]
     beta        = hyperParams[ const.KEY_BETA ]
     keep_prob   = hyperParams[ const.KEY_KEEP_PROB ]
     num_epochs  = hyperParams[ const.KEY_NUM_EPOCHS ]
     minibatch_size      = hyperParams[ const.KEY_MINIBATCH_SIZE ]
     start_learning_rate = hyperParams[ const.KEY_START_LEARNING_RATE ]
-    
+
     # Create Placeholders of shape (n_x, n_y)
     ### START CODE HERE ### (1 line)
     X, Y, KEEP_PROB = create_placeholders( n_x, n_y )
@@ -304,17 +306,17 @@ def model(
 
     # Initialize parameters
     ### START CODE HERE ### (1 line)
-    parameters = initialize_parameters( nbUnits, n_x, isTensorboardFull = isTensorboardFull )
+    parameters = initialize_parameters( structure, n_x, isTensorboardFull = isTensorboardFull )
     ### END CODE HERE ###
 
     # Forward propagation: Build the forward propagation in the tensorflow graph
     ### START CODE HERE ### (1 line)
-    Z_last = forward_propagation( X, parameters, nbUnits, n_x, KEEP_PROB, isTensorboardFull = isTensorboardFull )
+    Z_last = forward_propagation( X, parameters, structure, n_x, KEEP_PROB, isTensorboardFull = isTensorboardFull )
     ### END CODE HERE ###
 
     # Cost function: Add cost function to tensorflow graph
     ### START CODE HERE ### (1 line)
-    cost = compute_cost( Z_last, Y, WEIGHT_train, beta, parameters, nbUnits, n_x )
+    cost = compute_cost( Z_last, Y, WEIGHT_train, beta, parameters, structure, n_x )
     ### END CODE HERE ###
 
     # Back-propagation: Define the tensorflow optimizer. Use an AdamOptimizer.
@@ -347,11 +349,14 @@ def model(
     # Merge all the summaries and write them out to /tmp/mnist_logs (by default)
     mergedSummaries = tf.summary.merge_all()
 
+    # Start time
+    tsStart = time.time()
+
     # Start the session to compute the tensorflow graph
     with tf.Session() as sess:
 
-        train_writer = tf.summary.FileWriter( tensorBoardLogDir + '/train', sess.graph )
-        dev_writer   = tf.summary.FileWriter( tensorBoardLogDir + '/dev', sess.graph )
+        train_writer = tf.summary.FileWriter( TENSORBOARD_LOG_DIR + '/train', sess.graph )
+        dev_writer   = tf.summary.FileWriter( TENSORBOARD_LOG_DIR + '/dev', sess.graph )
 
         # Run the initialization
         init = tf.global_variables_initializer()
@@ -437,7 +442,7 @@ def model(
                 if ( epoch_cost <= minCostFinalization ) :
                     # finished
                     finished = True
-                    
+
         # Close tensorboard streams
         train_writer.close()
         dev_writer.close()
@@ -464,15 +469,22 @@ def model(
         print ( "Dev Accuracy:", accuracyDev )
 
         ## Errors
+        resultInfo = {}
 
         if ( extractImageErrors ) :
 
             # Lists of OK for training
             oks_train = correct_prediction.eval( {X: X_train, Y: Y_train, KEEP_PROB: 1 } )
-            statsExtractErrors( "train", X_orig = X_train_orig, oks = oks_train, PATH = PATH_train, TAG = TAG_train )
+            map1, map2 = statsExtractErrors( "train", X_orig = X_train_orig, oks = oks_train, PATH = PATH_train, TAG = TAG_train, show_plot=show_plot )
+            # Errors nb by data tag
+            resultInfo[ const.KEY_TRN_NB_ERROR_BY_TAG ] = map1
+            resultInfo[ const.KEY_TRN_PC_ERROR_BY_TAG ] = map1
 
             oks_dev = correct_prediction.eval( {X: X_dev, Y: Y_dev, KEEP_PROB: 1 } )
-            statsExtractErrors( "dev", X_orig= X_dev_orig, oks = oks_dev, PATH = PATH_dev, TAG = TAG_dev )
+            map1, map2 = statsExtractErrors( "dev", X_orig= X_dev_orig, oks = oks_dev, PATH = PATH_dev, TAG = TAG_dev, show_plot=show_plot )
+            # Errors nb by data tag
+            resultInfo[ const.KEY_DEV_NB_ERROR_BY_TAG ] = map1
+            resultInfo[ const.KEY_DEV_PC_ERROR_BY_TAG ] = map1
 
         # Serialize parameters
 #         paramsFileName = "saved/params-Beta" + str( beta ) + "-keepProb"  + str( keep_prob )+ ".bin"
@@ -486,16 +498,36 @@ def model(
 #                 # Array
 #                 np.save( fpOut, value )
 
+    # End time
+    tsEnd = time.time()
 
-        return parameters, accuracyDev, accuracyTrain
+    ## Elapsed (seconds)
+    elapsedSeconds = tsEnd - tsStart
+    # performance index : per iEpoth - per samples
+    perfIndex = elapsedSeconds / iEpoch / n_x * 1e6
+
+    perfInfo = {
+        const.KEY_ELAPSED_SECOND: elapsedSeconds,
+    }
+
+    # Update DB run after execution, add extra info
+    db.updateRunAfter(
+        conn, idRun,
+        perf_info = perfInfo, result_info=resultInfo,
+        perf_index=perfIndex, 
+        train_accuracy=accuracyTrain.astype( float ), 
+        dev_accuracy=accuracyDev.astype( float )
+    )
+
+    return parameters, accuracyDev, accuracyTrain
 
 def model_batch(
-    nbUnits, X_train, Y_train, X_test, Y_test, learning_rate = 0.0001,
+    structure, X_train, Y_train, X_test, Y_test, learning_rate = 0.0001,
     beta = 0, keep_prob = [1,1,1],
     num_epochs = 1900, minibatch_size = 32):
 
     return model(
-        nbUnits, X_train, Y_train, X_test, Y_test, learning_rate,
+        structure, X_train, Y_train, X_test, Y_test, learning_rate,
         beta, keep_prob,
         num_epochs, minibatch_size, print_cost = True, show_plot = False, extractImageErrors = False
     )
@@ -534,7 +566,7 @@ def tuning( num_epochs, learning_rate ):
         print( "keep_prob = " + str( keep_prob ))
 
         _, accuracyDev, accuracyTrain = model_batch(
-            nbUnits, X_train, Y_train, X_dev, Y_dev,
+            structure, X_train, Y_train, X_dev, Y_dev,
             beta = beta, keep_prob = keep_prob,
             num_epochs = num_epochs, learning_rate = learning_rate
         )
@@ -579,13 +611,12 @@ if __name__ == '__main__':
         tf.gfile.DeleteRecursively( TENSORBOARD_LOG_DIR )
         tf.gfile.MakeDirs( TENSORBOARD_LOG_DIR )
 
-    # Init DB
-    print( "Db dir:", DB_DIR )
-    db.initDb( APP_KEY, DB_DIR )
-    
     # Make sure random is predictible...
     np.random.seed( 1 )
-    
+
+    # system info
+    systemInfo = getSystemInfo( tf.__version__ )
+
     # hyper parameters
     hyperParams = {}
 
@@ -597,12 +628,12 @@ if __name__ == '__main__':
 #     tf.session(config=config)
 
 #     ## Units of layers
-    hyperParams[ const.KEY_NB_UNITS ]           = [ 1 ]
+    structure                                   = [ 1 ]
     hyperParams[ const.KEY_MINIBATCH_SIZE ]     = 64
-    hyperParams[ const.KEY_NUM_EPOCHS ]         = 2000
+    hyperParams[ const.KEY_NUM_EPOCHS ]         = 20
     hyperParams[ const.KEY_USE_WEIGHTS ]        = False
     hyperParams[ const.KEY_START_LEARNING_RATE ]= 0.003
-    hyperParams[ const.KEY_BETA ]               = 0 
+    hyperParams[ const.KEY_BETA ]               = 0
     hyperParams[ const.KEY_KEEP_PROB ]          = 1
 
     ## Units of layers
@@ -617,19 +648,19 @@ if __name__ == '__main__':
     # {'beta': 1.6980624617370184e-15, 'keep_prob': 0.724123179663981, 'accuracyDev': 0.8095238, 'accuracyTrain': 0.99946064}
 
     ## Units of layers
-#     nbUnits = [ 50, 24, 12, 1 ]
+#     structure = [ 50, 24, 12, 1 ]
 #     num_epochs = 1000
 #     # Result from tuning
 #     beta = 0
 #     keep_prob = 1
 #     learning_rate = 0.0001
 
-    #nbUnits = [ 100, 48, 1 ]
+    #structure = [ 100, 48, 1 ]
     # Result from tuning
     #beta = 1.6980624617370184e-15
     #keep_prob = 0.724123179663981
 
-#     nbUnits = [ 25, 12, 1 ]
+#     structure = [ 25, 12, 1 ]
 #     # Result from tuning
 #     beta = 6.531654400821318e-14
 #     keep_prob = 0.8213956561201344
@@ -667,14 +698,50 @@ if __name__ == '__main__':
     if ( hyperParams[ const.KEY_USE_WEIGHTS ] ) :
         print ( "  Weights_train shape :", WEIGHT_train.shape )
 
-    # Run model
-    print( "Units:")
-    print( hyperParams[ const.KEY_NB_UNITS ] )
+    print( "Structure:", structure )
 
+    dataInfo = {
+        const.KEY_TRN_SIZE  : str( X_train.shape[1] ),
+        const.KEY_DEV_SIZE       : str( X_dev.shape[1] ),
+        const.KEY_TRN_SHAPE : str( X_train.shape ),
+        const.KEY_DEV_SHAPE      : str( X_dev.shape ),
+        const.KEY_TRN_Y_SIZE         : str( Y_dev.shape[1] ),
+        const.KEY_TRN_Y_SHAPE        : str( Y_dev.shape ),
+        const.KEY_DEV_Y_SIZE         : str( Y_dev.shape[1] ),
+        const.KEY_DEV_Y_SHAPE        : str( Y_dev.shape ),
+    }
+
+    #
 #    tuning( num_epochs = num_epochs, learning_rate = learning_rate )
 
+    print()
+    comment = input( "Run comment: " )
+
+    # Init DB
+    print( "Db dir:", DB_DIR )
+    conn = db.initDb( APP_KEY, DB_DIR )
+
+    # Create run
+    idRun = db.createRun( conn )
+
+    # Update run before calling model
+    db.updateRunBefore(
+        conn, idRun,
+        structure=structure, comment=comment,
+        system_info=systemInfo, hyper_params=hyperParams, data_info=dataInfo
+    )
+
+    # Run model and update DB run with extra info
     model(
+        conn, idRun, structure,
         X_train, Y_train, PATH_train, TAG_train, WEIGHT_train,
         X_dev, Y_dev, PATH_dev, TAG_dev,
         hyperParams
     )
+
+    # Print run
+    run = db.getRun( conn, idRun )
+    print( "Run stored in DB:", str( run ) )
+
+    conn.close()
+
