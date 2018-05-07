@@ -4,7 +4,8 @@ Machine Learning pseudo-constants
 @author: fran
 '''
 # Dico keys
-KEY_HYPER_PARAMS = "hyperParameters"
+KEY_DICO_HYPER_PARAMS   = "hyperParameters"
+KEY_DICO_SYSTEM         = "systems"
 
 # hyper-parameters keys
 KEY_NB_UNITS            = "nbUnits"

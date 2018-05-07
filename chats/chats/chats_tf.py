@@ -15,6 +15,7 @@ from tensorflow.python.framework import ops
 from chats_utils import *
 
 import const.constants as const
+import db.db as db
 
 import random
 import sys
@@ -23,7 +24,9 @@ import sys
 # %matplotlib inline
 
 # Tensorboard log dir
-tensorBoardLogDir = os.getcwd().replace( "\\", "/" ) + "/temp/tf-board/chats"
+APP_KEY = "chats" 
+TENSORBOARD_LOG_DIR = os.getcwd().replace( "\\", "/" ) + "/run/tf-board/" + APP_KEY
+DB_DIR              = os.getcwd().replace( "\\", "/" ) + "/run/db/" + APP_KEY
 
 def variable_summaries( var ):
   """Attach a lot of summaries to a Tensor (for TensorBoard visualization)."""
@@ -569,13 +572,17 @@ if __name__ == '__main__':
 
     print( "TensorFlow version:", tf.__version__ )
     # Tensorboard output dir
-    print( "TensorBoard dir:", tensorBoardLogDir )
+    print( "TensorBoard dir:", TENSORBOARD_LOG_DIR )
 
     # clean TF log dir
-    if tf.gfile.Exists( tensorBoardLogDir ):
-        tf.gfile.DeleteRecursively( tensorBoardLogDir )
-        tf.gfile.MakeDirs( tensorBoardLogDir )
+    if tf.gfile.Exists( TENSORBOARD_LOG_DIR ):
+        tf.gfile.DeleteRecursively( TENSORBOARD_LOG_DIR )
+        tf.gfile.MakeDirs( TENSORBOARD_LOG_DIR )
 
+    # Init DB
+    print( "Db dir:", DB_DIR )
+    db.initDb( APP_KEY, DB_DIR )
+    
     # Make sure random is predictible...
     np.random.seed( 1 )
     
