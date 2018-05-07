@@ -211,5 +211,4 @@ if __name__ == '__main__':
         
         run = getRun( conn, idRun )    
         print( "After :", str( run ) )
-
     
