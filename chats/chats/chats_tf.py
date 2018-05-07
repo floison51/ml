@@ -14,6 +14,8 @@ from tensorflow.python.framework import ops
 
 from chats_utils import *
 
+import const.constants as const
+
 import random
 import sys
 
@@ -61,7 +63,7 @@ def create_placeholders(n_x, n_y):
 
     return X, Y, KEEP_PROB
 
-def initialize_parameters( nbUnits, n_x ):
+def initialize_parameters( nbUnits, n_x, isTensorboardFull ):
     """
     Initializes parameters to build a neural network with tensorflow. The shapes are:
                         W1 : [25, 12288]
@@ -92,17 +94,20 @@ def initialize_parameters( nbUnits, n_x ):
             # This Variable will hold the state of the weights for the layer
             with tf.name_scope( 'weights' ):
                 W_cur = tf.get_variable( "W" + str( i + 1 ), [ nbUnits0[ i + 1 ], nbUnits0[ i ] ], initializer = tf.contrib.layers.xavier_initializer(seed = 1))
-                variable_summaries( W_cur )
+                if isTensorboardFull :
+                    variable_summaries( W_cur )
+                    
             with tf.name_scope( 'bias' ):
                 b_cur = tf.get_variable( "b" + str( i + 1 ), [ nbUnits0[ i + 1 ], 1             ], initializer = tf.zeros_initializer())
-                variable_summaries( b_cur )
+                if isTensorboardFull :
+                    variable_summaries( b_cur )
 
         parameters[ "W" + str( i + 1 ) ] = W_cur
         parameters[ "b" + str( i + 1 ) ] = b_cur
 
     return parameters
 
-def forward_propagation( X, parameters, nbUnits, n_x, KEEP_PROB ):
+def forward_propagation( X, parameters, nbUnits, n_x, KEEP_PROB, isTensorboardFull ):
     """
     Implements the forward propagation for the model: LINEAR -> RELU -> LINEAR -> RELU -> LINEAR -> SOFTMAX
 
@@ -140,12 +145,14 @@ def forward_propagation( X, parameters, nbUnits, n_x, KEEP_PROB ):
             ## Linear part
             with tf.name_scope( 'Z' ):
                 Z = tf.add( tf.matmul( W_layer, curInput_drop_out  ), b_layer )
-                tf.summary.histogram( 'Z', Z )
+                if isTensorboardFull :
+                    tf.summary.histogram( 'Z', Z )
 
             ## Activation function for hidden layers
             if i < len( nbUnits0 ) - 1 :
                 A = tf.nn.relu( Z )
-                tf.summary.histogram( 'A', A   )
+                if isTensorboardFull :
+                    tf.summary.histogram( 'A', A   )
 
             ## Change cur input to A(layer)
             curInput = A
@@ -249,11 +256,11 @@ def runIteration(
     return curCost
 
 def model(
-    nbUnits, X_train, Y_train, PATH_train, TAG_train, WEIGHT_train,
+    X_train, Y_train, PATH_train, TAG_train, WEIGHT_train,
     X_dev, Y_dev, PATH_dev, TAG_dev,
-    start_learning_rate = 0.0001, beta = 0, keep_prob = [1,1,1],
-    num_epochs = 1900, minibatch_size = 32,
-    print_cost = True, show_plot = True, extractImageErrors = True, isTensorboard = True
+    hyperParams,
+    print_cost = True, show_plot = True, extractImageErrors = True, 
+    isTensorboard = True, isTensorboardFull = False
 ):
     """
     Implements a three-layer tensorflow neural network: LINEAR->RELU->LINEAR->RELU->LINEAR->SIGMOID.
@@ -279,6 +286,14 @@ def model(
     n_y = Y_train.shape[0]                            # n_y : output size
     costs = []                                        # To keep track of the cost
 
+    # Get hyper parameters from dico
+    nbUnits     = hyperParams[ const.KEY_NB_UNITS ]
+    beta        = hyperParams[ const.KEY_BETA ]
+    keep_prob   = hyperParams[ const.KEY_KEEP_PROB ]
+    num_epochs  = hyperParams[ const.KEY_NUM_EPOCHS ]
+    minibatch_size      = hyperParams[ const.KEY_MINIBATCH_SIZE ]
+    start_learning_rate = hyperParams[ const.KEY_START_LEARNING_RATE ]
+    
     # Create Placeholders of shape (n_x, n_y)
     ### START CODE HERE ### (1 line)
     X, Y, KEEP_PROB = create_placeholders( n_x, n_y )
@@ -286,12 +301,12 @@ def model(
 
     # Initialize parameters
     ### START CODE HERE ### (1 line)
-    parameters = initialize_parameters( nbUnits, n_x )
+    parameters = initialize_parameters( nbUnits, n_x, isTensorboardFull = isTensorboardFull )
     ### END CODE HERE ###
 
     # Forward propagation: Build the forward propagation in the tensorflow graph
     ### START CODE HERE ### (1 line)
-    Z_last = forward_propagation( X, parameters, nbUnits, n_x, KEEP_PROB )
+    Z_last = forward_propagation( X, parameters, nbUnits, n_x, KEEP_PROB, isTensorboardFull = isTensorboardFull )
     ### END CODE HERE ###
 
     # Cost function: Add cost function to tensorflow graph
@@ -371,7 +386,7 @@ def model(
 
             else:
                 #Minibatch mode
-                num_minibatches = int(m / minibatch_size) # number of minibatches of size minibatch_size in the train set
+                num_minibatches = int( m / minibatch_size ) # number of minibatches of size minibatch_size in the train set
                 seed = seed + 1
                 minibatches = random_mini_batches( X_train, Y_train, minibatch_size, seed )
 
@@ -563,6 +578,9 @@ if __name__ == '__main__':
 
     # Make sure random is predictible...
     np.random.seed( 1 )
+    
+    # hyper parameters
+    hyperParams = {}
 
     ## Init tensorflow multi-threading
     # When TF 1.8 available...
@@ -571,29 +589,25 @@ if __name__ == '__main__':
 #     config.inter_op_parallelism_threads = 16
 #     tf.session(config=config)
 
-    ## Units of layers
-    nbUnits = [ 1 ]
-    # Mini-batch
-    minibatch_size = 64
-    num_epochs = 2000
-
-    isLoadWeights = False
-    learning_rate = 0.003
-
-    beta = 0
-    keep_prob = 1
-
-
 #     ## Units of layers
-#     nbUnits = [ 100, 48, 1 ]
+    hyperParams[ const.KEY_NB_UNITS ]           = [ 1 ]
+    hyperParams[ const.KEY_MINIBATCH_SIZE ]     = 64
+    hyperParams[ const.KEY_NUM_EPOCHS ]         = 2000
+    hyperParams[ const.KEY_USE_WEIGHTS ]        = False
+    hyperParams[ const.KEY_START_LEARNING_RATE ]= 0.003
+    hyperParams[ const.KEY_BETA ]               = 0 
+    hyperParams[ const.KEY_KEEP_PROB ]          = 1
+
+    ## Units of layers
+#     hyperParams[ const.KEY_NB_UNITS ] = [ 100, 48, 1 ]
 #     # Mini-batch
-#     minibatch_size = 64
-#     num_epochs = 2000
-#     isLoadWeights = False
-#     learning_rate = 0.001
-#     beta = 1.6980624617370184e-15
-#     keep_prob = 0.724123179663981
-#     # {'beta': 1.6980624617370184e-15, 'keep_prob': 0.724123179663981, 'accuracyDev': 0.8095238, 'accuracyTrain': 0.99946064}
+#     hyperParams[ const.KEY_MINIBATCH_SIZE ] = 64
+#     hyperParams[ const.KEY_NUM_EPOCHS ] = 2000
+#     hyperParams[ const.KEY_USE_WEIGHTS ] = False
+#     hyperParams[ const.KEY_LEARNING_RATE ] = 0.0001
+#     hyperParams[ const.KEY_BETA ] = 0 #1.6980624617370184e-15
+#     hyperParams[ const.KEY_KEEP_PROB ] = 0.724123179663981
+    # {'beta': 1.6980624617370184e-15, 'keep_prob': 0.724123179663981, 'accuracyDev': 0.8095238, 'accuracyTrain': 0.99946064}
 
     ## Units of layers
 #     nbUnits = [ 50, 24, 12, 1 ]
@@ -618,14 +632,14 @@ if __name__ == '__main__':
     # Loading the dataset
     X_train_orig, Y_train_orig, PATH_train, TAG_train, WEIGHT_train, \
     X_dev_orig  , Y_dev_orig, PATH_dev, TAG_dev= \
-        load_dataset( isLoadWeights )
+        load_dataset( hyperParams[ const.KEY_USE_WEIGHTS ] )
 
     # Flatten the training and test images
-    X_train_flatten = X_train_orig.reshape(X_train_orig.shape[0], -1).T
-    X_dev_flatten = X_dev_orig.reshape(X_dev_orig.shape[0], -1).T
+    X_train_flatten = X_train_orig.reshape( X_train_orig.shape[0], -1 ).T
+    X_dev_flatten = X_dev_orig.reshape( X_dev_orig.shape[0], -1 ).T
     # Normalize image vectors
-    X_train = X_train_flatten/255.
-    X_dev = X_dev_flatten/255.
+    X_train = X_train_flatten / 255.
+    X_dev   = X_dev_flatten / 255.
 
     Y_train = Y_train_orig
     Y_dev = Y_dev_orig
@@ -637,26 +651,23 @@ if __name__ == '__main__':
     print ("X_test shape: " + str(X_dev.shape))
     print ("Y_test shape: " + str(Y_dev.shape))
     print ()
-    print ("Learning rate  :", str( learning_rate ) )
-    print ("Num epoch      :", str( num_epochs ) )
-    print ("Minibatch size :", str( minibatch_size ) )
-    print ("Beta           :", str( beta ) )
-    print ("keep_prob      :", str( keep_prob ) )
-    print ( "isLoadWeights:", isLoadWeights )
-    if ( isLoadWeights ) :
-        print ( "Weights_train shape :", WEIGHT_train.shape )
+    print ("Start Learning rate :", str( hyperParams[ const.KEY_START_LEARNING_RATE ] ) )
+    print ("Num epoch           :", str( hyperParams[ const.KEY_NUM_EPOCHS ] ) )
+    print ("Minibatch size      :", str( hyperParams[ const.KEY_MINIBATCH_SIZE ] ) )
+    print ("Beta                :", str( hyperParams[ const.KEY_BETA ] ) )
+    print ("keep_prob           :", str( hyperParams[ const.KEY_KEEP_PROB ] ) )
+    print ("isLoadWeights :", hyperParams[ const.KEY_USE_WEIGHTS ] )
+    if ( hyperParams[ const.KEY_USE_WEIGHTS ] ) :
+        print ( "  Weights_train shape :", WEIGHT_train.shape )
 
     # Run model
     print( "Units:")
-    print( nbUnits )
+    print( hyperParams[ const.KEY_NB_UNITS ] )
 
 #    tuning( num_epochs = num_epochs, learning_rate = learning_rate )
 
     model(
-        nbUnits,
         X_train, Y_train, PATH_train, TAG_train, WEIGHT_train,
         X_dev, Y_dev, PATH_dev, TAG_dev,
-        beta = beta, keep_prob = keep_prob,
-        num_epochs = num_epochs, start_learning_rate = learning_rate,
-        minibatch_size=minibatch_size
+        hyperParams
     )
