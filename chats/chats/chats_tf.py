@@ -27,6 +27,7 @@ import time
 
 # Tensorboard log dir
 APP_KEY = "chats"
+TENSORFLOW_SAVE_DIR = os.getcwd().replace( "\\", "/" ) + "/run/tf-save/" + APP_KEY
 TENSORBOARD_LOG_DIR = os.getcwd().replace( "\\", "/" ) + "/run/tf-board/" + APP_KEY
 DB_DIR              = os.getcwd().replace( "\\", "/" ) + "/run/db/" + APP_KEY
 
@@ -349,6 +350,9 @@ def model(
     # Merge all the summaries and write them out to /tmp/mnist_logs (by default)
     mergedSummaries = tf.summary.merge_all()
 
+    # Add ops to save and restore all the variables.
+    tfSaver = tf.train.Saver()
+
     # Start time
     tsStart = time.time()
 
@@ -486,18 +490,15 @@ def model(
             resultInfo[ const.KEY_DEV_NB_ERROR_BY_TAG ] = map1
             resultInfo[ const.KEY_DEV_PC_ERROR_BY_TAG ] = map1
 
-        # Serialize parameters
-#         paramsFileName = "saved/params-Beta" + str( beta ) + "-keepProb"  + str( keep_prob )+ ".bin"
-#         print( "Serialize parameters to " + paramsFileName )
-#
-#         with open( paramsFileName, "wb" ) as fpOut:
-#             for key, value in parameters.items():
-#                 # Key
-#                 bKey = bytearray( key, "UTF-8" )
-#                 fpOut.write( bKey )
-#                 # Array
-#                 np.save( fpOut, value )
-
+            # Serialize parameters
+            save_dir = TENSORFLOW_SAVE_DIR + "/" + str( idRun ) + "/save"
+            if tf.gfile.Exists( save_dir ):
+                tf.gfile.DeleteRecursively( save_dir )
+            tf.gfile.MakeDirs( save_dir )
+            
+            save_path = tfSaver.save( sess, save_dir )
+            print( "Model saved in path: %s" % save_path)
+            
     # End time
     tsEnd = time.time()
 
