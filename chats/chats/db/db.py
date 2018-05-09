@@ -9,38 +9,38 @@ import datetime
 import json
 
 def createRun( conn ) :
-    
+
     c = conn.cursor();
-    
+
     cursor = c.execute( '''
-        INSERT INTO runs VALUES ( null, ?, null, null, null, null, null, null, null, null, null, null )''',
+        INSERT INTO runs VALUES ( null, ?, null, null, null, null, null, null, null, null, null, null, null )''',
         ( datetime.datetime.now(), )
     )
-    
+
     id = cursor.lastrowid
-    
+
     c.close();
-    
+
     # Save (commit) the changes
     conn.commit()
-    
+
     return id
-    
-def updateRunBefore( 
-    conn, idRun, 
-    structure = "?", comment = "?", 
+
+def updateRunBefore(
+    conn, idRun,
+    structure = "?", comment = "?",
     system_info = {}, hyper_params = {}, data_info = {},
 ) :
 
     c = conn.cursor();
-    
+
     # JSon conversion
     json_system_info    = json.dumps( system_info )
     json_hyper_params   = json.dumps( hyper_params )
     json_data_info      = json.dumps( data_info )
     json_perf_info      = json.dumps( {} )
     json_result_info    = json.dumps( {} )
-    
+
     # Update run
     updateStatement = \
         "update runs set " + \
@@ -49,84 +49,85 @@ def updateRunBefore(
              "perf_index=?, train_accuracy=?, dev_accuracy=? " + \
              "where id=?"
 
-    c.execute( 
+    c.execute(
         updateStatement,
-        ( 
+        (
             str( structure ), comment,
             json_system_info, json_hyper_params, json_data_info, json_perf_info, json_result_info,
             -1, -1, -1,
-            idRun, 
+            idRun,
         )
     )
-    
+
     c.close();
-    
+
     # Save (commit) the changes
     conn.commit()
-        
-def updateRunAfter( 
-    conn, idRun, 
-    perf_info = {}, result_info={}, 
-    perf_index = -1, train_accuracy = -1, dev_accuracy = -1
+
+def updateRunAfter(
+    conn, idRun,
+    perf_info = {}, result_info={},
+    perf_index = -1, elapsed_second =- 1, train_accuracy = -1, dev_accuracy = -1
 ) :
 
     c = conn.cursor();
-    
+
     # JSon conversion
     json_perf_info      = json.dumps( perf_info )
     json_result_info    = json.dumps( result_info )
-    
+
     # Update run
     updateStatement = \
         "update runs set " + \
             "json_perf_info=?, json_result_info=?," + \
-             "perf_index=?, train_accuracy=?, dev_accuracy=? " + \
+             "perf_index=?, elapsed_second=?, train_accuracy=?, dev_accuracy=? " + \
              "where id=?"
 
-    c.execute( 
+    c.execute(
         updateStatement,
-        ( 
+        (
             json_perf_info, json_result_info,
-            perf_index, train_accuracy, dev_accuracy,
-            idRun, 
+            perf_index, elapsed_second, train_accuracy, dev_accuracy,
+            idRun,
         )
     )
-    
+
     c.close();
-    
+
     # Save (commit) the changes
     conn.commit()
-        
+
 def getRun( conn, idRun ) :
-    
+
     c = conn.cursor();
-    
+
     # Update run
     cursor = c.execute( '''
         select * from runs where id=?''',
         (idRun,)
     )
-    
+
     result = {}
-    
-    for row in cursor : 
+
+    for row in cursor :
         result[ "id" ]              = row[ 0 ]
         result[ "dateTime" ]        = row[ 1 ]
         result[ "structure" ]       = row[ 2 ]
         result[ "comment" ]         = row[ 3 ]
         result[ "perf_index" ]      = row[ 4 ]
-        result[ "train_accuracy" ]  = row[ 5 ]
-        result[ "dev_accuracy" ]    = row[ 6 ]
-        result[ "system_info" ]     = json.loads( row[ 7 ] )
-        result[ "hyper_params" ]    = json.loads( row[ 8 ] )
-        result[ "data_info" ]       = json.loads( row[ 9 ] )
-        result[ "perf_info" ]       = json.loads( row[ 10 ] )
-        result[ "result_info" ]     = json.loads( row[ 11 ] )
-        
+        result[ "elapsed_second" ]  = row[ 5 ]
+        result[ "train_accuracy" ]  = row[ 6 ]
+        result[ "dev_accuracy" ]    = row[ 7 ]
+        result[ "system_info" ]     = json.loads( row[ 8 ] )
+        result[ "hyper_params" ]    = json.loads( row[ 9 ] )
+        result[ "data_info" ]       = json.loads( row[ 10 ] )
+        result[ "perf_info" ]       = json.loads( row[ 11 ] )
+        result[ "result_info" ]     = json.loads( row[ 12 ] )
+
     c.close();
-    
+
     return result
-    
+
 def initDb( key, dbFolder ) :
 
     # create dbFolder if needed
@@ -148,19 +149,20 @@ def initDb( key, dbFolder ) :
             conn.commit()
 
     c.close();
-    
+
     return conn;
 
 def initTables( c ) :
-    
+
     # Create table
     c.execute( '''CREATE TABLE runs
         (
-           id integer PRIMARY KEY AUTOINCREMENT, 
+           id integer PRIMARY KEY AUTOINCREMENT,
            date datetime DEFAULT CURRENT_TIMESTAMP,
            structure text,
            comment text,
            perf_index number,
+           elapsed_second integer,
            train_accuracy number,
            dev_accuracy number,
            json_system_info text,
@@ -170,45 +172,45 @@ def initTables( c ) :
            json_result_info text
          )'''
     )
-    
+
     # Indexes
     c.execute( '''CREATE INDEX idx_runs_id on runs( id ) ''' )
     c.execute( '''CREATE INDEX idx_runs_perf_index on runs( perf_index ) ''' )
+    c.execute( '''CREATE INDEX idx_runs_elapsed_second on runs( elapsed_second ) ''' )
     c.execute( '''CREATE INDEX idx_runs_train_accuracy on runs( train_accuracy ) ''' )
     c.execute( '''CREATE INDEX idx_runs_dev_accuracy on runs( dev_accuracy ) ''' )
-    
+
 if __name__ == '__main__':
 
     DB_DIR = "C:/Users/frup82455/git/ml/chats/chats/run/db/chats"
     APP_KEY = "chats"
-    
+
         # Init DB
     print( "Db dir:", DB_DIR )
-    with initDb( APP_KEY, DB_DIR ) as conn : 
+    with initDb( APP_KEY, DB_DIR ) as conn :
 
         # Create run
         idRun = createRun( conn )
-        
+
         systemInfo = { "host": "12345678" }
         hyperParams = { "toto": "titi" }
         dataInfo = { "data": "chats" }
         perfInfo = { "perf": 4567 }
-        
-        updateRunBefore( 
-            conn, idRun, 
+
+        updateRunBefore(
+            conn, idRun,
             structure="[2]", comment="comment",
             system_info=systemInfo, hyper_params=hyperParams, data_info=dataInfo
         )
-        
+
         run = getRun( conn, idRun )
         print( "Before:", str( run ) )
-         
-        updateRunAfter( 
-            conn, idRun, 
+
+        updateRunAfter(
+            conn, idRun,
             perf_info = perfInfo, result_info={ "errors": [1,2,3] },
-            perf_index=10, train_accuracy=0.5, dev_accuracy=0.75
+            perf_index=10, elapsed_second=20, train_accuracy=0.5, dev_accuracy=0.75
         )
-        
-        run = getRun( conn, idRun )    
+
+        run = getRun( conn, idRun )
         print( "After :", str( run ) )
-    

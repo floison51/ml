@@ -69,7 +69,7 @@ def create_placeholders(n_x, n_y):
 
     return X, Y, KEEP_PROB
 
-def initialize_parameters( structure, n_x, isTensorboardFull ):
+def initialize_parameters( structure, n_x, isTensorboardFull = False ):
     """
     Initializes parameters to build a neural network with tensorflow. The shapes are:
                         W1 : [25, 12288]
@@ -113,7 +113,7 @@ def initialize_parameters( structure, n_x, isTensorboardFull ):
 
     return parameters
 
-def forward_propagation( X, parameters, structure, n_x, KEEP_PROB, isTensorboardFull ):
+def forward_propagation( X, parameters, structure, n_x, KEEP_PROB, isTensorboardFull = False ):
     """
     Implements the forward propagation for the model: LINEAR -> RELU -> LINEAR -> RELU -> LINEAR -> SOFTMAX
 
@@ -229,6 +229,18 @@ def compute_cost( Z_last, Y, WEIGHT, beta, parameters, structure, n_x ):
 
     return cost
 
+def getPerfCounters( tsStart, iEpoch, n_x, m ):
+    
+    # Now
+    tsNow = time.time()
+    
+    ## Elapsed (seconds)
+    elapsedSeconds = int( round( tsNow - tsStart ) )
+    # performance index : per iEpoth - per samples
+    perfIndex = 1 / ( elapsedSeconds / iEpoch / ( n_x * m ) ) * 1e-6
+    
+    return elapsedSeconds, perfIndex
+    
 def runIteration(
     iteration, num_minibatches, sess, feed_dict,
     optimizer, cost,
@@ -255,16 +267,33 @@ def runIteration(
             )
             train_writer.add_summary( summary, iteration )
         else :
-            _ , epoch_cost = sess.run(
+            _ , curCost = sess.run(
                 [optimizer,cost], feed_dict=feed_dict
             )
 
     return curCost
 
+
+def defineAccuracy( tf, Y, Z_last, isTensorBoard=False ):
+    with tf.name_scope('accuracy'):
+        # To calculate the correct predictions
+        prediction = tf.round(tf.sigmoid(Z_last))
+        with tf.name_scope('correct_prediction'):
+            correct_prediction = tf.equal( prediction, Y)
+        with tf.name_scope('accuracy'):
+            # Calculate accuracy on the test set
+            accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
+
+    if isTensorBoard :
+        tf.summary.scalar('accuracy', accuracy)
+    
+    return accuracy, correct_prediction
+
 def model(
     conn, idRun, structure,
     X_train, Y_train, PATH_train, TAG_train, WEIGHT_train,
     X_dev, Y_dev, PATH_dev, TAG_dev,
+    X_train_orig, X_dev_orig,
     hyperParams,
     print_cost = True, show_plot = True, extractImageErrors = True,
     isTensorboard = True, isTensorboardFull = False
@@ -336,16 +365,8 @@ def model(
     # Adam optimizer
     optimizer = tf.train.AdamOptimizer( learning_rate ).minimize( cost, global_step = global_step )
 
-    with tf.name_scope('accuracy'):
-        # To calculate the correct predictions
-        prediction = tf.round( tf.sigmoid( Z_last ) )
-        with tf.name_scope('correct_prediction'):
-            correct_prediction = tf.equal( prediction, Y )
-        with tf.name_scope('accuracy'):
-            # Calculate accuracy on the test set
-            accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
-
-    tf.summary.scalar('accuracy', accuracy)
+    # Accuracy and correct prediction
+    accuracy, correct_prediction = defineAccuracy( tf, Y, Z_last )
 
     # Merge all the summaries and write them out to /tmp/mnist_logs (by default)
     mergedSummaries = tf.summary.merge_all()
@@ -382,7 +403,7 @@ def model(
         while ( not finished and ( iEpoch <= current_num_epochs ) ) :
 
             epoch_cost = 0.                       # Defines a cost related to an epoch
-
+            
             if ( minibatch_size < 0 ) :
 
                 # No mini-batch : do a gradient descent for whole data
@@ -420,7 +441,11 @@ def model(
 
             if print_cost == True and iEpoch % 100 == 0:
                 print ("Cost after epoch %i, iteration %i: %f" % ( iEpoch, iteration, epoch_cost ) )
-
+                if ( iEpoch != 0 ) :
+                    # Performance counters
+                    curElapsedSeconds, curPerfIndex = getPerfCounters( tsStart, iEpoch, n_x, m )
+                    print( "  current: elapsedTime:", curElapsedSeconds, "perfIndex:", curPerfIndex ) 
+                
             if print_cost == True and iEpoch % 5 == 0:
                 costs.append( epoch_cost )
 
@@ -453,6 +478,9 @@ def model(
 
         # Final cost
         print( "Final cost:", epoch_cost )
+
+        # End time
+        tsEnd = time.time()
 
         # plot the cost
         plt.plot(np.squeeze(costs))
@@ -495,31 +523,27 @@ def model(
             if tf.gfile.Exists( save_dir ):
                 tf.gfile.DeleteRecursively( save_dir )
             tf.gfile.MakeDirs( save_dir )
-            
+
             save_path = tfSaver.save( sess, save_dir )
             print( "Model saved in path: %s" % save_path)
-            
-    # End time
-    tsEnd = time.time()
 
     ## Elapsed (seconds)
-    elapsedSeconds = tsEnd - tsStart
-    # performance index : per iEpoth - per samples
-    perfIndex = elapsedSeconds / iEpoch / n_x * 1e6
-
+    elapsedSeconds, perfIndex = getPerfCounters( tsStart, iEpoch, n_x, m )
     perfInfo = {
-        const.KEY_ELAPSED_SECOND: elapsedSeconds,
+        const.KEY_PERF_IS_USE_TENSORBOARD       : isTensorboard,
+        const.KEY_PERF_IS_USE_FULL_TENSORBOARD  : isTensorboardFull,
     }
 
     print( "Elapsed (s):", elapsedSeconds )
     print( "Perf index :", perfIndex )
-    
+
     # Update DB run after execution, add extra info
     db.updateRunAfter(
         conn, idRun,
         perf_info = perfInfo, result_info=resultInfo,
-        perf_index=perfIndex, 
-        train_accuracy=accuracyTrain.astype( float ), 
+        perf_index=perfIndex,
+        elapsed_second = elapsedSeconds,
+        train_accuracy=accuracyTrain.astype( float ),
         dev_accuracy=accuracyDev.astype( float )
     )
 
@@ -599,43 +623,28 @@ def tuning( num_epochs, learning_rate ):
     print( "Max hyper params:" )
     print( maxHyperParams )
 
-
-if __name__ == '__main__':
-
-    print( "***************************************************************" )
-    print( "Cat's recognition with TensorFlow - using parameterized network" )
-    print( "***************************************************************" )
-
-    print( "TensorFlow version:", tf.__version__ )
-    # Tensorboard output dir
-    print( "TensorBoard dir:", TENSORBOARD_LOG_DIR )
-    print( "Db dir         :", DB_DIR )
-
-    # clean TF log dir
-    if tf.gfile.Exists( TENSORBOARD_LOG_DIR ):
-        tf.gfile.DeleteRecursively( TENSORBOARD_LOG_DIR )
-        tf.gfile.MakeDirs( TENSORBOARD_LOG_DIR )
-
-    # Make sure random is predictible...
-    np.random.seed( 1 )
-
-    # system info
-    systemInfo = getSystemInfo( tf.__version__ )
+def train() :
 
     # hyper parameters
     hyperParams = {}
+
+    # use tensorboard
+    isUseTensorboard = False
 
     ## Init tensorflow multi-threading
     # When TF 1.8 available...
 #     config = tf.ConfigProto()
 #     config.intra_op_parallelism_threads = 16
 #     config.inter_op_parallelism_threads = 16
-#     tf.session(config=config)
-
+#     tf.session( config=config )
+    
+    # system info
+    systemInfo = getSystemInfo( tf.__version__ )
+    
 #     ## Units of layers
     structure                                   = [ 1 ]
     hyperParams[ const.KEY_MINIBATCH_SIZE ]     = 64
-    hyperParams[ const.KEY_NUM_EPOCHS ]         = 20
+    hyperParams[ const.KEY_NUM_EPOCHS ]         = 2000
     hyperParams[ const.KEY_USE_WEIGHTS ]        = False
     hyperParams[ const.KEY_START_LEARNING_RATE ]= 0.003
     hyperParams[ const.KEY_BETA ]               = 0
@@ -687,6 +696,8 @@ if __name__ == '__main__':
     Y_train = Y_train_orig
     Y_dev = Y_dev_orig
 
+    print( "Structure:", structure )
+    print()
     print ("number of training examples = " + str(X_train.shape[1]))
     print ("number of test examples = " + str(X_dev.shape[1]))
     print ("X_train shape: " + str(X_train.shape))
@@ -702,8 +713,6 @@ if __name__ == '__main__':
     print ("isLoadWeights :", hyperParams[ const.KEY_USE_WEIGHTS ] )
     if ( hyperParams[ const.KEY_USE_WEIGHTS ] ) :
         print ( "  Weights_train shape :", WEIGHT_train.shape )
-
-    print( "Structure:", structure )
 
     dataInfo = {
         const.KEY_TRN_SIZE  : str( X_train.shape[1] ),
@@ -724,28 +733,140 @@ if __name__ == '__main__':
 
     # Init DB
     with db.initDb( APP_KEY, DB_DIR ) as conn:
-    
+
         # Create run
         idRun = db.createRun( conn )
-    
+
         # Update run before calling model
         db.updateRunBefore(
             conn, idRun,
             structure=structure, comment=comment,
             system_info=systemInfo, hyper_params=hyperParams, data_info=dataInfo
         )
-    
+
         # Run model and update DB run with extra info
         model(
             conn, idRun, structure,
             X_train, Y_train, PATH_train, TAG_train, WEIGHT_train,
             X_dev, Y_dev, PATH_dev, TAG_dev,
-            hyperParams
+            X_train_orig, X_dev_orig,
+            hyperParams,
+            isTensorboard = isUseTensorboard,
         )
-    
+
         # Print run
-        #run = db.getRun( conn, idRun )
-        #print( "Run stored in DB:", str( run ) )
+        run = db.getRun( conn, idRun )
+        print( "Run stored in DB:", str( run ) )
 
     print( "Finished" )
-    
+
+def init() :
+
+    print( "***************************************************************" )
+    print( "Cat's recognition with TensorFlow - using parameterized network" )
+    print( "***************************************************************" )
+
+    print( "TensorFlow version:", tf.__version__ )
+    # Tensorboard output dir
+    print( "TensorBoard dir:", TENSORBOARD_LOG_DIR )
+    print( "Db dir         :", DB_DIR )
+
+    # clean TF log dir
+    if tf.gfile.Exists( TENSORBOARD_LOG_DIR ):
+        tf.gfile.DeleteRecursively( TENSORBOARD_LOG_DIR )
+        tf.gfile.MakeDirs( TENSORBOARD_LOG_DIR )
+
+    # Make sure random is predictible...
+    np.random.seed( 1 )
+
+def predict( idRun, structure, X, Y=None ):
+
+    ops.reset_default_graph()                         # to be able to rerun the model without overwriting tf variables
+    tf.set_random_seed(1)                             # to keep consistent results
+    seed = 3                                          # to keep consistent results
+
+    # Reshpae image X to (n,1)
+    ( n_x, m ) = X.shape                          # (n_x: input size, m : number of examples in the train set)
+    n_y = Y_train.shape[ 0 ]                            # n_y : output size
+
+    tf_X, tf_Y, tf_KEEP_PROB = create_placeholders( n_x, n_y )
+    ### END CODE HERE ###
+
+    # Initialize parameters
+    ### START CODE HERE ### (1 line)
+    parameters = initialize_parameters( structure, n_x )
+    ### END CODE HERE ###
+
+    # Forward propagation: Build the forward propagation in the tensorflow graph
+    tf_Z_last = forward_propagation( tf_X, parameters, structure, n_x, tf_KEEP_PROB )
+
+    # Apply sigmoid
+    tf_A_last     = tf.sigmoid( tf_Z_last )
+    tf_prediction = tf.round( tf_A_last )
+
+    # Accuracy and correct prediction
+    tf_accuracy, tf_correct_prediction = defineAccuracy( tf, tf_Y, tf_Z_last )
+
+    # Restore all the variables.
+    tfSaver = tf.train.Saver()
+
+    # Start the session to compute the tensor flow graph
+    with tf.Session() as sess:
+
+        # Run the initialization
+        init = tf.global_variables_initializer()
+        sess.run( init )
+
+        # Serialize parameters
+        save_dir = TENSORFLOW_SAVE_DIR + "/" + str( idRun ) + "/save"
+
+        tfSaver.restore( sess, save_dir )
+
+        # Evaluate result
+        result = sess.run(
+            [ tf_prediction], feed_dict={ tf_X: X, tf_KEEP_PROB: 1 }
+        )
+        # Simplify
+        finalResult = result[0]
+        
+        accuracy = None
+        oks = None
+        
+        ## Calculate accuracy
+        if ( not( Y is None ) ) :
+            accuracy = tf_accuracy.eval( { tf_X: X, tf_Y: Y, tf_KEEP_PROB: 1 } )
+            print( "Accuracy :", accuracy )
+            print( "Oks      :", oks )
+
+    return finalResult, accuracy, oks
+
+if __name__ == '__main__':
+
+    init()
+
+    ## Train model
+    train()
+
+    ## Predict given an input and saved model
+#     X_train_orig, Y_train_orig, PATH_train, TAG_train, WEIGHT_train, \
+#     X_dev_orig  , Y_dev_orig, PATH_dev, TAG_dev= \
+#         load_dataset( False )
+# 
+#     # Flatten the training and test images
+#     X_train_flatten = X_train_orig.reshape( X_train_orig.shape[0], -1 ).T
+#     X_dev_flatten = X_dev_orig.reshape( X_dev_orig.shape[0], -1 ).T
+#     # Normalize image vectors
+#     X_train = X_train_flatten / 255.
+#     X_dev   = X_dev_flatten / 255.
+# 
+#     Y_train = Y_train_orig
+#     Y_dev = Y_dev_orig
+# 
+#     n_x = X_dev.shape[ 0 ]
+#     n_y = Y_dev.shape[ 0 ]
+#     X = X_dev[ : , 0:2 ].reshape( ( ( n_x, 2 ) ) )
+#     Y = Y_dev[ : , 0:2 ].reshape( ( ( n_y, 2 ) ) )
+# 
+#     #predict( idRun = 6, structure = [1], X = X, Y = Y )
+#     
+#     predict( idRun = 6, structure = [1], X = X_dev, Y = Y_dev )

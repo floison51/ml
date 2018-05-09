@@ -40,5 +40,5 @@ KEY_DEV_NB_ERROR_BY_TAG = "devNbErrorsByTag"
 KEY_DEV_PC_ERROR_BY_TAG = "devNbErrorsPcByTag"
 
 # Performance keys
-KEY_ELAPSED_SECOND = "elapsedSeconds"
-
+KEY_PERF_IS_USE_TENSORBOARD         = "isUseTensorboard"
+KEY_PERF_IS_USE_FULL_TENSORBOARD    = "isUseFullTensorboard"
