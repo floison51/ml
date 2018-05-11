@@ -482,12 +482,12 @@ def model(
         # End time
         tsEnd = time.time()
 
-        # plot the cost
-        plt.plot(np.squeeze(costs))
-        plt.ylabel('cost')
-        plt.xlabel('iterations (per tens)')
-        plt.title("Start learning rate =" + str( start_learning_rate ) )
         if ( show_plot ) :
+            # plot the cost
+            plt.plot(np.squeeze(costs))
+            plt.ylabel('cost')
+            plt.xlabel('iterations (per tens)')
+            plt.title("Start learning rate =" + str( start_learning_rate ) )
             plt.show()
 
         # lets save the parameters in a variable
@@ -549,81 +549,7 @@ def model(
 
     return parameters, accuracyDev, accuracyTrain
 
-def model_batch(
-    structure, X_train, Y_train, X_test, Y_test, learning_rate = 0.0001,
-    beta = 0, keep_prob = [1,1,1],
-    num_epochs = 1900, minibatch_size = 32):
-
-    return model(
-        structure, X_train, Y_train, X_test, Y_test, learning_rate,
-        beta, keep_prob,
-        num_epochs, minibatch_size, print_cost = True, show_plot = False, extractImageErrors = False
-    )
-
-def tuning( num_epochs, learning_rate ):
-    beta_min = 0.000000000000001
-    beta_max = 0.5
-
-    keep_prob_min = 0.5
-    keep_prob_max = 1
-
-    # store results
-    tuning = {}
-
-    # max accuracyDev
-    maxAccuracyDev = -1;
-
-    maxHyperParams = {}
-
-    nbTuning = 20
-
-    for j in range( 1, nbTuning ) :
-
-        print( "*****************************" )
-        print( "Tune round", str( j ), "/", str( nbTuning ) )
-        print( "*****************************" )
-
-        # calculate beta
-        logBeta = random.uniform( math.log10( beta_min ), math.log10( beta_max ) )
-        beta = math.pow( 10, logBeta )
-        print( "Beta = " + str( beta ))
-
-        # calculate keep_prob
-        logKeep_prob = random.uniform( math.log10( keep_prob_min ), math.log10( keep_prob_max ) )
-        keep_prob = math.pow( 10, logKeep_prob )
-        print( "keep_prob = " + str( keep_prob ))
-
-        _, accuracyDev, accuracyTrain = model_batch(
-            structure, X_train, Y_train, X_dev, Y_dev,
-            beta = beta, keep_prob = keep_prob,
-            num_epochs = num_epochs, learning_rate = learning_rate
-        )
-
-        # Store results
-        tuning[ j ] = {
-            "beta": beta, "keep_prob": keep_prob,
-            "accuracyDev": accuracyDev, "accuracyTrain": accuracyTrain
-        }
-
-        # Max
-        if ( accuracyDev > maxAccuracyDev ) :
-            maxAccuracyDev = accuracyDev
-            maxHyperParams = tuning[ j ]
-
-        # print max
-        print( "Max DEV accuracy:", maxAccuracyDev )
-        print( "Max hyper params:" )
-        print( maxHyperParams )
-
-
-    # Print tuning
-    print( "Tuning:" )
-    print( tuning )
-
-    print( "Max hyper params:" )
-    print( maxHyperParams )
-
-def train() :
+def train( tune = True) :
 
     # hyper parameters
     hyperParams = {}
@@ -641,26 +567,50 @@ def train() :
     # system info
     systemInfo = getSystemInfo( tf.__version__ )
     
-#     ## Units of layers
-    structure                                   = [ 1 ]
-    hyperParams[ const.KEY_MINIBATCH_SIZE ]     = 64
-    hyperParams[ const.KEY_NUM_EPOCHS ]         = 2000
-    hyperParams[ const.KEY_USE_WEIGHTS ]        = False
-    hyperParams[ const.KEY_START_LEARNING_RATE ]= 0.003
-    hyperParams[ const.KEY_BETA ]               = 0
-    hyperParams[ const.KEY_KEEP_PROB ]          = 1
+    ## Units of layers
+#     structure                                   = [ 1 ]
+#     hyperParams[ const.KEY_MINIBATCH_SIZE ]     = 64
+#     hyperParams[ const.KEY_NUM_EPOCHS ]         = 100
+#     hyperParams[ const.KEY_USE_WEIGHTS ]        = False
+#     hyperParams[ const.KEY_START_LEARNING_RATE ]= 0.003
+#     hyperParams[ const.KEY_BETA ]               = 0
+#     hyperParams[ const.KEY_KEEP_PROB ]          = 1
 
     ## Units of layers
-#     hyperParams[ const.KEY_NB_UNITS ] = [ 100, 48, 1 ]
-#     # Mini-batch
-#     hyperParams[ const.KEY_MINIBATCH_SIZE ] = 64
-#     hyperParams[ const.KEY_NUM_EPOCHS ] = 2000
-#     hyperParams[ const.KEY_USE_WEIGHTS ] = False
-#     hyperParams[ const.KEY_LEARNING_RATE ] = 0.0001
-#     hyperParams[ const.KEY_BETA ] = 0 #1.6980624617370184e-15
-#     hyperParams[ const.KEY_KEEP_PROB ] = 0.724123179663981
-    # {'beta': 1.6980624617370184e-15, 'keep_prob': 0.724123179663981, 'accuracyDev': 0.8095238, 'accuracyTrain': 0.99946064}
+#     structure                                   = [ 50, 24, 1 ]
+#     hyperParams[ const.KEY_MINIBATCH_SIZE ]     = 64
+#     hyperParams[ const.KEY_NUM_EPOCHS ]         = 2000
+#     hyperParams[ const.KEY_USE_WEIGHTS ]        = False
+#     hyperParams[ const.KEY_START_LEARNING_RATE ]= 0.0001
+#     # From tuning run id=42
+#     hyperParams[ const.KEY_BETA ]               = 2.4233061084214308e-15
+#     hyperParams[ const.KEY_KEEP_PROB ]          = 10.646631549280114
 
+    ## Units of layers
+    structure                                    = [ 100, 48, 1 ]
+    hyperParams[ const.KEY_MINIBATCH_SIZE ]      = 64
+    hyperParams[ const.KEY_NUM_EPOCHS ]          = 2500
+    hyperParams[ const.KEY_USE_WEIGHTS ]         = False
+    hyperParams[ const.KEY_START_LEARNING_RATE ] = 0.0001
+    hyperParams[ const.KEY_BETA ]                = 0
+    hyperParams[ const.KEY_KEEP_PROB ]           = 1
+
+    if tune : 
+        # Tune params
+        beta_min = 0.000000000000001
+        beta_max = 0.5
+        
+        keep_prob_min = 0.5
+        keep_prob_max = 1
+    
+        nbTuning = 20
+        tuning= {}
+        
+        maxAccuracyDev = -9999999999999
+        maxIdRun = -1
+    else :
+        nbTuning = 1
+        
     ## Units of layers
 #     structure = [ 50, 24, 12, 1 ]
 #     num_epochs = 1000
@@ -710,7 +660,7 @@ def train() :
     print ("Minibatch size      :", str( hyperParams[ const.KEY_MINIBATCH_SIZE ] ) )
     print ("Beta                :", str( hyperParams[ const.KEY_BETA ] ) )
     print ("keep_prob           :", str( hyperParams[ const.KEY_KEEP_PROB ] ) )
-    print ("isLoadWeights :", hyperParams[ const.KEY_USE_WEIGHTS ] )
+    print ("isLoadWeights       :", hyperParams[ const.KEY_USE_WEIGHTS ] )
     if ( hyperParams[ const.KEY_USE_WEIGHTS ] ) :
         print ( "  Weights_train shape :", WEIGHT_train.shape )
 
@@ -731,34 +681,89 @@ def train() :
     print()
     comment = input( "Run comment: " )
 
+    # Start time
+    tsGlobalStart = time.time()
+   
     # Init DB
     with db.initDb( APP_KEY, DB_DIR ) as conn:
 
-        # Create run
-        idRun = db.createRun( conn )
+        for j in range( 1, nbTuning + 1 ) :
+            
+            if tune:
+                print( "*****************************" )
+                print( "Tune round", str( j ), "/", str( nbTuning ) )
+                print( "*****************************" )
+            
+                # calculate beta
+                logBeta = random.uniform( math.log10( beta_min ), math.log10( beta_max ) )
+                beta = math.pow( 10, logBeta )
+                print( "Beta = " + str( beta ))
+            
+                # calculate keep_prob
+                logKeep_prob = random.uniform( math.log10( keep_prob_min ), math.log10( keep_prob_max ) )
+                keep_prob = math.pow( 10, logKeep_prob )
+                print( "keep_prob = " + str( keep_prob ))
+                
+                # update hyper params
+                hyperParams[ const.KEY_BETA         ] = beta
+                hyperParams[ const.KEY_KEEP_PROB    ] = keep_prob
+        
+            # Create run
+            idRun = db.createRun( conn )
+    
+            # Update run before calling model
+            db.updateRunBefore(
+                conn, idRun,
+                structure=structure, comment=comment,
+                system_info=systemInfo, hyper_params=hyperParams, data_info=dataInfo
+            )
+    
+            # Run model and update DB run with extra info
+            _, accuracyDev, accuracyTrain = model(
+                conn, idRun, structure,
+                X_train, Y_train, PATH_train, TAG_train, WEIGHT_train,
+                X_dev, Y_dev, PATH_dev, TAG_dev,
+                X_train_orig, X_dev_orig,
+                hyperParams,
+                isTensorboard = isUseTensorboard,
+                show_plot = not tune, extractImageErrors = not tune
+            )
+    
+            # Print run
+            run = db.getRun( conn, idRun )
+            print( "Run stored in DB:", str( run ) )
 
-        # Update run before calling model
-        db.updateRunBefore(
-            conn, idRun,
-            structure=structure, comment=comment,
-            system_info=systemInfo, hyper_params=hyperParams, data_info=dataInfo
-        )
+            if tune :
+                # Store results
+                tuning[ j ] = { 
+                    "beta": beta, "keep_prob": keep_prob, 
+                    "accuracyDev": accuracyDev, "accuracyTrain": accuracyTrain
+                }
+            
+                # Max
+                if ( accuracyDev > maxAccuracyDev ) :
+                    maxAccuracyDev = accuracyDev
+                    maxHyperParams = tuning[ j ]
+                    maxIdRun = idRun
+                    
+                # print max
+                print( "Max DEV accuracy:", maxAccuracyDev )
+                print( "Max hyper params:" )
+                print( maxHyperParams )
+            
+                
+        if tune :
+            # Print tuning
+            print( "Tuning:" , tuning )
+            print()
+            print( "Max DEV accuracy      :", maxAccuracyDev )
+            print( "Max hyper params idRun:", maxIdRun )
 
-        # Run model and update DB run with extra info
-        model(
-            conn, idRun, structure,
-            X_train, Y_train, PATH_train, TAG_train, WEIGHT_train,
-            X_dev, Y_dev, PATH_dev, TAG_dev,
-            X_train_orig, X_dev_orig,
-            hyperParams,
-            isTensorboard = isUseTensorboard,
-        )
+    # Start time
+    tsGlobalEnd = time.time()   
+    globalElapsedSeconds = int( round( tsGlobalEnd - tsGlobalStart ) )
 
-        # Print run
-        run = db.getRun( conn, idRun )
-        print( "Run stored in DB:", str( run ) )
-
-    print( "Finished" )
+    print( "Finished in", globalElapsedSeconds, "seconds" )
 
 def init() :
 
@@ -845,7 +850,7 @@ if __name__ == '__main__':
     init()
 
     ## Train model
-    train()
+    train( tune = False )
 
     ## Predict given an input and saved model
 #     X_train_orig, Y_train_orig, PATH_train, TAG_train, WEIGHT_train, \
