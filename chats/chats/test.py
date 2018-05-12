@@ -1,12 +1,13 @@
 import db.db as db
 import view.view as view
 import control.control as control
+import os
 
 from tkinter import *
 
 if __name__ == '__main__':
 
-    DB_DIR = "C:/Users/frup82455/git/ml/chats/chats/run/db/chats"
+    DB_DIR = os.getcwd().replace( "\\", "/" ) + "/run/db/chats"
     APP_KEY = "chats"
 
         # Init DB
