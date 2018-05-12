@@ -165,7 +165,7 @@ class ViewOrUpdateHyperParamsUpdateWindow ( Toplevel ) :
     def buttonCancelClicked( self ) : 
         # Bye
         result = None
-        finish()
+        self.finish()
         
     def buttonOkClicked( self ) : 
         # Bye
@@ -173,5 +173,5 @@ class ViewOrUpdateHyperParamsUpdateWindow ( Toplevel ) :
         for key, value in self.inputs.items() :
             print( key, "=", value.get() )
         result = None
-        finish()
+        self.finish()
         
