@@ -6,19 +6,23 @@ class ConfigDoer:
     def __init__( self, conn ) :
         self.conn = conn
 
-    def showHyperParams( self, idConf ):
+    def showHyperParams( self, fenetre, idConf ):
 
         # Get config
-        config = db.getConfig( self.conn, idConf )
+        self.config = db.getConfig( self.conn, idConf )
         # get hyper parameters id
-        idHyperParams = config[ "idHyperParams" ]
+        self.idHyperParams = self.config[ "idHyperParams" ]
         # get hyper parameters
-        hyperParams = db.getHyperParams( self.conn, idHyperParams )
+        hyperParams = db.getHyperParams( self.conn, self.idHyperParams )
 
         # Launch window, it may update hps
-        viewHp = view.ViewOrUpdateHyperParamsUpdateWindow()
+        viewHp = view.ViewOrUpdateHyperParamsUpdateWindow( fenetre, self.updateHyperParams )
         
-        newHyperParams = viewHp.run( hyperParams )
+        # launch view with callback
+        viewHp.run( hyperParams )
+
+    def updateHyperParams( self, newHyperParams ):
+
         print( "Result:", newHyperParams )
         
         if ( newHyperParams == None ) :
@@ -26,21 +30,22 @@ class ConfigDoer:
             return
 
         # Get or create new hyper parameters
-        idNewHyperParams = db.getOrCreateHyperParams( self.conn, newHyperParams[ "hyper_params" ] )
+        idNewHyperParams = db.getOrCreateHyperParams( self.conn, newHyperParams )
 
         # check for change
-        if ( idHyperParams != idNewHyperParams ) :
+        if ( self.idHyperParams != idNewHyperParams ) :
             # Update config
-            updateConfig( self.conn, newHyperParams )
+            self.config[ "idHyperParams" ] = idNewHyperParams
+            db.updateConfig( self.conn, self.config )
             #commit
-            conn.commit()
-
-    def newConfig( this ):
+            self.conn.commit()
+        
+    def newConfig( self ):
         print( "newConfig" )
 
-    def updateConfig( this, idConf ):
+    def updateConfig( self, idConf ):
         print( "updateConfig" )
 
-    def deleteConfig( this, idConf ):
+    def deleteConfig( self, idConf ):
         print( "deleteConfig" )
 

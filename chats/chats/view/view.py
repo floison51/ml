@@ -4,110 +4,116 @@ Machine Learning configuration
 @author: fran
 '''
 from tkinter import *
+import const.constants as const
 
 buttonsToUpdate = []
 
-def buildConfigGrid( frameConfigs, configs, guiDoer ):
+class MainWindow :
+    
+    def __init__( self ) :
+    
+        self.fenetre = Tk()
+        # From conf radio-buttons
+        self.confSelected = StringVar()
+        self.confSelected.set( "None" )
+    
+    def show( self, configs, guiDoer ):
+    
+        frameTop = Frame( self.fenetre, relief=GROOVE )
+        frameTop.pack(side=TOP, padx=30, pady=30)
+    
+        label = Label( frameTop, text="Cat's Recognition Machine Learning" )
+        label.pack()
+    
+        frameConfigs = LabelFrame(self.fenetre, text="Configurations", padx=20, pady=20)
+        self.buildConfigGrid( frameConfigs, configs, guiDoer )
+        frameConfigs.pack(fill="both", expand="yes", padx=10, pady=10)
+    
+        frameButtons = Frame(self.fenetre, borderwidth=0 )
+        frameButtons.pack( side=BOTTOM, padx=10, pady=10, fill='both', expand=True )
+    
+        buttonRun = Button( frameButtons, text="Run", command=self.fenetre.quit, state=DISABLED )
+        buttonRun.pack( side="left", padx=40 )
+    
+        buttonsToUpdate.append( buttonRun )
+    
+        buttonCancel=Button( frameButtons, text="Cancel", command=self.fenetre.quit)
+        buttonCancel.pack( side="right", padx=40  )
+    
+        self.fenetre.mainloop()
 
-#     frameConfigsGlobalTable = LabelFrame( frameConfigs, padx=10, pady=10)
-#     frameConfigsGlobalTable.pack( side = "top" )
-#
-#     scrollbar = Scrollbar( frameConfigsGlobalTable )
-#     scrollbar.pack( side = RIGHT, fill = Y )
-
-#     frameConfigsTable = LabelFrame( frameConfigsGlobalTable )
-
-    frameConfigsTable = LabelFrame( frameConfigs, padx=10, pady=10)
-    frameConfigsTable.pack( side = "top" )
-
-    # show window
-    confSelected = StringVar()
-
-    labels = { 1: "", 2: "Id", 3: "Name", 4: "Structure", 5 : "Best DEV Accuracy", 6: "Hyper Params" }
-
-    for iCol in range( 1, 7 ) :
-        label = Label( frameConfigsTable, text=labels[ iCol ], borderwidth=1 ).grid( row=1, column=iCol )
-
-    iRow = 2
-    for config in configs :
-
-        idConf = config[ 0 ]
-
-        # Radio button
-        radioButton = Radiobutton( frameConfigsTable, variable=confSelected, value=idConf, command=confRbClicked ).grid( row=iRow, column=1 )
-
-        iCol = 2
-        for item in config:
-            label = Label( frameConfigsTable, text=item, borderwidth=1 ).grid( row=iRow, column=iCol )
-            iCol += 1
-
-        # Button to show hyper params
-        buttonShowHP = Button( frameConfigsTable, text="Show", command=(lambda s=idConf : guiDoer.showHyperParams( s )) ).grid( row=iRow, column=iCol )
-
-        iRow += 1
-
-    frameConfigsButtons = LabelFrame( frameConfigs, padx=10, pady=10)
-    frameConfigsButtons.pack( side = "bottom" )
-
-    buttonNewConfig = Button( frameConfigsButtons, text="New", command=guiDoer.newConfig )
-    buttonNewConfig.grid( row=1, column=1 )
-    buttonUpdateConfig = Button( frameConfigsButtons, text="Update", command=guiDoer.updateConfig, state=DISABLED )
-    buttonUpdateConfig.grid( row=1, column=2 )
-    buttonDeleteConfig = Button( frameConfigsButtons, text="Delete", command=guiDoer.deleteConfig, state=DISABLED )
-    buttonDeleteConfig.grid( row=1, column=3 )
-
-    buttonsToUpdate.append( buttonUpdateConfig )
-    buttonsToUpdate.append( buttonDeleteConfig )
-    # Last one is a button
-    #button = Button(frameConfigs, text=labels[ len( labels ) ], borderwidth=1).grid( row=1, column=len( labels ) )
-    #button.pck()
-
-def enableEntry( entry ):
-    entry.configure( state=NORMAL )
-    entry.update()
-
-def confRbClicked():
-    for button in buttonsToUpdate :
-        enableEntry( button )
-
-def showMainWindow( configs, guiDoer ):
-    fenetre = Tk()
-
-    frameTop = Frame( fenetre, relief=GROOVE )
-    frameTop.pack(side=TOP, padx=30, pady=30)
-
-    label = Label( frameTop, text="Cat's Recognition Machine Learning" )
-    label.pack()
-
-    frameConfigs = LabelFrame(fenetre, text="Configurations", padx=20, pady=20)
-    buildConfigGrid( frameConfigs, configs, guiDoer )
-    frameConfigs.pack(fill="both", expand="yes", padx=10, pady=10)
-
-    frameButtons = Frame(fenetre, borderwidth=2, relief=GROOVE)
-    frameButtons.pack( side=BOTTOM, padx=30, pady=30)
-
-    frameConfigs = Frame(fenetre, borderwidth=2, relief=GROOVE)
-    frameConfigs.pack(side=LEFT, padx=30, pady=30)
-
-    buttonRun = Button( frameButtons, text="Run", command=fenetre.quit, state=DISABLED )
-    buttonRun.pack( side="left" )
-
-    buttonsToUpdate.append( buttonRun )
-
-    buttonCancel=Button( frameButtons, text="Cancel", command=fenetre.quit)
-    buttonCancel.pack( side="right")
-
-    fenetre.mainloop()
-
+    def buildConfigGrid( self, frameConfigs, configs, guiDoer ):
+    
+    #     frameConfigsGlobalTable = LabelFrame( frameConfigs, padx=10, pady=10)
+    #     frameConfigsGlobalTable.pack( side = "top" )
+    #
+    #     scrollbar = Scrollbar( frameConfigsGlobalTable )
+    #     scrollbar.pack( side = RIGHT, fill = Y )
+    
+    #     frameConfigsTable = LabelFrame( frameConfigsGlobalTable )
+    
+        frameConfigsTable = LabelFrame( frameConfigs, padx=10, pady=10)
+        frameConfigsTable.pack( side = "top" )
+    
+        # show window
+        labels = { 1: "", 2: "Id", 3: "Name", 4: "Structure", 5 : "Best DEV\nAccuracy", 6: "Hyper Params" }
+    
+        for iCol in range( 1, 7 ) :
+            label = Label( frameConfigsTable, text=labels[ iCol ], borderwidth=1 ).grid( row=1, column=iCol, sticky=W, padx=10 )
+    
+        iRow = 2
+        for config in configs :
+    
+            idConf = config[ 0 ]
+    
+            # Radio button
+            radioButton = Radiobutton( frameConfigsTable, variable=self.confSelected, value=idConf, command=self.confRbClicked ).grid( row=iRow, column=1 )
+    
+            iCol = 2
+            for item in config:
+                label = Label( frameConfigsTable, text=item, borderwidth=1 ).grid( row=iRow, column=iCol, sticky=W, padx=10 )
+                iCol += 1
+    
+            # Button to show hyper params
+            buttonShowHP = Button( frameConfigsTable, text="Show", command=(lambda idConf=idConf : guiDoer.showHyperParams( self.fenetre, idConf )) ).grid( row=iRow, column=iCol )
+    
+            iRow += 1
+    
+        frameConfigsButtons = LabelFrame( frameConfigs, padx=10, pady=10, borderwidth=0 )
+        frameConfigsButtons.pack( side = "bottom", fill='both', expand=True )
+    
+        buttonNewConfig = Button( frameConfigsButtons, text="New", command=guiDoer.newConfig )
+        buttonNewConfig.grid( row=1, column=1, padx=10 )
+        buttonUpdateConfig = Button( frameConfigsButtons, text="Update", command=guiDoer.updateConfig, state=DISABLED )
+        buttonUpdateConfig.grid( row=1, column=2, padx=10 )
+        buttonDeleteConfig = Button( frameConfigsButtons, text="Delete", command=guiDoer.deleteConfig, state=DISABLED )
+        buttonDeleteConfig.grid( row=1, column=3, padx=10 )
+    
+        buttonsToUpdate.append( buttonUpdateConfig )
+        buttonsToUpdate.append( buttonDeleteConfig )
+        # Last one is a button
+        #button = Button(frameConfigs, text=labels[ len( labels ) ], borderwidth=1).grid( row=1, column=len( labels ) )
+        #button.pck()
+    
+    def enableEntry( self, entry ):
+        entry.configure( state=NORMAL )
+        entry.update()
+    
+    def confRbClicked( self ):
+        for button in buttonsToUpdate :
+            self.enableEntry( button )
+    
 class ViewOrUpdateHyperParamsUpdateWindow ( Toplevel ) :
     
-    def __init__( self, **options ) :
-        Toplevel.__init__( self, **options )
-        # Fenetre modale
-        ## TODO : disable parent window
+    def __init__( self, boss, callbackFct, **options ) :
+        Toplevel.__init__( self, boss, **options )
         
-        self.transient( self.master )
+        # Modal window
+        ## disable parent window
+        boss.wm_attributes( "-disabled", True )
+        self.transient( boss )
         
+        self.callbackFct = callbackFct
         self.result = None
         self.inputs = {}
  
@@ -123,8 +129,8 @@ class ViewOrUpdateHyperParamsUpdateWindow ( Toplevel ) :
         frameForm = Frame( self, relief=GROOVE )
         frameForm.pack( padx=30, pady=30)
     
-        frameButtons = Frame( self, borderwidth=2, relief=GROOVE)
-        frameButtons.pack( side=BOTTOM, padx=30, pady=30)
+        frameButtons = LabelFrame( self, borderwidth=0 )
+        frameButtons.pack( side=BOTTOM, padx=30, pady=30, fill='both', expand=True )
     
         # Add dico entries
         iRow = 1
@@ -135,11 +141,12 @@ class ViewOrUpdateHyperParamsUpdateWindow ( Toplevel ) :
         for key, value in hyperParams.items() :
     
             # Label
-            label = Label( frameForm, text=key, borderwidth=1 ).grid( row=iRow, column=1 )
+            label = Label( frameForm, text=key, borderwidth=1 ).grid( row=iRow, column=1, sticky=W, padx=10 )
     
-            # input
-            inputVar = StringVar()
-            input = Entry( frameForm, textvariable=inputVar ).grid( row=iRow, column=2 )
+            # input : type depends on hp name
+            inputVar = self.getInputVar( key )
+            
+            input = Entry( frameForm, textvariable=inputVar ).grid( row=iRow, column=2, sticky=W, padx=10 )
             self.inputs[ key ] = inputVar
 
             inputVar.set( str( value ) )
@@ -149,29 +156,46 @@ class ViewOrUpdateHyperParamsUpdateWindow ( Toplevel ) :
         buttonSave   = Button( frameButtons, text="Save"  , command=self.buttonOkClicked    , state=NORMAL )
         buttonCancel = Button( frameButtons, text="Cancel", command=self.buttonCancelClicked, state=NORMAL )
         
-        buttonSave.pack()
-        buttonCancel.pack()
-    
-        # Run window
-        ## TODO modal
-        self.mainloop()
+        buttonSave.pack( side=LEFT, padx=40 )
+        buttonCancel.pack( side=RIGHT, padx=40 )
         
-        return self.result
+    
 
-    def finish( self ) :
-        ## TODO : enable parent window
+    def getInputVar( self, hpName ) :
+        # use dico
+        hpCarac = const.HyperParamsDico.carac[ hpName ]
+        # Get type
+        hpType = hpCarac[ 0 ]
+        
+        if ( hpType == "int" ) :
+            return IntVar()
+        elif ( hpType == "float" ) :
+            return DoubleVar()
+        elif ( hpType == "boolean" ) :
+            return BooleanVar()
+        else :
+            raise ValueError( "Unknown type", hpType )
+
+        
+    def do_close( self ) :
+        ## enable parent window
+        self.master.wm_attributes( "-disabled", False )
         self.destroy()
+        # update callback
+        self.callbackFct( self.result )
         
     def buttonCancelClicked( self ) : 
         # Bye
         result = None
-        self.finish()
+        self.do_close()
         
     def buttonOkClicked( self ) : 
-        # Bye
-        print( self.inputs )
+        
+        # Read values from form
+        self.result = {}
         for key, value in self.inputs.items() :
-            print( key, "=", value.get() )
-        result = None
-        self.finish()
+            self.result[ key ] = value.get()
+
+        # Bye
+        self.do_close()
         

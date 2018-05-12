@@ -42,3 +42,15 @@ KEY_DEV_PC_ERROR_BY_TAG = "devNbErrorsPcByTag"
 # Performance keys
 KEY_PERF_IS_USE_TENSORBOARD         = "isUseTensorboard"
 KEY_PERF_IS_USE_FULL_TENSORBOARD    = "isUseFullTensorboard"
+
+class HyperParamsDico:
+    
+    carac = {
+        
+        KEY_MINIBATCH_SIZE      : [ "int" ],
+        KEY_NUM_EPOCHS          : [ "int" ],
+        KEY_USE_WEIGHTS         : [ "boolean" ],
+        KEY_START_LEARNING_RATE : [ "float" ],
+        KEY_BETA                : [ "float" ],
+        KEY_KEEP_PROB           : [ "float" ],
+    } 

@@ -20,4 +20,5 @@ if __name__ == '__main__':
 
         configDoer = control.ConfigDoer( conn )
         
-        view.showMainWindow( configs, configDoer )
+        mainWindow = view.MainWindow()
+        mainWindow.show( configs, configDoer )

@@ -8,6 +8,8 @@ import os
 import datetime
 import json
 
+from collections import OrderedDict
+
 def createConfig( conn, name, structure, hyper_params ) :
 
     # get hyparams
@@ -56,8 +58,10 @@ def getOrCreateHyperParams( conn, hyper_params ) :
 
     c = conn.cursor();
 
+    # Sort hyperparams by key
+    sorted_hyper_params = OrderedDict( sorted( hyper_params.items(), key=lambda t: t[0] ) )
     # JSon conversion
-    json_hyper_params   = json.dumps( hyper_params )
+    json_hyper_params   = json.dumps( sorted_hyper_params )
 
     # get existing, if anay
     cursor = c.execute(
@@ -127,6 +131,27 @@ def getOrCreateConfig( c, name, structure, hyperParams ) :
 
     return idResult;
 
+def updateConfig( conn, config ) :
+    
+    c = conn.cursor();
+
+    # Update config
+    updateStatement = \
+        "update configs set " + \
+             "name=?, " + \
+             "structure=?, " + \
+             "idHyperParams=? " + \
+             "where id=?"
+
+    c.execute(
+        updateStatement,
+        (
+            config[ "name" ], config[ "structure" ], config[ "idHyperParams" ], config[ "id" ]
+        )
+    )
+
+    c.close();
+    
 def getConfigsWithMaxDevAccuracy( conn ) :
 
     c = conn.cursor()
