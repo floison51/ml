@@ -105,6 +105,7 @@ class ViewOrUpdateHyperParamsUpdateWindow ( Toplevel ) :
         Toplevel.__init__( self, **options )
         # Fenetre modale
         ## TODO : disable parent window
+        
         self.transient( self.master )
         
         self.result = None
