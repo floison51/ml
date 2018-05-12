@@ -353,7 +353,7 @@ def initTables( c ) :
 
 if __name__ == '__main__':
 
-    DB_DIR = "C:/Users/frup82455/git/ml/chats/chats/run/db/chats"
+    DB_DIR = os.getcwd().replace( "\\", "/" ) + "/../run/db/chats"
     APP_KEY = "chats"
 
         # Init DB
@@ -361,9 +361,9 @@ if __name__ == '__main__':
     with initDb( APP_KEY, DB_DIR ) as conn :
 
         # Create config
-        hyperParams = { "beta": 0 }
+        hyperParams = { "beta": 100 }
 
-        idConfig = getOrCreateConfig( conn, "Hello conf6", "[2]", hyperParams )
+        idConfig = getOrCreateConfig( conn, "Hello conf 100", "[1]", hyperParams )
 
         systemInfo = { "host": "12345678" }
         dataInfo = { "data": "chats" }
