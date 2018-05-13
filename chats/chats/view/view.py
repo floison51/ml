@@ -92,10 +92,8 @@ class MainWindow ( Tk ):
         
         for config in configs :
     
-            padx, borderwidth, text, command, row, column, idConf = self.addRowConfig(hpDoer, frameConfigsTable, iCol, label, Label, W, iRow, idConf, config)
+            self.addRowConfig( hpDoer, frameConfigsTable, iCol, label, Label, W, iRow, config )
             
-            iRow += 1
-    
         frameConfigsButtons = LabelFrame( frameConfigs, padx=10, pady=10, borderwidth=0 )
         frameConfigsButtons.pack( side = "bottom", fill='both', expand=True )
     
