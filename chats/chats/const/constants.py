@@ -44,7 +44,8 @@ KEY_PERF_IS_USE_TENSORBOARD         = "isUseTensorboard"
 KEY_PERF_IS_USE_FULL_TENSORBOARD    = "isUseFullTensorboard"
 
 class HyperParamsDico:
-    
+
+    KEYS = { id }
     CARAC = {
         # Type, default value
         KEY_MINIBATCH_SIZE      : [ "int"       , 64        ],
@@ -53,4 +54,22 @@ class HyperParamsDico:
         KEY_START_LEARNING_RATE : [ "float"     , 0.0001    ],
         KEY_BETA                : [ "float"     , 0.        ],
         KEY_KEEP_PROB           : [ "float"     , 1.        ],
-    } 
+    }
+
+class ConfigsDico:
+
+    KEYS = { "id", "idMachine", "idHyperParams" }
+    CARAC = {
+        # Type, default value
+        "name"      : [ "string" , None ],
+        "structure" : [ "string" , None ],
+    }
+
+class MachinesDico:
+
+    KEYS = { "id" }
+    CARAC = {
+        # Type, default value
+        "name"      : [ "string" , "None" ],
+        "class"     : [ "string" , "learning.NoneMachine" ],
+    }

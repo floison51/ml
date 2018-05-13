@@ -13,16 +13,19 @@ from collections import OrderedDict
 
 import const.constants as const
 
-def createConfig( conn, name, structure, hyper_params ) :
+def createConfig( conn, name, structure, machineName, hyper_params ) :
 
+    # Id machine
+    idMachine = getIdMachineByName( conn, machineName )
+        
     # get hyparams
     idHyperParams = getOrCreateHyperParams( conn, hyper_params )
 
     c = conn.cursor();
 
     cursor = c.execute(
-        "INSERT INTO configs VALUES ( null, ?, ?, ? )",
-        ( name, structure, idHyperParams, )
+        "INSERT INTO configs VALUES ( null, ?, ?, ?, ? )",
+        ( name, structure, idMachine, idHyperParams, )
     )
 
     id = cursor.lastrowid
@@ -40,13 +43,13 @@ def getHyperParams( conn, idHyperParams ) :
         "select * from hyperparams where id=?",
         ( idHyperParams, )
     )
-    
+
     result = {}
 
     for row in cursor :
         result[ "id" ]    = row[ 0 ]
         json_hyper_params = row[ 1 ]
-        
+
         hyper_params = json.loads( json_hyper_params )
         result[ const.KEY_DICO_HYPER_PARAMS ]  = hyper_params
 
@@ -66,17 +69,17 @@ def getBestHyperParams( conn, idConfig ) :
 
     devAccuracy = None
     hyperParams = {}
-    
+
     idHyperParams = None
     for row in cursor :
         idHyperParams = row[ 0 ]
         devAccuracy   = row[ 1 ]
-        
+
     c.close();
 
     if ( idHyperParams != None ) :
-        hyperParams = getHyperParams( conn, idHyperParams ) 
-    
+        hyperParams = getHyperParams( conn, idHyperParams )
+
     return ( hyperParams, devAccuracy )
 
 def getOrCreateHyperParams( conn, hyper_params ) :
@@ -115,7 +118,7 @@ def getOrCreateHyperParams( conn, hyper_params ) :
 def getConfig( conn, idConfig ) :
 
     c = conn.cursor()
-    
+
     cursor = c.execute(
         "select c.* from configs c where c.id=? ",
         ( idConfig, )
@@ -127,7 +130,8 @@ def getConfig( conn, idConfig ) :
         result[ "id" ]               = row[ 0 ]
         result[ "name" ]             = row[ 1 ]
         result[ "structure" ]        = row[ 2 ]
-        result[ "idHyperParams" ]    = row[ 3 ]
+        result[ "idMachine" ]        = row[ 3 ]
+        result[ "idHyperParams" ]    = row[ 4 ]
 
     c.close();
 
@@ -157,7 +161,7 @@ def getOrCreateConfig( conn, name, structure, hyperParams ) :
     return idResult;
 
 def updateConfig( conn, config ) :
-    
+
     c = conn.cursor();
 
     # Update config
@@ -176,9 +180,9 @@ def updateConfig( conn, config ) :
     )
 
     c.close();
-    
+
 def deleteConfig( conn, idConf ) :
-    
+
     c = conn.cursor();
 
     # Update config
@@ -189,34 +193,99 @@ def deleteConfig( conn, idConf ) :
     )
 
     c.close();
-    
-def getConfigsWithMaxDevAccuracy( conn ) :
+
+def getConfigsWithMaxDevAccuracy( conn, idConfig = None ) :
 
     c = conn.cursor()
-    
+    parameters = ()
+
+    statement = "select c.id, c.name, c.structure, ( select m.name from machines m where m.id=c.idMachine ), ( select max(r.dev_accuracy) from runs r where r.idConf=c.id ) from configs c"
+    if ( idConfig != None ) :
+        statement += " where c.id=?"
+        parameters = ( idConfig, )
+
+    statement += " order by c.id asc"
+
     # Update run
     cursor = c.execute(
-        "select c.id, c.name, c.structure, ( select max(r.dev_accuracy) from runs r where r.idConf=c.id ) from configs c " +
-        "order by c.id asc"
+        statement,
+        parameters
     )
 
     results = []
 
     for row in cursor :
-        
+
         result = []
-        
+
         result.append( row[ 0 ] )
         result.append( row[ 1 ] )
         result.append( row[ 2 ] )
         result.append( row[ 3 ] )
+        result.append( row[ 4 ] )
 
         results.append( result )
-        
+
     c.close();
 
     return results
 
+def getMachineNames( conn ) :
+
+    c = conn.cursor();
+
+    # Update run
+    cursor = c.execute(
+        "select name from machines"
+    )
+
+    result = []
+
+    for row in cursor :
+        result.append( row[ 0 ] )
+
+    c.close();
+
+    return result
+
+def getIdMachineByName( conn, machineName ):
+    
+    c = conn.cursor();
+
+    # Update run
+    cursor = c.execute(
+        "select id from machines where name=?",
+        ( machineName, )
+    )
+
+    result = None
+
+    for row in cursor :
+        result = row[ 0 ]
+
+    c.close();
+
+    return result
+   
+def getMachineNameById( conn, id ):
+    
+    c = conn.cursor();
+
+    # Update run
+    cursor = c.execute(
+        "select name from machines where id=?",
+        ( id, )
+    )
+
+    result = None
+
+    for row in cursor :
+        result = row[ 0 ]
+
+    c.close();
+
+    return result
+    
 
 def createRun( conn, idConfig, runHyperParams ) :
 
@@ -224,7 +293,7 @@ def createRun( conn, idConfig, runHyperParams ) :
 
     # get config
     config = getConfig( conn, idConfig )
-    
+
     # Get hyperparams
     idRunHyperParams = getOrCreateHyperParams( conn, runHyperParams );
 
@@ -363,6 +432,15 @@ def initDb( key, dbFolder ) :
 
 def initTables( c ) :
 
+    # Create table - machines
+    c.execute( '''CREATE TABLE IF NOT EXISTS machines
+        (
+           id integer PRIMARY KEY AUTOINCREMENT,
+           name text not null unique,
+           class text not null
+         )'''
+    )
+
     # Create table - hyperparams
     c.execute( '''CREATE TABLE IF NOT EXISTS hyperparams
         (
@@ -377,8 +455,10 @@ def initTables( c ) :
            id integer PRIMARY KEY AUTOINCREMENT,
            name text,
            structure text,
+           idMachine not null,
            idHyperParams not null,
            CONSTRAINT cs_unique0 UNIQUE (name, structure)
+           FOREIGN KEY (idMachine) REFERENCES machines( id )
            FOREIGN KEY (idHyperParams) REFERENCES hyperparams( id )
          )'''
     )
@@ -405,6 +485,9 @@ def initTables( c ) :
     )
 
     # Indexes
+    c.execute( '''CREATE INDEX idx_machines_id on machines( id ) ''' )
+    c.execute( '''CREATE INDEX idx_machines_name on machines( name ) ''' )
+
     c.execute( '''CREATE INDEX idx_configs_id on configs( id ) ''' )
     c.execute( '''CREATE INDEX idx_configs_structure on configs( structure ) ''' )
 
@@ -416,6 +499,13 @@ def initTables( c ) :
     c.execute( '''CREATE INDEX idx_runs_elapsed_second on runs( elapsed_second ) ''' )
     c.execute( '''CREATE INDEX idx_runs_train_accuracy on runs( train_accuracy ) ''' )
     c.execute( '''CREATE INDEX idx_runs_dev_accuracy on runs( dev_accuracy ) ''' )
+
+    ## Create default values
+    c.execute(
+        "insert into machines values( null, ?, ? )",
+        ( const.MachinesDico.CARAC[ "name"  ][ 1 ],   #default value for name
+          const.MachinesDico.CARAC[ "class" ][ 1 ], ) #default value for name
+    )
 
 def test( conn ):
 

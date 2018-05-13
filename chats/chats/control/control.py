@@ -6,7 +6,7 @@ class Doer:
     def __init__( self, conn ) :
         self.conn = conn
 
-    
+
 class HyperParamsDoer( Doer ):
 
     def __init__( self, conn ) :
@@ -23,17 +23,17 @@ class HyperParamsDoer( Doer ):
 
         # get best hyper params
         ( bestHyperParams, bestDevAccuracy ) = db.getBestHyperParams( self.conn, idConf )
-         
+
         # Launch window, it may update hps
         viewHp = view.ViewOrUpdateHyperParamsWindow( fenetre, self.doCreateOrUpdateHyperParams )
-        
+
         # launch view with callback
         viewHp.run( hyperParams, bestHyperParams, bestDevAccuracy )
 
     def doCreateOrUpdateHyperParams( self, fenetre, newHyperParams ):
 
         print( "Result:", newHyperParams )
-        
+
         if ( newHyperParams == None ) :
             ## Nothing to do
             return
@@ -48,46 +48,95 @@ class HyperParamsDoer( Doer ):
             db.updateConfig( self.conn, self.config )
             #commit
             self.conn.commit()
-        
+
 class ConfigDoer( Doer ):
 
     def __init__( self, conn ) :
         super().__init__( conn )
 
-    def newConfig( self, fenetre ):
+    def createConfig( self, fenetre ):
         "Create new config"
-        viewConfig = view.CreateOrUpdateConfigWindow( fenetre, self.doCreateOrUpdateConfig )
+        viewConfig = view.CreateOrUpdateConfigWindow( fenetre, self.doCreateConfig )
+
+        #Get machine names
+        machineNames = db.getMachineNames( self.conn )
+
         # launch view with callback
-        viewConfig.run()
+        viewConfig.run( machineNames )
 
     def updateConfig( self, fenetre, idConf ):
-        print( "updateConfig" )
+        "Update new config"
+
+        # Get config
+        config = db.getConfig( self.conn, idConf )
+
+        viewConfig = view.CreateOrUpdateConfigWindow( fenetre, self.doUpdateConfig )
+
+        #Get machine names
+        machineNames = db.getMachineNames( self.conn )
+
+        # Add machine name
+        idMachine = config[ "idMachine" ]
+        machineName = db.getMachineNameById( self.conn, idMachine )
+        config[ "machine" ] = machineName
+        
+        # launch view with callback
+        viewConfig.run( machineNames, config )
 
     def deleteConfig( self, fenetre, idConf ):
         print( "deleteConfig", idConf )
         db.deleteConfig( self.conn, idConf )
-        
+
         # Update window
         fenetre.deleteConfigGrid( idConf )
+
         # commit
         self.conn.commit()
-        
-    def doCreateOrUpdateConfig( self, fenetre, newConfig ):
 
-        print( "Result:", newConfig )
-        
+    def doCreateConfig( self, fenetre, newConfig ):
+
         if ( newConfig == None ) :
             ## Nothing to do
             return
-        
+
         # Default hyper params
-        if ( not const.KEY_DICO_HYPER_PARAMS in newConfig ) :
-            hyperParams = {}
-            for ( key, hpCarac ) in const.HyperParamsDico.CARAC.items() :
-                hyperParams[ key ] = hpCarac[ 1 ]                
-            
+        hyperParams = {}
+        for ( key, hpCarac ) in const.HyperParamsDico.CARAC.items() :
+            hyperParams[ key ] = hpCarac[ 1 ]
+
         # Get or create new config
-        idNewConfig = db.getOrCreateConfig( self.conn, newConfig[ "name" ], newConfig[ "structure" ], hyperParams )
-        
+        idNewConfig = db.createConfig( self.conn, \
+            newConfig[ "name" ], newConfig[ "structure" ], \
+            newConfig[ "machine" ], hyperParams \
+        )
+
+        # Update window
+        config = db.getConfigsWithMaxDevAccuracy( self.conn, idNewConfig )[ 0 ]
+        fenetre.master.addConfigGrid( config )
+
         # commit
-        self.conn.commit()        
+        self.conn.commit()
+
+    def doUpdateConfig( self, fenetre, newConfig ):
+
+        if ( newConfig == None ) :
+            ## Nothing to do
+            return
+
+        #Update config
+        db.updateConfig( self.conn, newConfig )
+
+        # Update window
+        config = db.getConfigsWithMaxDevAccuracy( self.conn, idNewConfig )[ 0 ]
+        fenetre.master.addConfigGrid( config )
+
+        # commit
+        self.conn.commit()
+
+class RunsDoer( Doer ):
+
+    def __init__( self, conn ) :
+        super().__init__( conn )
+
+    def showRuns( self, fenetre, idConf ):
+        print( "Show runs" )
