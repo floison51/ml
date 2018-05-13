@@ -15,10 +15,13 @@ if __name__ == '__main__':
     
     with db.initDb( APP_KEY, DB_DIR ) as conn :
 
+        #db.test( conn )
+        
         # Read configurations
         configs = db.getConfigsWithMaxDevAccuracy( conn )
 
-        configDoer = control.ConfigDoer( conn )
+        configDoer  = control.ConfigDoer     ( conn )
+        hpDoer      = control.HyperParamsDoer( conn )
         
         mainWindow = view.MainWindow()
-        mainWindow.show( configs, configDoer )
+        mainWindow.show( configs, configDoer, hpDoer )

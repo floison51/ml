@@ -45,12 +45,12 @@ KEY_PERF_IS_USE_FULL_TENSORBOARD    = "isUseFullTensorboard"
 
 class HyperParamsDico:
     
-    carac = {
-        
-        KEY_MINIBATCH_SIZE      : [ "int" ],
-        KEY_NUM_EPOCHS          : [ "int" ],
-        KEY_USE_WEIGHTS         : [ "boolean" ],
-        KEY_START_LEARNING_RATE : [ "float" ],
-        KEY_BETA                : [ "float" ],
-        KEY_KEEP_PROB           : [ "float" ],
+    CARAC = {
+        # Type, default value
+        KEY_MINIBATCH_SIZE      : [ "int"       , 64        ],
+        KEY_NUM_EPOCHS          : [ "int"       , 2000      ],
+        KEY_USE_WEIGHTS         : [ "boolean"   , False     ],
+        KEY_START_LEARNING_RATE : [ "float"     , 0.0001    ],
+        KEY_BETA                : [ "float"     , 0.        ],
+        KEY_KEEP_PROB           : [ "float"     , 1.        ],
     } 

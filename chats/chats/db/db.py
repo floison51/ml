@@ -3,12 +3,15 @@ Created on 28 avr. 2018
 Machine Learning DB
 @author: fran
 '''
+
 import sqlite3
 import os
 import datetime
 import json
 
 from collections import OrderedDict
+
+import const.constants as const
 
 def createConfig( conn, name, structure, hyper_params ) :
 
@@ -25,9 +28,6 @@ def createConfig( conn, name, structure, hyper_params ) :
     id = cursor.lastrowid
 
     c.close();
-
-    # commit
-    conn.commit()
 
     return id
 
@@ -48,11 +48,36 @@ def getHyperParams( conn, idHyperParams ) :
         json_hyper_params = row[ 1 ]
         
         hyper_params = json.loads( json_hyper_params )
-        result[ "hyper_params" ]  = hyper_params
+        result[ const.KEY_DICO_HYPER_PARAMS ]  = hyper_params
 
     c.close();
 
     return result
+
+def getBestHyperParams( conn, idConfig ) :
+
+    c = conn.cursor();
+
+    # get existing, if anay
+    cursor = c.execute(
+        "select r.idHyperParams, max(r.dev_accuracy) from configs c, runs r where ( c.id=? and r.idConf=c.id )",
+        ( idConfig, )
+    )
+
+    devAccuracy = None
+    hyperParams = {}
+    
+    idHyperParams = None
+    for row in cursor :
+        idHyperParams = row[ 0 ]
+        devAccuracy   = row[ 1 ]
+        
+    c.close();
+
+    if ( idHyperParams != None ) :
+        hyperParams = getHyperParams( conn, idHyperParams ) 
+    
+    return ( hyperParams, devAccuracy )
 
 def getOrCreateHyperParams( conn, hyper_params ) :
 
@@ -108,7 +133,7 @@ def getConfig( conn, idConfig ) :
 
     return result
 
-def getOrCreateConfig( c, name, structure, hyperParams ) :
+def getOrCreateConfig( conn, name, structure, hyperParams ) :
 
     c = conn.cursor();
 
@@ -152,6 +177,19 @@ def updateConfig( conn, config ) :
 
     c.close();
     
+def deleteConfig( conn, idConf ) :
+    
+    c = conn.cursor();
+
+    # Update config
+    deleteStatement = "delete from configs where id=?"
+    c.execute(
+        deleteStatement,
+        ( idConf, )
+    )
+
+    c.close();
+    
 def getConfigsWithMaxDevAccuracy( conn ) :
 
     c = conn.cursor()
@@ -180,16 +218,19 @@ def getConfigsWithMaxDevAccuracy( conn ) :
     return results
 
 
-def createRun( conn, idConfig ) :
+def createRun( conn, idConfig, runHyperParams ) :
 
     c = conn.cursor();
 
     # get config
     config = getConfig( conn, idConfig )
+    
+    # Get hyperparams
+    idRunHyperParams = getOrCreateHyperParams( conn, runHyperParams );
 
     cursor = c.execute( '''
         INSERT INTO runs ( idConf, idHyperParams, date ) VALUES ( ?, ?, ? )''',
-        ( config[ "id" ], config[ "idHyperParams" ], datetime.datetime.now(), )
+        ( config[ "id" ], idRunHyperParams, datetime.datetime.now(), )
     )
 
     id = cursor.lastrowid
@@ -376,40 +417,35 @@ def initTables( c ) :
     c.execute( '''CREATE INDEX idx_runs_train_accuracy on runs( train_accuracy ) ''' )
     c.execute( '''CREATE INDEX idx_runs_dev_accuracy on runs( dev_accuracy ) ''' )
 
-if __name__ == '__main__':
+def test( conn ):
 
-    DB_DIR = os.getcwd().replace( "\\", "/" ) + "/../run/db/chats"
-    APP_KEY = "chats"
+    # Create config
+    hyperParams = { "beta": 100 }
 
-        # Init DB
-    print( "Db dir:", DB_DIR )
-    with initDb( APP_KEY, DB_DIR ) as conn :
+    idConfig = getOrCreateConfig( conn, "Hello conf 100", "[1]", hyperParams )
 
-        # Create config
-        hyperParams = { "beta": 100 }
+    systemInfo = { "host": "12345678" }
+    dataInfo = { "data": "chats" }
+    perfInfo = { "perf": 4567 }
 
-        idConfig = getOrCreateConfig( conn, "Hello conf 100", "[1]", hyperParams )
 
-        systemInfo = { "host": "12345678" }
-        dataInfo = { "data": "chats" }
-        perfInfo = { "perf": 4567 }
+    runHyperParams = { const.KEY_BETA: 10, const.KEY_KEEP_PROB: 0.5 }
+    idRun = createRun( conn, idConfig, runHyperParams )
 
-        idRun = createRun( conn, idConfig )
+    updateRunBefore(
+        conn, idRun,
+        comment="comment",
+        system_info=systemInfo, data_info=dataInfo
+    )
 
-        updateRunBefore(
-            conn, idRun,
-            comment="comment",
-            system_info=systemInfo, data_info=dataInfo
-        )
+    run = getRun( conn, idRun )
+    print( "Before:", str( run ) )
 
-        run = getRun( conn, idRun )
-        print( "Before:", str( run ) )
+    updateRunAfter(
+        conn, idRun,
+        perf_info = perfInfo, result_info={ "errors": [1,2,3] },
+        perf_index=10, elapsed_second=20, train_accuracy=0.5, dev_accuracy=0.9
+    )
 
-        updateRunAfter(
-            conn, idRun,
-            perf_info = perfInfo, result_info={ "errors": [1,2,3] },
-            perf_index=10, elapsed_second=20, train_accuracy=0.5, dev_accuracy=0.1
-        )
-
-        run = getRun( conn, idRun )
-        print( "After :", str( run ) )
+    run = getRun( conn, idRun )
+    print( "After :", str( run ) )
