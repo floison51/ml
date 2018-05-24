@@ -17,6 +17,8 @@ KEY_USE_WEIGHTS         = "isUseWeights"
 KEY_START_LEARNING_RATE = "start_learning_rate"
 KEY_BETA                = "beta"
 KEY_KEEP_PROB           = "keepProb"
+KEY_DECAY_NB            = "decayNb"
+KEY_DECAY_PERCENT       = "decayPercent"
 
 # system info keys
 KEY_HOSTNAME            = "hostname"
@@ -54,6 +56,8 @@ class HyperParamsDico:
         KEY_START_LEARNING_RATE : [ "float"     , 0.0001    ],
         KEY_BETA                : [ "float"     , 0.        ],
         KEY_KEEP_PROB           : [ "float"     , 1.        ],
+        KEY_DECAY_NB            : [ "int"       , 10000     ],
+        KEY_DECAY_PERCENT       : [ "float"     , 0.96      ],
     }
 
 class ConfigsDico:

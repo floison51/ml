@@ -294,7 +294,7 @@ class ViewOrUpdateHyperParamsWindow ( MyDialog ) :
             label = Label( frameForm, text=key, borderwidth=1 ).grid( row=iRow, column=1, sticky=W, padx=10 )
 
             # input : type depends on hp name
-            inputVar = self.getInputVar( key )
+            inputVar = getInputVar( const.HyperParamsDico.CARAC, key )
 
             input = Entry( frameForm, textvariable=inputVar ).grid( row=iRow, column=2, sticky=W, padx=10 )
             self.inputs[ key ] = inputVar
