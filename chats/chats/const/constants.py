@@ -61,9 +61,14 @@ class ConfigsDico:
     KEYS = { "id", "idMachine", "idHyperParams" }
     CARAC = {
         # Type, default value
-        "name"      : [ "string" , None ],
-        "structure" : [ "string" , None ],
+        "id"           : [ "int" , None ],
+        "name"         : [ "string" , None ],
+        "structure"    : [ "string" , None ],
+        "machine"      : [ "string" , None ],
+        "bestAccuracy" : [ "float" , None ],
     }
+    OBJECT_FIELDS  = [ "id", "name", "structure", "idMachine", "idHyperParams" ]
+    DISPLAY_FIELDS = [ "id", "name", "structure", "machine", "bestAccuracy" ]
 
 class MachinesDico:
 

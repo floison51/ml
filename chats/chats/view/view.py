@@ -65,6 +65,7 @@ class MainWindow ( Tk ):
 
         #Configuration rows
         self.rows = {}
+        self.rowVarLabels = {}
 
         self.frameConfigsTable = LabelFrame( frameConfigs, padx=10, pady=10)
 
@@ -109,8 +110,12 @@ class MainWindow ( Tk ):
 
     def addRowConfig( self, config ):
 
+        colNames = const.ConfigsDico.DISPLAY_FIELDS
+
         cols = []
-        idConf = config[0]
+        colVarLabels = []
+
+        idConf = config[ "id" ]
         iRow = self.nbRowsAdded + 1 # 1 for header
 
         # Radio button
@@ -122,8 +127,16 @@ class MainWindow ( Tk ):
         radioButton.grid( row=iRow, column=1 )
 
         iCol = 2
-        for item in config:
-            label = Label( self.frameConfigsTable, text=item, borderwidth=1 )
+        for colName in colNames:
+
+            item = config[ colName ]
+            ## We need a var of label values, to be able to modify labels
+            varLabel = getInputVar( const.ConfigsDico.CARAC, colName )
+            varLabel.set( item )
+            colVarLabels.append( varLabel )
+
+            label = Label( self.frameConfigsTable, borderwidth=1, textvariable=varLabel )
+
             cols.append( label )
             label.grid( row=iRow, column=iCol, sticky=W, padx=10 )
             iCol += 1
@@ -147,9 +160,27 @@ class MainWindow ( Tk ):
 
         ## Declare row
         self.rows[ idConf ] = cols
+        self.rowVarLabels[ idConf ] = colVarLabels;
 
         ## Count
         self.nbRowsAdded += 1
+
+    def updateRowConfig( self, config ):
+
+        colNames = const.ConfigsDico.DISPLAY_FIELDS
+
+        ## get conf id
+        id = config[ "id" ]
+        varLabels = self.rowVarLabels[ id ]
+
+        iCol = 0 # 1 = offset radio-button
+        for colName in colNames:
+            # associated var
+            var = varLabels[ iCol ]
+            # get and set value
+            value  = config[ colName ]
+            var.set( value )
+            iCol += 1
 
     def deleteConfigGrid( self, idConfig ):
         cols = self.rows[ idConfig ]
@@ -163,6 +194,9 @@ class MainWindow ( Tk ):
 
     def addConfigGrid( self, config ):
         self.addRowConfig( config )
+
+    def updateConfigGrid( self, config ):
+        self.updateRowConfig( config )
 
     def enableEntry( self, entry ):
         entry.configure( state=NORMAL )
@@ -280,22 +314,6 @@ class ViewOrUpdateHyperParamsWindow ( MyDialog ) :
         buttonSave.pack( side=LEFT, padx=40 )
         buttonCancel.pack( side=RIGHT, padx=40 )
 
-    def getInputVar( self, hpName ) :
-        # use dico
-        hpCarac = const.HyperParamsDico.CARAC[ hpName ]
-        # Get type
-        hpType = hpCarac[ 0 ]
-
-        if ( hpType == "int" ) :
-            return IntVar()
-        elif ( hpType == "float" ) :
-            return DoubleVar()
-        elif ( hpType == "boolean" ) :
-            return BooleanVar()
-        else :
-            raise ValueError( "Unknown type", hpType )
-
-
 class CreateOrUpdateConfigWindow ( MyDialog ) :
 
     def __init__( self, boss, callbackFct, **options ) :
@@ -358,4 +376,23 @@ class CreateOrUpdateConfigWindow ( MyDialog ) :
 
         buttonSave.pack( side=LEFT, padx=40 )
         buttonCancel.pack( side=RIGHT, padx=40 )
+
+
+def getInputVar( dicoCarac, hpName ) :
+    # use dico
+    hpCarac = dicoCarac[ hpName ]
+    # Get type
+    hpType = hpCarac[ 0 ]
+
+    if ( hpType == "int" ) :
+        return IntVar()
+    elif ( hpType == "string" ) :
+        return StringVar()
+    elif ( hpType == "float" ) :
+        return DoubleVar()
+    elif ( hpType == "boolean" ) :
+        return BooleanVar()
+    else :
+        raise ValueError( "Unknown type", hpType )
+
 

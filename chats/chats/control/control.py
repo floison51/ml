@@ -79,7 +79,7 @@ class ConfigDoer( Doer ):
         idMachine = config[ "idMachine" ]
         machineName = db.getMachineNameById( self.conn, idMachine )
         config[ "machine" ] = machineName
-        
+
         # launch view with callback
         viewConfig.run( machineNames, config )
 
@@ -122,13 +122,17 @@ class ConfigDoer( Doer ):
         if ( newConfig == None ) :
             ## Nothing to do
             return
-
-        #Update config
+        
+        # Convert machine name to machine id
+        idMachine = db.getIdMachineByName( self.conn, newConfig[ "machine" ] )
+        newConfig[ "idMachine" ] = idMachine
+        
+        #Update config 
         db.updateConfig( self.conn, newConfig )
 
         # Update window
-        config = db.getConfigsWithMaxDevAccuracy( self.conn, idNewConfig )[ 0 ]
-        fenetre.master.addConfigGrid( config )
+        config = db.getConfigsWithMaxDevAccuracy( self.conn, newConfig[ "id" ] )[ 0 ]
+        fenetre.master.updateConfigGrid( config )
 
         # commit
         self.conn.commit()

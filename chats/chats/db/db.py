@@ -17,7 +17,7 @@ def createConfig( conn, name, structure, machineName, hyper_params ) :
 
     # Id machine
     idMachine = getIdMachineByName( conn, machineName )
-        
+
     # get hyparams
     idHyperParams = getOrCreateHyperParams( conn, hyper_params )
 
@@ -127,11 +127,12 @@ def getConfig( conn, idConfig ) :
     result = {}
 
     for row in cursor :
-        result[ "id" ]               = row[ 0 ]
-        result[ "name" ]             = row[ 1 ]
-        result[ "structure" ]        = row[ 2 ]
-        result[ "idMachine" ]        = row[ 3 ]
-        result[ "idHyperParams" ]    = row[ 4 ]
+        
+        iCol = 0;
+        
+        for colName in const.ConfigsDico.OBJECT_FIELDS :    
+            result[ colName ] = row[ iCol ]
+            iCol += 1
 
     c.close();
 
@@ -169,13 +170,14 @@ def updateConfig( conn, config ) :
         "update configs set " + \
              "name=?, " + \
              "structure=?, " + \
+             "idMachine=?, " + \
              "idHyperParams=? " + \
              "where id=?"
 
     c.execute(
         updateStatement,
         (
-            config[ "name" ], config[ "structure" ], config[ "idHyperParams" ], config[ "id" ]
+            config[ "name" ], config[ "structure" ], config[ "idMachine" ], config[ "idHyperParams" ], config[ "id" ]
         )
     )
 
@@ -199,7 +201,11 @@ def getConfigsWithMaxDevAccuracy( conn, idConfig = None ) :
     c = conn.cursor()
     parameters = ()
 
-    statement = "select c.id, c.name, c.structure, ( select m.name from machines m where m.id=c.idMachine ), ( select max(r.dev_accuracy) from runs r where r.idConf=c.id ) from configs c"
+    statement = \
+        "select c.id as id, c.name as name, c.structure as structure, " + \
+        "( select m.name from machines m where m.id=c.idMachine ) as machine, " +\
+        "( select max(r.dev_accuracy) " + \
+        "from runs r where r.idConf=c.id ) as bestAccuracy from configs c"
     if ( idConfig != None ) :
         statement += " where c.id=?"
         parameters = ( idConfig, )
@@ -216,14 +222,15 @@ def getConfigsWithMaxDevAccuracy( conn, idConfig = None ) :
 
     for row in cursor :
 
-        result = []
+        result = {}
 
-        result.append( row[ 0 ] )
-        result.append( row[ 1 ] )
-        result.append( row[ 2 ] )
-        result.append( row[ 3 ] )
-        result.append( row[ 4 ] )
+        iCol = 0
+        
+        for colName in const.ConfigsDico.DISPLAY_FIELDS : 
+            result[ colName ] = row[ iCol ]
+            iCol += 1
 
+        # add result
         results.append( result )
 
     c.close();
@@ -249,7 +256,7 @@ def getMachineNames( conn ) :
     return result
 
 def getIdMachineByName( conn, machineName ):
-    
+
     c = conn.cursor();
 
     # Update run
@@ -266,9 +273,9 @@ def getIdMachineByName( conn, machineName ):
     c.close();
 
     return result
-   
+
 def getMachineNameById( conn, id ):
-    
+
     c = conn.cursor();
 
     # Update run
@@ -285,7 +292,7 @@ def getMachineNameById( conn, id ):
     c.close();
 
     return result
-    
+
 
 def createRun( conn, idConfig, runHyperParams ) :
 
