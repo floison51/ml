@@ -382,19 +382,23 @@ def updateRunAfter(
     # Save (commit) the changes
     conn.commit()
 
-def getRun( conn, idRun ) :
+def getRuns( conn, idConf ) :
 
     c = conn.cursor();
 
     # Update run
     cursor = c.execute( '''
-        select * from runs where id=?''',
-        (idRun,)
+        select * from runs where idConf=?''',
+        (idConf,)
     )
 
-    result = {}
+    results = []
 
+    # TODO use dico
     for row in cursor :
+        
+        result = {}
+        
         result[ "id" ]              = row[ 0 ]
         result[ "idConf" ]          = row[ 1 ]
         result[ "idHyperParams" ]   = row[ 2 ]
@@ -409,9 +413,11 @@ def getRun( conn, idRun ) :
         result[ "perf_info" ]       = json.loads( row[ 11 ] )
         result[ "result_info" ]     = json.loads( row[ 12 ] )
 
+        results.append( result )
+        
     c.close();
 
-    return result
+    return results
 
 def initDb( key, dbFolder ) :
 

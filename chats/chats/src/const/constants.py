@@ -82,3 +82,25 @@ class MachinesDico:
         "name"      : [ "string" , "None" ],
         "class"     : [ "string" , "learning.NoneMachine" ],
     }
+
+class RunsDico:
+
+    KEYS = { "id", "idConf", "idHyperParams" }
+    CARAC = {
+        # Type, default value
+        "id"                : [ "int" , None ],
+        "date"              : [ "datetime" , None ],
+        "comment"           : [ "string" , None ],
+        "perf_index"        : [ "float" , None ],
+        "elapsed_second"    : [ "int" , None ],
+        "train_accuracy"    : [ "float" , None ],
+        "dev_accuracy"      : [ "float" , None ],
+        "json_system_info"  : [ "json" , None ],
+        "json_data_info"    : [ "json" , None ],
+        "json_perf_info"    : [ "json" , None ],
+        "json_result_info"  : [ "json" , None ],
+        
+    }
+    OBJECT_FIELDS  = [ "id", "date", "comment", "perf_index", "elapsed_second", "train_accuracy", "dev_accuracy", "json_system_info", "json_data_info", "json_perf_info", "json_result_info" ]
+    DISPLAY_FIELDS = OBJECT_FIELDS
+

@@ -28,7 +28,7 @@ class MainWindow ( Tk ):
         self.nbRowsAdded = 0
 
 
-    def show( self, configs ):
+    def showAndSelectConf( self, configs ):
 
         frameTop = Frame( self, relief=GROOVE )
         frameTop.pack(side=TOP, padx=30, pady=30)
@@ -59,6 +59,9 @@ class MainWindow ( Tk ):
         buttonCancel.pack( side="right", padx=40  )
 
         self.mainloop()
+
+        # return selected idConf
+        return self.confSelected
 
 
     def buildConfigGrid( self, frameConfigs, configs ):
@@ -211,6 +214,7 @@ class MainWindow ( Tk ):
             self.enableEntry( button )
 
 class MyDialog( Toplevel ):
+    "Modal dialog window"
 
     def __init__( self, boss, callbackFct, **options ) :
         Toplevel.__init__( self, boss, **options )
@@ -223,6 +227,18 @@ class MyDialog( Toplevel ):
         self.callbackFct = callbackFct
         self.result = None
         self.inputs = {}
+
+    def close( self ):
+        "Override close to deleselct modal mode"
+        ## enable parent window
+        self.master.wm_attributes( "-disabled", False )
+        super( MyDialog, self ).close()
+
+    def destroy( self ):
+        "Override close to deleselct modal mode"
+        ## enable parent window
+        self.master.wm_attributes( "-disabled", False )
+        super( MyDialog, self ).destroy()
 
     def do_close( self ) :
         ## enable parent window

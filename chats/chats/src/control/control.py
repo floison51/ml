@@ -1,4 +1,5 @@
 import view.view as view
+from view.viewruns import ViewRunsWindow
 import db.db as db
 import const.constants as const
 
@@ -122,12 +123,12 @@ class ConfigDoer( Doer ):
         if ( newConfig == None ) :
             ## Nothing to do
             return
-        
+
         # Convert machine name to machine id
         idMachine = db.getIdMachineByName( self.conn, newConfig[ "machine" ] )
         newConfig[ "idMachine" ] = idMachine
-        
-        #Update config 
+
+        #Update config
         db.updateConfig( self.conn, newConfig )
 
         # Update window
@@ -143,4 +144,16 @@ class RunsDoer( Doer ):
         super().__init__( conn )
 
     def showRuns( self, fenetre, idConf ):
-        print( "Show runs" )
+
+        if ( idConf == None ) :
+            ## Nothing to do
+            return
+
+        # Launch window, without callback
+        viewRuns = ViewRunsWindow( fenetre, None )
+
+        # get runs
+        runs = db.getRuns( self.conn, idConf )
+        # launch view
+        viewRuns.run( idConf, runs )
+
