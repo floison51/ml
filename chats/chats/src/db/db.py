@@ -13,7 +13,7 @@ from collections import OrderedDict
 
 import const.constants as const
 
-def createConfig( conn, name, structure, machineName, hyper_params ) :
+def createConfig( conn, name, structure, imageSize, machineName, hyper_params ) :
 
     # Id machine
     idMachine = getIdMachineByName( conn, machineName )
@@ -24,15 +24,15 @@ def createConfig( conn, name, structure, machineName, hyper_params ) :
     c = conn.cursor();
 
     cursor = c.execute(
-        "INSERT INTO configs VALUES ( null, ?, ?, ?, ? )",
-        ( name, structure, idMachine, idHyperParams, )
+        "INSERT INTO configs VALUES ( null, ?, ?, ?, ?, ? )",
+        ( name, structure, imageSize, idMachine, idHyperParams, )
     )
 
-    id = cursor.lastrowid
+    idConfig = cursor.lastrowid
 
     c.close();
 
-    return id
+    return idConfig
 
 def getHyperParams( conn, idHyperParams ) :
 
@@ -99,8 +99,8 @@ def getOrCreateHyperParams( conn, hyper_params ) :
 
     # For some reason, cursor.rowcount is NOK, use another method
     idResult = -1
-    for ( id ) in cursor:
-        idResult = id[ 0 ]
+    for ( hp ) in cursor:
+        idResult = hp[ 0 ]
 
     if ( idResult < 0 ) :
         # None, create
@@ -150,8 +150,8 @@ def getOrCreateConfig( conn, name, structure, hyperParams ) :
 
     # For some reason, cursor.rowcount is NOK, use another method
     idResult = -1
-    for ( id ) in cursor:
-        idResult = id[ 0 ]
+    for config in cursor:
+        idResult = config[ 0 ]
 
     if ( idResult < 0 ) :
         # None, create
@@ -170,6 +170,7 @@ def updateConfig( conn, config ) :
         "update configs set " + \
              "name=?, " + \
              "structure=?, " + \
+             "imageSize=?, " + \
              "idMachine=?, " + \
              "idHyperParams=? " + \
              "where id=?"
@@ -177,7 +178,7 @@ def updateConfig( conn, config ) :
     c.execute(
         updateStatement,
         (
-            config[ "name" ], config[ "structure" ], config[ "idMachine" ], config[ "idHyperParams" ], config[ "id" ]
+            config[ "name" ], config[ "structure" ], config[ "imageSize" ], config[ "idMachine" ], config[ "idHyperParams" ], config[ "id" ]
         )
     )
 
@@ -202,7 +203,7 @@ def getConfigsWithMaxDevAccuracy( conn, idConfig = None ) :
     parameters = ()
 
     statement = \
-        "select c.id as id, c.name as name, c.structure as structure, " + \
+        "select c.id as id, c.name as name, c.structure as structure, c.imageSize as imageSize, " + \
         "( select m.name from machines m where m.id=c.idMachine ) as machine, " +\
         "( select max(r.dev_accuracy) " + \
         "from runs r where r.idConf=c.id ) as bestAccuracy from configs c"
@@ -274,14 +275,14 @@ def getIdMachineByName( conn, machineName ):
 
     return result
 
-def getMachineNameById( conn, id ):
+def getMachineNameById( conn, idMachine ):
 
     c = conn.cursor();
 
     # Update run
     cursor = c.execute(
         "select name from machines where id=?",
-        ( id, )
+        ( idMachine, )
     )
 
     result = None
@@ -292,6 +293,45 @@ def getMachineNameById( conn, id ):
     c.close();
 
     return result
+
+def getMachineIdByName( conn, machineName ):
+
+    c = conn.cursor();
+
+    # Update run
+    cursor = c.execute(
+        "select id from machines where name=?",
+        ( machineName, )
+    )
+
+    result = None
+
+    for row in cursor :
+        result = row[ 0 ]
+
+    c.close();
+
+    return result
+
+def addUniqueMachineName( conn, machineName ) :
+
+    c = conn.cursor();
+    
+    # exists?
+    idMachine = getMachineIdByName( conn, machineName )
+    
+    if ( idMachine == None ) :
+        cursor = c.execute( '''
+            INSERT INTO machines ( name ) VALUES ( ? )''',
+            ( machineName, )
+        )
+    
+        idMachine = cursor.lastrowid
+
+    c.close();
+
+    return idMachine
+
 
 
 def createRun( conn, idConfig, runHyperParams ) :
@@ -309,11 +349,11 @@ def createRun( conn, idConfig, runHyperParams ) :
         ( config[ "id" ], idRunHyperParams, datetime.datetime.now(), )
     )
 
-    id = cursor.lastrowid
+    idRun = cursor.lastrowid
 
     c.close();
 
-    return id
+    return idRun
 
 def updateRunBefore(
     conn, idRun,
@@ -382,6 +422,25 @@ def updateRunAfter(
     # Save (commit) the changes
     conn.commit()
 
+
+def getRunFromRow(row):
+    # TODO : use dico
+    result = {}
+    result["id"] = row[0]
+    result["idConf"] = row[1]
+    result["idHyperParams"] = row[2]
+    result["dateTime"] = row[3]
+    result["comment"] = row[4]
+    result["perf_index"] = row[5]
+    result["elapsed_second"] = row[6]
+    result["train_accuracy"] = row[7]
+    result["dev_accuracy"] = row[8]
+    result["system_info"] = json.loads(row[9])
+    result["data_info"] = json.loads(row[10])
+    result["perf_info"] = json.loads(row[11])
+    result["result_info"] = json.loads(row[12])
+    return result
+
 def getRuns( conn, idConf ) :
 
     c = conn.cursor();
@@ -397,27 +456,30 @@ def getRuns( conn, idConf ) :
     # TODO use dico
     for row in cursor :
         
-        result = {}
-        
-        result[ "id" ]              = row[ 0 ]
-        result[ "idConf" ]          = row[ 1 ]
-        result[ "idHyperParams" ]   = row[ 2 ]
-        result[ "dateTime" ]        = row[ 3 ]
-        result[ "comment" ]         = row[ 4 ]
-        result[ "perf_index" ]      = row[ 5 ]
-        result[ "elapsed_second" ]  = row[ 6 ]
-        result[ "train_accuracy" ]  = row[ 7 ]
-        result[ "dev_accuracy" ]    = row[ 8 ]
-        result[ "system_info" ]     = json.loads( row[ 9 ] )
-        result[ "data_info" ]       = json.loads( row[ 10 ] )
-        result[ "perf_info" ]       = json.loads( row[ 11 ] )
-        result[ "result_info" ]     = json.loads( row[ 12 ] )
+        result = getRunFromRow( row )
 
         results.append( result )
         
     c.close();
 
     return results
+
+def getRun( conn, idRun ) :
+
+    c = conn.cursor();
+
+    # Update run
+    cursor = c.execute( '''
+        select * from runs where idRun=?''',
+        (idRun,)
+    )
+
+    row = cursor.firstRow()
+    result = getRunFromRow( row )
+
+    c.close();
+
+    return result
 
 def initDb( key, dbFolder ) :
 
@@ -449,8 +511,7 @@ def initTables( c ) :
     c.execute( '''CREATE TABLE IF NOT EXISTS machines
         (
            id integer PRIMARY KEY AUTOINCREMENT,
-           name text not null unique,
-           class text not null
+           name text not null unique
          )'''
     )
 
@@ -468,6 +529,7 @@ def initTables( c ) :
            id integer PRIMARY KEY AUTOINCREMENT,
            name text,
            structure text,
+           imageSize integer,
            idMachine not null,
            idHyperParams not null,
            CONSTRAINT cs_unique0 UNIQUE (name, structure)
@@ -515,9 +577,10 @@ def initTables( c ) :
 
     ## Create default values
     c.execute(
-        "insert into machines values( null, ?, ? )",
-        ( const.MachinesDico.CARAC[ "name"  ][ 1 ],   #default value for name
-          const.MachinesDico.CARAC[ "class" ][ 1 ], ) #default value for name
+        "insert into machines values( null, ? )",
+        ( 
+            const.MachinesDico.CARAC[ "name"  ][ 1 ],   #default value for name
+        ) 
     )
 
 def test( conn ):

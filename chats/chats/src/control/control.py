@@ -108,6 +108,7 @@ class ConfigDoer( Doer ):
         # Get or create new config
         idNewConfig = db.createConfig( self.conn, \
             newConfig[ "name" ], newConfig[ "structure" ], \
+            newConfig[ "imageSize" ], \
             newConfig[ "machine" ], hyperParams \
         )
 

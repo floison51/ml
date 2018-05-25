@@ -5,7 +5,6 @@ DataSource for cats
 '''
 
 from ml.data import DataSource, DataSet
-from ml.machine import Machine
 
 import os
 import h5py

@@ -2,6 +2,9 @@ import db.db as db
 import view.view as view
 import control.control as control
 import os
+from six.moves import configparser
+import sys
+import importlib
 
 from tkinter import *
 
@@ -13,6 +16,26 @@ from ml.data import DataSource, DataSet
 import ml.cats.cats as cats
 import ml.logreg.logreg as logreg
 
+def updateMachines( conn ):
+    
+    # Read init file
+    configMachines = configparser.ConfigParser()
+    # Leave keys unchanged
+    configMachines.optionxform = str
+    configMachines.read( "machines.ini" )
+    
+    # get machines section
+    machines = configMachines.items( "Classes" )
+    
+    for machine_class in machines :
+        # update db
+        db.addUniqueMachineName( conn, machine_class[ 0 ] )
+    
+    # commit result
+    conn.commit()
+    
+    return configMachines
+    
 if __name__ == '__main__':
 
     DB_DIR = os.getcwd().replace( "\\", "/" ) + "/run/db/chats"
@@ -23,8 +46,9 @@ if __name__ == '__main__':
 
     with db.initDb( APP_KEY, DB_DIR ) as conn :
 
-        #db.test( conn )
-
+        # update machines
+        configMachines = updateMachines( conn )
+        
         # Read configurations
         configs = db.getConfigsWithMaxDevAccuracy( conn )
 
@@ -33,12 +57,33 @@ if __name__ == '__main__':
         runsDoer    = control.RunsDoer( conn )
 
         mainWindow = view.MainWindow( configDoer, hpDoer, runsDoer )
-        #idConf = mainWindow.showAndSelectConf( configs )
+        ( idConfig, buttonClicked ) = mainWindow.showAndSelectConf( configs )
 
+        # cancel?
+        if ( buttonClicked == "Cancel" ) :
+            print( "Operation cancelled by user" )
+            sys.exit( 10 )
+            
+        # Read config
+        config = db.getConfig( conn, idConfig );
+        # get machine name
+        machineName = db.getMachineNameById( conn, config[ "idMachine" ] )
+        
         # TODO write machine main params
         #print( "Structure:", structure )
 
         # TODO : inistiate actual ML from conf
+        
+        # Get machine data source
+        machineDataSourceClass = configMachines.get( "DataSources", machineName )
+        if ( machineDataSourceClass == None ) :
+            raise ValueError( "Unknown machine data source", machineName )
+        
+        module_name, class_name = machineDataSourceClass.rsplit(".", 1)
+        MyClass = getattr( importlib.import_module(module_name), class_name)
+        instance = MyClass()
+        print( instance )
+        
         dataSource = cats.CatDataSource()
         ml = logreg.HandMadeLogregMachine()
 

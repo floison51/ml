@@ -26,7 +26,8 @@ class MainWindow ( Tk ):
 
         #Nb rows added
         self.nbRowsAdded = 0
-
+        
+        self.buttonClicked = None
 
     def showAndSelectConf( self, configs ):
 
@@ -43,25 +44,40 @@ class MainWindow ( Tk ):
         frameButtons = Frame(self, borderwidth=0 )
         frameButtons.pack( side=BOTTOM, padx=10, pady=10, fill='both', expand=True )
 
-        buttonTrain = Button( frameButtons, text="Train", command=self.quit, state=DISABLED )
+        buttonTrain = Button( 
+            frameButtons, text="Train",
+            command=lambda name="Train" : ( self.clickButton( name ) ), 
+            state=DISABLED 
+        )
         buttonTrain.pack( side="left", padx=40 )
         buttonsToUpdate.append( buttonTrain )
 
-        buttonTune = Button( frameButtons, text="Tune", command=self.quit, state=DISABLED )
+        buttonTune = Button( 
+            frameButtons, text="Tune", 
+            command=lambda name="Tune" : ( self.clickButton( name ) ), 
+            state=DISABLED 
+        )
         buttonTune.pack( side="left", padx=40 )
         buttonsToUpdate.append( buttonTune )
 
-        buttonPredict = Button( frameButtons, text="Predict", command=self.quit, state=DISABLED )
+        buttonPredict = Button( 
+            frameButtons, text="Predict", 
+            command=lambda name="Predict" : ( self.clickButton( name ) ), 
+            state=DISABLED 
+        )
         buttonPredict.pack( side="left", padx=40 )
         buttonsToUpdate.append( buttonPredict )
 
-        buttonCancel=Button( frameButtons, text="Cancel", command=self.quit)
+        buttonCancel=Button( 
+            frameButtons, text="Cancel", 
+            command=lambda name="Cancel" : ( self.clickButton( name ) ), 
+        )
         buttonCancel.pack( side="right", padx=40  )
 
         self.mainloop()
 
         # return selected idConf
-        return self.confSelected
+        return ( self.confSelected.get(), self.buttonClicked )
 
 
     def buildConfigGrid( self, frameConfigs, configs ):
@@ -73,7 +89,7 @@ class MainWindow ( Tk ):
         self.frameConfigsTable = LabelFrame( frameConfigs, padx=10, pady=10)
 
         # show window
-        labels = { 1: "", 2: "Id", 3: "Name", 4: "Structure", 5 : "Machine", 6 : "Best DEV\nAccuracy", 7: "Hyper Params", 8: "Runs" }
+        labels = { 1: "", 2: "Id", 3: "Name", 4: "Structure", 5: "Image Size", 6 : "Machine", 7 : "Best DEV\nAccuracy", 8: "Hyper Params", 9: "Runs" }
 
         for iCol in range( 1, len( labels ) + 1 ) :
             label = Label( self.frameConfigsTable, text=labels[ iCol ], borderwidth=1 ).grid( row=0, column=iCol, sticky=W, padx=10 )
@@ -212,6 +228,10 @@ class MainWindow ( Tk ):
     def confRbClicked( self ):
         for button in buttonsToUpdate :
             self.enableEntry( button )
+            
+    def clickButton( self, buttonName ):
+        self.buttonClicked = buttonName
+        self.destroy()
 
 class MyDialog( Toplevel ):
     "Modal dialog window"
@@ -248,6 +268,7 @@ class MyDialog( Toplevel ):
         self.callbackFct( self, self.result )
 
     def buttonCancelClicked( self ) :
+        buttonClicked = "cancel"
         # Bye
         result = None
         self.do_close()
@@ -352,7 +373,11 @@ class CreateOrUpdateConfigWindow ( MyDialog ) :
 
         # Normalize form
         if ( config == None ) :
-            config = { "name": "", "structure": "", "machine": const.MachinesDico.CARAC[ "name" ][ 1 ] }
+            config = { 
+                "name": "", "structure": "", 
+                "imageSize" : const.ConfigsDico.CARAC[ "imageSize" ][ 1 ], 
+                "machine"   : const.MachinesDico.CARAC[ "name" ][ 1 ] 
+            }
 
         # Table labels
         iRow = 1
