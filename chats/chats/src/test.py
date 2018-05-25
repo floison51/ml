@@ -5,6 +5,7 @@ import os
 
 from tkinter import *
 
+import const.constants as const
 from ml.machine import Machine
 from ml.data import DataSource, DataSet
 
@@ -45,25 +46,35 @@ if __name__ == '__main__':
         ml.printSystemInfo()
 
         # Load data
-        ( datasetTrain, datasetDev ) = dataSource.getDatasets( isLoadWeights = False );
+        ( datasetTrn, datasetDev ) = dataSource.getDatasets( isLoadWeights = False );
 
         # Save original data
-        ( X_ori, Y_ori ) = ( datasetTrain.X, datasetDev.Y )
+        ( X_ori, Y_ori ) = ( datasetTrn.X, datasetDev.Y )
 
         # flatten data
-        datasetTrain.X = dataSource.flatten( datasetTrain.X )
-        datasetDev.X   = dataSource.flatten( datasetDev.X )
-        
+        datasetTrn.X = dataSource.flatten( datasetTrn.X )
+        datasetDev.X = dataSource.flatten( datasetDev.X )
+
         # normalize X
-        datasetTrain.X = dataSource.normalize( datasetTrain.X )
-        datasetDev.X   = dataSource.normalize( datasetDev.X )
+        datasetTrn.X = dataSource.normalize( datasetTrn.X )
+        datasetDev.X = dataSource.normalize( datasetDev.X )
+
+        # Store data info in a dico 
+        dataInfo = {
+            const.KEY_TRN_X_SIZE    : str( datasetTrn.X.shape[1] ),
+            const.KEY_TRN_X_SHAPE   : str( datasetTrn.X.shape ),
+            const.KEY_TRN_Y_SHAPE   : str( datasetTrn.Y.shape ),
+            const.KEY_DEV_X_SIZE    : str( datasetDev.X.shape[1] ),
+            const.KEY_DEV_X_SHAPE   : str( datasetDev.X.shape ),
+            const.KEY_DEV_Y_SHAPE   : str( datasetDev.Y.shape ),
+        }
         
         print()
-        print ("number of training examples = " + str( datasetTrain.X.shape[1] ) )
-        print ("number of dev test examples = " + str( datasetDev.X.shape[1] ) )
-        print ("X_train shape: " + str( datasetTrain.X.shape ) )
-        print ("Y_train shape: " + str( datasetTrain.Y.shape ) )
-        print ("X_test shape: "  + str( datasetDev.X.shape ) )
-        print ("Y_test shape: "  + str( datasetDev.Y.shape ) )
+        print ("number of training examples = " + str( dataInfo[ const.KEY_TRN_X_SIZE ] ) )
+        print ("number of dev test examples = " + str( dataInfo[ const.KEY_DEV_X_SIZE ] ) )
+        print ("X_train shape: " + str( dataInfo[ const.KEY_TRN_X_SHAPE ] ) )
+        print ("Y_train shape: " + str( dataInfo[ const.KEY_TRN_Y_SHAPE ] ) )
+        print ("X_test shape: "  + str( dataInfo[ const.KEY_DEV_X_SHAPE ] ) )
+        print ("Y_test shape: "  + str( dataInfo[ const.KEY_DEV_Y_SHAPE ] ) )
         print ()
 

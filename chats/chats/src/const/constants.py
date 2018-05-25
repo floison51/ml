@@ -26,14 +26,14 @@ KEY_TENSOR_FLOW_VERSION = "tensorFlowVersion"
 KEY_OS_NAME             = "osName"
 
 # data kets
-KEY_TRN_SIZE    = "trnSize"
-KEY_DEV_SIZE    = "devSize"
-KEY_TRN_SHAPE   = "trainigShape"
-KEY_DEV_SHAPE   = "devShape"
-KEY_DEV_Y_SIZE  = "yDevSize"
-KEY_DEV_Y_SHAPE = "yDevShape"
-KEY_TRN_Y_SIZE  = "yTrnSize"
-KEY_TRN_Y_SHAPE = "yTrnShape"
+KEY_TRN_X_SIZE    = "xTrnSize"
+KEY_TRN_X_SHAPE   = "xTrnShape"
+KEY_DEV_X_SIZE    = "xDevSize"
+KEY_DEV_X_SHAPE   = "xDevShape"
+KEY_DEV_Y_SIZE    = "yDevSize"
+KEY_DEV_Y_SHAPE   = "yDevShape"
+KEY_TRN_Y_SIZE    = "yTrnSize"
+KEY_TRN_Y_SHAPE   = "yTrnShape"
 
 # result keys
 KEY_TRN_NB_ERROR_BY_TAG = "trnNbErrorsByTag"
