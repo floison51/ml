@@ -12,9 +12,13 @@ import const.constants as const
 from ml.machine import Machine
 from ml.data import DataSource, DataSet
 
-# A effacer
-import ml.cats.cats as cats
-import ml.logreg.logreg as logreg
+def instantiateClass( classFqName ) :
+    module_name, class_name = classFqName.rsplit(".", 1)
+    TheClass = getattr( importlib.import_module(module_name), class_name)
+    instance = TheClass()
+    
+    return instance
+        
 
 def updateMachines( conn ):
     
@@ -36,6 +40,46 @@ def updateMachines( conn ):
     
     return configMachines
     
+def prepapreData( dataSource ): 
+    # Load data
+    ( datasetTrn, datasetDev ) = dataSource.getDatasets( isLoadWeights = False );
+
+    # Save original data
+    ( X_ori, Y_ori ) = ( datasetTrn.X, datasetDev.Y )
+
+    # flatten data
+    datasetTrn.X = dataSource.flatten( datasetTrn.X )
+    datasetDev.X = dataSource.flatten( datasetDev.X )
+
+    # normalize X
+    datasetTrn.X = dataSource.normalize( datasetTrn.X )
+    datasetDev.X = dataSource.normalize( datasetDev.X )
+
+    # Store data info in a dico 
+    dataInfo = {
+        const.KEY_TRN_X_SIZE    : str( datasetTrn.X.shape[1] ),
+        const.KEY_TRN_X_SHAPE   : str( datasetTrn.X.shape ),
+        const.KEY_TRN_Y_SHAPE   : str( datasetTrn.Y.shape ),
+        const.KEY_DEV_X_SIZE    : str( datasetDev.X.shape[1] ),
+        const.KEY_DEV_X_SHAPE   : str( datasetDev.X.shape ),
+        const.KEY_DEV_Y_SHAPE   : str( datasetDev.Y.shape ),
+    }
+    
+    print()
+    print ("number of training examples = " + str( dataInfo[ const.KEY_TRN_X_SIZE ] ) )
+    print ("number of dev test examples = " + str( dataInfo[ const.KEY_DEV_X_SIZE ] ) )
+    print ("X_train shape: " + str( dataInfo[ const.KEY_TRN_X_SHAPE ] ) )
+    print ("Y_train shape: " + str( dataInfo[ const.KEY_TRN_Y_SHAPE ] ) )
+    print ("X_test shape: "  + str( dataInfo[ const.KEY_DEV_X_SHAPE ] ) )
+    print ("Y_test shape: "  + str( dataInfo[ const.KEY_DEV_Y_SHAPE ] ) )
+    
+    ## TODO
+#     if ( hyperParams[ const.KEY_USE_WEIGHTS ] ) :
+#         print ( "  Weights_train shape :", WEIGHT_train.shape )
+    print ()
+
+    return datasetTrn, datasetDev, dataInfo
+
 if __name__ == '__main__':
 
     DB_DIR = os.getcwd().replace( "\\", "/" ) + "/run/db/chats"
@@ -77,49 +121,31 @@ if __name__ == '__main__':
         # Get machine data source
         machineDataSourceClass = configMachines.get( "DataSources", machineName )
         if ( machineDataSourceClass == None ) :
-            raise ValueError( "Unknown machine data source", machineName )
+            raise ValueError( "Unknown machine data source class", machineName )
         
-        module_name, class_name = machineDataSourceClass.rsplit(".", 1)
-        MyClass = getattr( importlib.import_module(module_name), class_name)
-        instance = MyClass()
-        print( instance )
+        # Get machine class
+        machineClass = configMachines.get( "Classes", machineName )
+        if ( machineClass == None ) :
+            raise ValueError( "Unknown machine class", machineClass )
         
-        dataSource = cats.CatDataSource()
-        ml = logreg.HandMadeLogregMachine()
+        dataSource = instantiateClass( machineDataSourceClass )
+        ml = instantiateClass( machineClass )
 
         # Print system info
-        ml.printSystemInfo()
-
-        # Load data
-        ( datasetTrn, datasetDev ) = dataSource.getDatasets( isLoadWeights = False );
-
-        # Save original data
-        ( X_ori, Y_ori ) = ( datasetTrn.X, datasetDev.Y )
-
-        # flatten data
-        datasetTrn.X = dataSource.flatten( datasetTrn.X )
-        datasetDev.X = dataSource.flatten( datasetDev.X )
-
-        # normalize X
-        datasetTrn.X = dataSource.normalize( datasetTrn.X )
-        datasetDev.X = dataSource.normalize( datasetDev.X )
-
-        # Store data info in a dico 
-        dataInfo = {
-            const.KEY_TRN_X_SIZE    : str( datasetTrn.X.shape[1] ),
-            const.KEY_TRN_X_SHAPE   : str( datasetTrn.X.shape ),
-            const.KEY_TRN_Y_SHAPE   : str( datasetTrn.Y.shape ),
-            const.KEY_DEV_X_SIZE    : str( datasetDev.X.shape[1] ),
-            const.KEY_DEV_X_SHAPE   : str( datasetDev.X.shape ),
-            const.KEY_DEV_Y_SHAPE   : str( datasetDev.Y.shape ),
-        }
+        systemInfos = {}
+        ml.addSystemInfo( systemInfos )
         
-        print()
-        print ("number of training examples = " + str( dataInfo[ const.KEY_TRN_X_SIZE ] ) )
-        print ("number of dev test examples = " + str( dataInfo[ const.KEY_DEV_X_SIZE ] ) )
-        print ("X_train shape: " + str( dataInfo[ const.KEY_TRN_X_SHAPE ] ) )
-        print ("Y_train shape: " + str( dataInfo[ const.KEY_TRN_Y_SHAPE ] ) )
-        print ("X_test shape: "  + str( dataInfo[ const.KEY_DEV_X_SHAPE ] ) )
-        print ("Y_test shape: "  + str( dataInfo[ const.KEY_DEV_Y_SHAPE ] ) )
-        print ()
+        # get data
+        ( datasetTrn, datasetDev, dataInfos ) = prepapreData( dataSource )
+        # Set data
+        ml.setData( datasetTrn, datasetDev )
+        
+        # Set all infos
+        ml.setInfos( systemInfos, dataInfos )
 
+        # train?
+        if ( buttonClicked == "Train" ) :
+            print( "Train machine", machineName )
+            
+            comment = "TODO"
+            ml.train( conn, config, comment )

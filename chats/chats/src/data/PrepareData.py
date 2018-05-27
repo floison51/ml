@@ -215,6 +215,8 @@ def createTrainAndDevSets():
     
     # current dir for data
     dataDir = os.getcwd().replace( "\\", "/" )
+    # TODO
+    dataDir = "C:/Users/fran/local-git/ml/chats/chats/data"
     
     # Base dir for cats and not cats images
     baseDir = dataDir + "/images"
@@ -229,7 +231,7 @@ def createTrainAndDevSets():
     # Shuffle files
     random.shuffle( files )
     
-    print( "Build TRAINING test set" )
+    print( "Build DEV data set" )
     iEndTrainingSet = int( len( files ) * TRAINING_TEST_SET_PC );
     
     print( "Build TRAINING data set" )

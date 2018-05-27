@@ -1,0 +1,351 @@
+'''
+Created on 27 mai 2018
+
+@author: fran
+'''
+import const.constants as const
+from ml.machine import Machine
+
+import tensorflow as tf
+from tensorflow.python.framework import ops
+
+import os as os
+from _ctypes import Structure
+
+TENSORFLOW_SAVE_DIR = os.getcwd().replace( "\\", "/" ) + "/run/tf-save/"  + Machine.APP_KEY
+TENSORBOARD_LOG_DIR = os.getcwd().replace( "\\", "/" ) + "/run/tf-board/" + Machine.APP_KEY
+
+class TensorFlowMachine( Machine ):
+
+    def __init__( self, params = None ):
+        super( TensorFlowMachine, self ).__init__( params )
+        self.isTensorboard     = False
+        self.isTensorboardFull = False
+        
+    def addSystemInfo( self, systemInfo ):
+        "Add system information"
+        # TODO
+    
+    def addPerfInfo( self, perfInfo ):
+        "Add perf information"
+        perfInfo.append( 
+            { const.KEY_PERF_IS_USE_TENSORBOARD       : self.isTensorboard,
+              const.KEY_PERF_IS_USE_FULL_TENSORBOARD  : self.isTensorboardFull,
+            }
+        )
+    
+    def getSession( self ):
+        
+        sess = tf.Session()
+        # Run the initialization
+        init = tf.global_variables_initializer()
+        sess.run( init )
+
+        return sess
+        
+    def sessionInit( self, sess ):
+        self.train_writer = tf.summary.FileWriter( TENSORBOARD_LOG_DIR + '/train', sess.graph )
+        self.dev_writer   = tf.summary.FileWriter( TENSORBOARD_LOG_DIR + '/dev', sess.graph )
+
+        # Run the initialization
+        init = tf.global_variables_initializer()
+        sess.run( init )
+    
+    def parseStructure( self, strStructure ):
+        ## TODO
+        structure = [ 1 ]
+        return structure
+    
+    def modelInit( self, strStructure, n_x, n_y ):
+        
+        ops.reset_default_graph()                         # to be able to rerun the model without overwriting tf variables
+        tf.set_random_seed( 1 )                             # to keep consistent results
+
+        # parse structure
+        self.structure = self.parseStructure( strStructure )
+        
+        # Create Placeholders of shape (n_x, n_y)
+        self.create_placeholders( n_x, n_y )
+    
+        # Initialize parameters
+        self.initialize_parameters( n_x )
+    
+        # Forward propagation: Build the forward propagation in the tensorflow graph
+        ### START CODE HERE ### (1 line)
+        Z_last = self.forward_propagation( n_x )
+        ### END CODE HERE ###
+
+        # Cost function: Add cost function to tensorflow graph
+        self.compute_cost( Z_last, self.ph_Y, self.datasetTrn.weight, self.beta, n_x )
+    
+        # Back-propagation: Define the tensorflow optimizer. Use an AdamOptimizer.
+        # Decaying learning rate
+        global_step = tf.Variable( 0 )  # count the number of steps taken.
+        
+        with tf.name_scope('cross_entropy'):
+            with tf.name_scope( 'total' ):
+                learning_rate = tf.train.exponential_decay(
+                    # todo : use hp
+                    self.start_learning_rate, global_step, 10000, 0.96, staircase=True
+                )
+                tf.summary.scalar( 'learning_rate', learning_rate )
+    
+        # fixed learning rate
+        # learning_rate = start_learning_rate
+    
+        # Adam optimizer
+        self.optimizer = tf.train.AdamOptimizer( learning_rate ).minimize( self.cost, global_step = global_step )
+    
+        # Accuracy and correct prediction
+        self.accuracy, self.correct_prediction = self.defineAccuracy( self.ph_Y, Z_last )
+    
+        # Merge all the summaries and write them out to /tmp/mnist_logs (by default)
+        self.mergedSummaries = tf.summary.merge_all()
+    
+        # Add ops to save and restore all the variables.
+        self.tfSaver = tf.train.Saver()
+        
+    def modelEnd( self ):
+        # Close tensorboard streams
+        self.train_writer.close()
+        self.dev_writer.close()
+    
+    def compute_cost( self, Z_last, Y, WEIGHT, beta, n_x ):
+        """
+        Computes the cost
+    
+        Arguments:
+        Z3 -- output of forward propagation (output of the last LINEAR unit), of shape (6, number of examples)
+        Y -- "true" labels vector placeholder, same shape as Z3
+    
+        Returns:
+        cost - Tensor of the cost function
+        """
+    
+        ## Add Level 0 : X
+        # example : 12228, 100, 24, 1
+        structure0 = [ n_x ] + self.structure
+    
+        with tf.name_scope('cross_entropy'):
+    
+            # to fit the tensorflow requirement for tf.nn.softmax_cross_entropy_with_logits(...,...)
+            logits = tf.transpose( Z_last )
+            labels = tf.transpose( Y )
+    
+            raw_cost = None
+    
+            with tf.name_scope( 'total' ):
+                if ( ( type( WEIGHT ) == int ) and ( WEIGHT == 1 ) ) :
+                    raw_cost = \
+                        tf.reduce_mean(
+                            tf.nn.sigmoid_cross_entropy_with_logits( logits = logits, labels = labels )
+                        )
+    
+                else :
+                    # Use image weights to reduce false positives
+                    # pos_weight = tf.transpose( WEIGHT )
+                    raw_cost = \
+                        tf.reduce_mean(
+                            tf.nn.weighted_cross_entropy_with_logits(logits = logits, targets = labels, pos_weight = WEIGHT )
+                        )
+    
+                tf.summary.scalar( 'raw_cost', raw_cost)
+    
+                # Loss function using L2 Regularization
+                regularizer = None
+    
+                if ( beta != 0 ) :
+                    losses = []
+                    for i in range( 1, len( structure0 ) ) :
+                        W_cur = self.parameters[ 'W' + str( i ) ]
+                        losses.append( tf.nn.l2_loss( W_cur ) )
+    
+                    regularizer = tf.add_n( losses )
+    
+                cost = None
+    
+                if ( regularizer != None ) :
+                    cost = tf.reduce_mean( raw_cost + beta * regularizer )
+                else :
+                    cost = raw_cost
+    
+                tf.summary.scalar( 'cost', cost)
+    
+        self.cost = cost
+
+    def defineAccuracy( self, Y, Z_last ):
+        with tf.name_scope('accuracy'):
+            # To calculate the correct predictions
+            prediction = tf.round( tf.sigmoid( Z_last ) )
+            with tf.name_scope('correct_prediction'):
+                correct_prediction = tf.equal( prediction, Y )
+            with tf.name_scope('accuracy'):
+                # Calculate accuracy on the test set
+                accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
+    
+        if self.isTensorboard :
+            tf.summary.scalar('accuracy', accuracy)
+        
+        return accuracy, correct_prediction
+
+    def persistParams( self ):
+        # lets save the parameters in a variable
+        parameters = self.sess.run( self.parameters )
+        print ("Parameters have been trained!")
+    
+    def accuracyEval( self, X, Y ):
+        accuracy = self.accuracy.eval( { self.ph_X: X, self.ph_Y: Y, self.ph_KEEP_PROB: 1.0 } ) 
+        return accuracy
+    
+    def create_placeholders( self, n_x, n_y ):
+        """
+        Creates the placeholders for the tensorflow session.
+    
+        Arguments:
+        n_x -- scalar, size of an image vector (num_px * num_px = 64 * 64 * 3 = 12288)
+        n_y -- scalar, number of classes (from 0 to 5, so -> 6)
+    
+        Returns:
+        X -- placeholder for the data input, of shape [n_x, None] and dtype "float"
+        Y -- placeholder for the input labels, of shape [n_y, None] and dtype "float"
+    
+        Tips:
+        - You will use None because it let's us be flexible on the number of examples you will for the placeholders.
+          In fact, the number of examples during test/train is different.
+        """
+    
+        ### START CODE HERE ### (approx. 2 lines)
+        self.ph_X         = tf.placeholder( tf.float32, shape=( n_x, None ), name = "X" )
+        self.ph_Y         = tf.placeholder( tf.float32, shape=( n_y, None ), name = "Y" )
+        self.ph_KEEP_PROB = tf.placeholder( tf.float32, name = "KEEP_PROB" )
+        ### END CODE HERE ###
+    
+    def initialize_parameters( self, n_x ):
+        """
+        Initializes parameters to build a neural network with tensorflow. The shapes are:
+                            W1 : [25, 12288]
+                            b1 : [25, 1]
+                            W2 : [12, 25]
+                            b2 : [12, 1]
+                            W3 : [1, 12]
+                            b3 : [1, 1]
+    
+        Returns:
+        parameters -- a dictionary of tensors containing W1, b1, W2, b2, W3, b3
+        """
+    
+        tf.set_random_seed(1)                   # so that your "random" numbers match ours
+    
+        ## Add Level 0 : X
+        # example : 12228, 100, 24, 1
+        structure0 = [ n_x ] + self.structure
+    
+        # parameters
+        self.parameters = {}
+    
+        # browse layers
+        for i in range( 0, len( structure0 ) - 1 ):
+    
+            # Adding a name scope ensures logical grouping of the layers in the graph.
+            with tf.name_scope( "Layer" + str( i+1 ) ):
+                # This Variable will hold the state of the weights for the layer
+                with tf.name_scope( 'weights' ):
+                    W_cur = tf.get_variable( "W" + str( i + 1 ), [ structure0[ i + 1 ], structure0[ i ] ], initializer = tf.contrib.layers.xavier_initializer(seed = 1))
+                    if self.isTensorboardFull :
+                        self.variable_summaries( W_cur )
+    
+                with tf.name_scope( 'bias' ):
+                    b_cur = tf.get_variable( "b" + str( i + 1 ), [ structure0[ i + 1 ], 1             ], initializer = tf.zeros_initializer())
+                    if self.isTensorboardFull :
+                        self.variable_summaries( b_cur )
+    
+            self.parameters[ "W" + str( i + 1 ) ] = W_cur
+            self.parameters[ "b" + str( i + 1 ) ] = b_cur
+    
+
+    def forward_propagation( self, n_x ):
+        """
+        Implements the forward propagation for the model: LINEAR -> RELU -> LINEAR -> RELU -> LINEAR -> SOFTMAX
+    
+        Arguments:
+        X -- input dataset placeholder, of shape (input size, number of examples)
+        parameters -- python dictionary containing your parameters "W1", "b1", "W2", "b2", "W3", "b3"
+                      the shapes are given in initialize_parameters
+    
+        Returns:
+        Z3 -- the output of the last LINEAR unit
+        """
+    
+        ## Add Level 0 : X
+        # example : 12228, 100, 24, 1
+        structure0 = [ n_x ] + self.structure
+    
+    
+        Z = None
+        A = None
+    
+        curInput = self.ph_X
+    
+        for i in range( 1, len( structure0 ) ):
+            # Adding a name scope ensures logical grouping of the layers in the graph.
+            with tf.name_scope( "Layer" + str( i ) ):
+                # apply DropOut to hidden layer
+                curInput_drop_out = curInput
+                if i < len( structure0 ) - 1 :
+                    curInput_drop_out = tf.nn.dropout( curInput, this.ph_KEEP_PROB )
+    
+                ## Get W and b for current layer
+                W_layer = self.parameters[ "W" + str( i ) ]
+                b_layer = self.parameters[ "b" + str( i ) ]
+    
+                ## Linear part
+                with tf.name_scope( 'Z' ):
+                    Z = tf.add( tf.matmul( W_layer, curInput_drop_out  ), b_layer )
+                    if self.isTensorboardFull :
+                        tf.summary.histogram( 'Z', Z )
+    
+                ## Activation function for hidden layers
+                if i < len( structure0 ) - 1 :
+                    A = tf.nn.relu( Z )
+                    if self.isTensorboardFull :
+                        tf.summary.histogram( 'A', A   )
+    
+                ## Change cur input to A(layer)
+                curInput = A
+    
+        # For last layer (output layer): no dropout and return only Z
+        return Z
+
+    def runIteration(
+        self,
+        iteration, num_minibatches, sess,
+        X, Y, keep_prob,
+    ):
+    
+        feed_dict = { self.ph_X: X, self.ph_Y: Y, self.ph_KEEP_PROB: keep_prob }
+                    
+        # No mini-batch
+        if ( self.isTensorboard and ( iteration % ( 100 * num_minibatches ) == 100 * num_minibatches - 1 ) ):  # Record execution stats
+            run_options = tf.RunOptions( trace_level = tf.RunOptions.FULL_TRACE )
+            run_metadata = tf.RunMetadata()
+            summary, _ , curCost = sess.run(
+                [ self.mergedSummaries, self.optimizer, self.cost ], feed_dict=feed_dict,
+                options=run_options,run_metadata=run_metadata
+            )
+            self.train_writer.add_run_metadata( run_metadata, 'step%03d' % iteration )
+            self.train_writer.add_summary( summary, iteration )
+        else :
+    
+            if ( self.isTensorboard ) :
+                #run without meta data
+                summary, _ , curCost = sess.run(
+                    [ self.mergedSummaries, self.optimizer, cost], feed_dict=feed_dict
+                )
+                self.train_writer.add_summary( summary, iteration )
+            else :
+                _ , curCost = sess.run(
+                    [ self.optimizer, self.cost], feed_dict=feed_dict
+                )
+    
+        return curCost
+

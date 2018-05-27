@@ -117,6 +117,8 @@ def getOrCreateHyperParams( conn, hyper_params ) :
 
 def getConfig( conn, idConfig ) :
 
+    from model.mlconfig import MlConfig
+    
     c = conn.cursor()
 
     cursor = c.execute(
@@ -124,7 +126,7 @@ def getConfig( conn, idConfig ) :
         ( idConfig, )
     )
 
-    result = {}
+    result = MlConfig()
 
     for row in cursor :
         
@@ -199,6 +201,8 @@ def deleteConfig( conn, idConf ) :
 
 def getConfigsWithMaxDevAccuracy( conn, idConfig = None ) :
 
+    from model.mlconfig import MlConfig
+
     c = conn.cursor()
     parameters = ()
 
@@ -223,7 +227,7 @@ def getConfigsWithMaxDevAccuracy( conn, idConfig = None ) :
 
     for row in cursor :
 
-        result = {}
+        result = MlConfig()
 
         iCol = 0
         
