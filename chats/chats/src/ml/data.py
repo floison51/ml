@@ -29,7 +29,8 @@ class DataSource():
     
 class DataSet() :
     "Data set"
-    def __init__( self, X, Y, imgPath, tag = None, weight = None ):
+    def __init__( self, X_ori, X, Y, imgPath, tag = None, weight = None ):
+        self.X_ori = X_ori
         self.X = X
         self.Y = Y
         self.imgPath = imgPath

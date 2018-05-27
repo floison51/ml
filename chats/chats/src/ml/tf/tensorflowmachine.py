@@ -37,9 +37,6 @@ class TensorFlowMachine( Machine ):
     def getSession( self ):
         
         sess = tf.Session()
-        # Run the initialization
-        init = tf.global_variables_initializer()
-        sess.run( init )
 
         return sess
         
@@ -188,14 +185,27 @@ class TensorFlowMachine( Machine ):
         
         return accuracy, correct_prediction
 
-    def persistParams( self ):
+    def persistParams( self, sess, idRun ):
+        
         # lets save the parameters in a variable
-        parameters = self.sess.run( self.parameters )
-        print ("Parameters have been trained!")
+        #sess.run( self.parameters )
+        
+        # Serialize parameters
+        save_dir = TENSORFLOW_SAVE_DIR + "/" + str( idRun ) + "/save"
+        if tf.gfile.Exists( save_dir ):
+            tf.gfile.DeleteRecursively( save_dir )
+        tf.gfile.MakeDirs( save_dir )
+
+        save_path = self.tfSaver.save( sess, save_dir )
+        print( "Model saved in path: %s" % save_path)
     
     def accuracyEval( self, X, Y ):
         accuracy = self.accuracy.eval( { self.ph_X: X, self.ph_Y: Y, self.ph_KEEP_PROB: 1.0 } ) 
         return accuracy
+    
+    def correctPredictionEval( self, X, Y ):
+        correct_prediction = self.correct_prediction.eval( { self.ph_X: X, self.ph_Y: Y, self.ph_KEEP_PROB: 1.0 } )
+        return correct_prediction
     
     def create_placeholders( self, n_x, n_y ):
         """

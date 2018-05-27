@@ -9,6 +9,9 @@ import matplotlib.pyplot as plt
 import random
 import sys
 import time
+import os
+import shutil
+from collections import OrderedDict
 
 import const.constants as const
 import db.db as db
@@ -42,7 +45,7 @@ class Machine():
     def setData(self, datasetTrn, datasetDev ):
         self.datasetTrn  = datasetTrn
         self.datasetDev  = datasetDev
-          
+        
     def train( self,  conn, config, comment, tune = False ):
         "Train the model"
 
@@ -113,7 +116,7 @@ class Machine():
             )
     
             # Run model and update DB run with extra info
-            _, accuracyDev, accuracyTrain = self.model(
+            accuracyDev, accuracyTrain = self.model(
                 conn, idRun,
                 config[ "structure" ],
                 runHyperParams,
@@ -160,6 +163,14 @@ class Machine():
         # Abstract methode
         raise ValueError( "Abstract method" )
     
+    def getSession( self ):
+        # Abstract methode
+        raise ValueError( "Abstract method" )
+          
+    def sessionInit( self, sess ):
+        # Abstract methode
+        raise ValueError( "Abstract method" )
+          
     def modelEnd( self ):
         # Abstract methode
         raise ValueError( "Abstract method" )
@@ -169,6 +180,10 @@ class Machine():
         raise ValueError( "Abstract method" )
     
     def accuracyEval( self, X, Y ):
+        # Abstract methode
+        raise ValueError( "Abstract method" )
+    
+    def correctPredictionEval( self, X, Y ):
         # Abstract methode
         raise ValueError( "Abstract method" )
     
@@ -201,6 +216,9 @@ class Machine():
         
         with self.getSession() as sess:
     
+            # init session
+            self.sessionInit( sess )
+            
             # current iteration
             iteration = 0
     
@@ -284,6 +302,7 @@ class Machine():
             self.modelEnd()
     
             # Final cost
+            print ("Parameters have been trained!")
             print( "Final cost:", epoch_cost )
     
             # End time
@@ -297,7 +316,7 @@ class Machine():
                 plt.title("Start learning rate =" + str( self.start_learning_rate ) )
                 plt.show()
     
-            self.persistParams()
+            self.persistParams( sess, idRun )
     
             accuracyTrain = self.accuracyEval( self.datasetTrn.X, self.datasetTrn.Y )
             print ( "Train Accuracy:", accuracyTrain )
@@ -305,40 +324,31 @@ class Machine():
             accuracyDev = self.accuracyEval( self.datasetDev.X, self.datasetDev.Y )
             print ( "Dev Accuracy:", accuracyDev )
     
-            ## Errors
-            resultInfo = {}
-    
-#            if ( extractImageErrors ) :
-    
-                # Lists of OK for training
-#                 oks_train = correct_prediction.eval( {X: X_train, Y: Y_train, KEEP_PROB: 1 } )
-#                 map1, map2 = statsExtractErrors( "train", X_orig = X_train_orig, oks = oks_train, PATH = PATH_train, TAG = TAG_train, show_plot=show_plot )
-#                 # Errors nb by data tag
-#                 resultInfo[ const.KEY_TRN_NB_ERROR_BY_TAG ] = map1
-#                 resultInfo[ const.KEY_TRN_PC_ERROR_BY_TAG ] = map1
-#     
-#                 oks_dev = correct_prediction.eval( {X: X_dev, Y: Y_dev, KEEP_PROB: 1 } )
-#                 map1, map2 = statsExtractErrors( "dev", X_orig= X_dev_orig, oks = oks_dev, PATH = PATH_dev, TAG = TAG_dev, show_plot=show_plot )
-#                 # Errors nb by data tag
-#                 resultInfo[ const.KEY_DEV_NB_ERROR_BY_TAG ] = map1
-#                 resultInfo[ const.KEY_DEV_PC_ERROR_BY_TAG ] = map1
-#     
-#                 # Serialize parameters
-#                 save_dir = TENSORFLOW_SAVE_DIR + "/" + str( idRun ) + "/save"
-#                 if tf.gfile.Exists( save_dir ):
-#                     tf.gfile.DeleteRecursively( save_dir )
-#                 tf.gfile.MakeDirs( save_dir )
-#     
-#                 save_path = tfSaver.save( sess, save_dir )
-#                 print( "Model saved in path: %s" % save_path)
-    
             ## Elapsed (seconds)
-            elapsedSeconds, perfIndex = self.getPerfCounters( tsStart, iEpoch, n_x, m )
+            elapsedSeconds, perfIndex = self.getPerfCounters( tsStart, iEpoch, n_x, m, tsEnd )
             perfInfo = {}
         
             print( "Elapsed (s):", elapsedSeconds )
             print( "Perf index :", perfIndex )
         
+            ## Errors
+            resultInfo = {}
+    
+            if ( extractImageErrors ) :
+    
+                # Lists of OK for training
+                oks_train  = self.correctPredictionEval(  self.datasetTrn.X, self.datasetTrn.Y )
+                map1, map2 = self.statsExtractErrors( "train", dataset = self.datasetTrn, oks = oks_train, show_plot=show_plot )
+                # Errors nb by data tag
+                resultInfo[ const.KEY_TRN_NB_ERROR_BY_TAG ] = map1
+                resultInfo[ const.KEY_TRN_PC_ERROR_BY_TAG ] = map2
+     
+                oks_dev   = self.correctPredictionEval(  self.datasetDev.X, self.datasetDev.Y )
+                map1, map2 = self.statsExtractErrors( "dev", dataset = self.datasetDev, oks = oks_dev, show_plot=show_plot )
+                # Errors nb by data tag
+                resultInfo[ const.KEY_DEV_NB_ERROR_BY_TAG ] = map1
+                resultInfo[ const.KEY_DEV_PC_ERROR_BY_TAG ] = map2
+    
             # Update DB run after execution, add extra info
             db.updateRunAfter(
                 conn, idRun,
@@ -399,10 +409,7 @@ class Machine():
     
         return mini_batches
 
-    def getPerfCounters( self, tsStart, iEpoch, n_x, m ):
-        
-        # Now
-        tsNow = time.time()
+    def getPerfCounters( self, tsStart, iEpoch, n_x, m, tsNow = time.time() ):
         
         ## Elapsed (seconds)
         elapsedSeconds = int( round( tsNow - tsStart ) )
@@ -411,3 +418,125 @@ class Machine():
         
         return elapsedSeconds, perfIndex
     
+    def dumpBadImages( self, correct, X_orig, PATH, TAG, errorsDir ):
+    
+        # Delete files in error dir
+        for the_file in os.listdir( errorsDir ):
+            file_path = os.path.join( errorsDir, the_file )
+            try:
+                if os.path.isfile(file_path):
+                    os.unlink( file_path )
+            except Exception as e:
+                print(e)
+    
+        # check deleted
+        if ( len( os.listdir( errorsDir ) ) != 0 ) :
+            print( "Dir", errorsDir, "not empty." )
+            sys.exit( 1 )
+    
+        # Dico of errors by label
+        mapErrorNbByTag = {}
+    
+        imgBase = os.getcwd().replace( "\\", "/" ) + "/data/transformed"
+    
+        # Extract errors
+        for i in range( 0, correct.shape[ 1 ] - 1 ):
+            # Is an error?
+            if ( not( correct[ 0, i ] ) ) :
+    
+                # Add nb
+                label = str( TAG[ 0, i ] )
+                try:
+                    nb = mapErrorNbByTag[ label ]
+                except KeyError as e:
+                    ## Init nb
+                    nb = 0
+    
+                nb += 1
+                mapErrorNbByTag[ label ] = nb
+    
+                # extract 64x64x3 image
+                #X_errorImg = X_orig[ i ]
+                #errorImg = Image.fromarray( X_errorImg, 'RGB' )
+    
+                ## dump image
+                #errorImg.save( errorsDir + '/error-' + str( i ) + ".png", 'png' )
+    
+                # Get original image
+                # str: b'truc'
+                imgRelPath = str( PATH[ i ] )
+                # b'truc'
+                imgRelPath = imgRelPath[ 2: ]
+                # truc
+                imgRelPath = imgRelPath[ : -1 ]
+    
+                imgPath = imgBase + "/" + imgRelPath
+    
+                toFile = errorsDir + "/" + label + "-" + str( i ) + "-" + os.path.basename( imgRelPath )
+                shutil.copyfile( imgPath, toFile )
+    
+        # return dico
+        return mapErrorNbByTag
+
+    def statsExtractErrors( self, key, dataset, oks, show_plot=True ) :
+    
+        errorsDir = os.getcwd().replace( "\\", "/" ) + "/errors/" + key
+    
+        os.makedirs( errorsDir, exist_ok = True )
+    
+        # Delete files in error dir
+        for the_file in os.listdir( errorsDir ):
+    
+            file_path = os.path.join( errorsDir, the_file )
+            try:
+                if os.path.isfile(file_path):
+                    os.unlink( file_path )
+            except Exception as e:
+                print(e)
+    
+        # check deleted
+        if ( len( os.listdir( errorsDir ) ) != 0 ) :
+            print( "Dir", errorsDir, "not empty." )
+            sys.exit( 1 )
+    
+        # Dump bad images
+        mapErrorNbByTag = self.dumpBadImages( oks, dataset.X_ori, dataset.imgPath, dataset.tag, errorsDir )
+    
+        # Sort by value
+        mapErrorNbByTagSorted = \
+            OrderedDict(
+                sorted( mapErrorNbByTag.items(), key=lambda t: t[1], reverse=True )
+        )
+    
+        ## Error repartition by label
+        print( "Nb errors by tag for", key, ": ", mapErrorNbByTagSorted )
+    
+        # Build %age map
+        nbSamples = oks.shape[ 1 ]
+    
+        mapErrorPercentNbByTag = {}
+    
+        for labelError in mapErrorNbByTagSorted.items() :
+            label = labelError[ 0 ]
+            percentage = labelError[ 1 ] / nbSamples
+            mapErrorPercentNbByTag[ label ] = "{0:.0f}%".format( percentage * 100 )
+    
+        # Sort by value
+        mapErrorNbPercentByTagSorted = \
+            OrderedDict(
+                sorted( mapErrorPercentNbByTag.items(), key=lambda t: t[1], reverse=True )
+        )
+    
+        ## Error repartition by label
+        print( "% errors by tag for", key, ": ", mapErrorPercentNbByTag )
+    
+        ## Graph
+        if ( show_plot ) :
+            x = np.arange( len( mapErrorNbByTagSorted ) )
+            plt.bar( x, mapErrorNbByTagSorted.values() )
+            plt.xticks( x, mapErrorNbByTagSorted.keys( ) )
+            plt.title( "Error repartition for " + key )
+            plt.show()
+        
+        return mapErrorNbByTagSorted, mapErrorPercentNbByTag
+

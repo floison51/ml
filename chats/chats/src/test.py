@@ -5,6 +5,8 @@ import os
 from six.moves import configparser
 import sys
 import importlib
+import socket
+import platform
 
 from tkinter import *
 
@@ -90,6 +92,9 @@ if __name__ == '__main__':
 
     with db.initDb( APP_KEY, DB_DIR ) as conn :
 
+        # test (debug)
+        #db.test( conn )
+        
         # update machines
         configMachines = updateMachines( conn )
         
@@ -131,8 +136,13 @@ if __name__ == '__main__':
         dataSource = instantiateClass( machineDataSourceClass )
         ml = instantiateClass( machineClass )
 
-        # Print system info
+        # Define system infos
         systemInfos = {}
+        hostname = socket.gethostname()
+        systemInfos[ const.KEY_HOSTNAME ] = hostname
+        systemInfos[ const.KEY_OS_NAME ]  = platform.system() + " " + platform.release()
+        systemInfos[ const.KEY_TENSOR_FLOW_VERSION ] = hostname
+        
         ml.addSystemInfo( systemInfos )
         
         # get data

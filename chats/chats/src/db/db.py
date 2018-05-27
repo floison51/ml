@@ -474,12 +474,14 @@ def getRun( conn, idRun ) :
 
     # Update run
     cursor = c.execute( '''
-        select * from runs where idRun=?''',
+        select * from runs where id=?''',
         (idRun,)
     )
 
-    row = cursor.firstRow()
-    result = getRunFromRow( row )
+    result = None
+
+    for row in cursor :
+        result = getRunFromRow( row )
 
     c.close();
 
@@ -589,33 +591,36 @@ def initTables( c ) :
 
 def test( conn ):
 
-    # Create config
-    hyperParams = { "beta": 100 }
+     run = getRun( conn, 1 )
+     print( "After :", str( run ) )
 
-    idConfig = getOrCreateConfig( conn, "Hello conf 100", "[1]", hyperParams )
-
-    systemInfo = { "host": "12345678" }
-    dataInfo = { "data": "chats" }
-    perfInfo = { "perf": 4567 }
-
-
-    runHyperParams = { const.KEY_BETA: 10, const.KEY_KEEP_PROB: 0.5 }
-    idRun = createRun( conn, idConfig, runHyperParams )
-
-    updateRunBefore(
-        conn, idRun,
-        comment="comment",
-        system_info=systemInfo, data_info=dataInfo
-    )
-
-    run = getRun( conn, idRun )
-    print( "Before:", str( run ) )
-
-    updateRunAfter(
-        conn, idRun,
-        perf_info = perfInfo, result_info={ "errors": [1,2,3] },
-        perf_index=10, elapsed_second=20, train_accuracy=0.5, dev_accuracy=0.9
-    )
-
-    run = getRun( conn, idRun )
-    print( "After :", str( run ) )
+#     # Create config
+#     hyperParams = { "beta": 100 }
+# 
+#     idConfig = getOrCreateConfig( conn, "Hello conf 100", "[1]", hyperParams )
+# 
+#     systemInfo = { "host": "12345678" }
+#     dataInfo = { "data": "chats" }
+#     perfInfo = { "perf": 4567 }
+# 
+# 
+#     runHyperParams = { const.KEY_BETA: 10, const.KEY_KEEP_PROB: 0.5 }
+#     idRun = createRun( conn, idConfig, runHyperParams )
+# 
+#     updateRunBefore(
+#         conn, idRun,
+#         comment="comment",
+#         system_info=systemInfo, data_info=dataInfo
+#     )
+# 
+#     run = getRun( conn, idRun )
+#     print( "Before:", str( run ) )
+# 
+#     updateRunAfter(
+#         conn, idRun,
+#         perf_info = perfInfo, result_info={ "errors": [1,2,3] },
+#         perf_index=10, elapsed_second=20, train_accuracy=0.5, dev_accuracy=0.9
+#     )
+# 
+#     run = getRun( conn, idRun )
+#     print( "After :", str( run ) )
