@@ -305,8 +305,20 @@ class Machine():
             print ("Parameters have been trained!")
             print( "Final cost:", epoch_cost )
     
-            # End time
-            tsEnd = time.time()
+            ## Elapsed (seconds)
+            elapsedSeconds, perfIndex = self.getPerfCounters( tsStart, iEpoch, n_x, m )
+            perfInfo = {}
+        
+            print( "Elapsed (s):", elapsedSeconds )
+            print( "Perf index :", perfIndex )
+        
+            self.persistParams( sess, idRun )
+    
+            accuracyTrain = self.accuracyEval( self.datasetTrn.X, self.datasetTrn.Y )
+            print ( "Train Accuracy:", accuracyTrain )
+    
+            accuracyDev = self.accuracyEval( self.datasetDev.X, self.datasetDev.Y )
+            print ( "Dev Accuracy:", accuracyDev )
     
             if ( show_plot ) :
                 # plot the cost
@@ -316,21 +328,6 @@ class Machine():
                 plt.title("Start learning rate =" + str( self.start_learning_rate ) )
                 plt.show()
     
-            self.persistParams( sess, idRun )
-    
-            accuracyTrain = self.accuracyEval( self.datasetTrn.X, self.datasetTrn.Y )
-            print ( "Train Accuracy:", accuracyTrain )
-    
-            accuracyDev = self.accuracyEval( self.datasetDev.X, self.datasetDev.Y )
-            print ( "Dev Accuracy:", accuracyDev )
-    
-            ## Elapsed (seconds)
-            elapsedSeconds, perfIndex = self.getPerfCounters( tsStart, iEpoch, n_x, m, tsEnd )
-            perfInfo = {}
-        
-            print( "Elapsed (s):", elapsedSeconds )
-            print( "Perf index :", perfIndex )
-        
             ## Errors
             resultInfo = {}
     
@@ -409,7 +406,9 @@ class Machine():
     
         return mini_batches
 
-    def getPerfCounters( self, tsStart, iEpoch, n_x, m, tsNow = time.time() ):
+    def getPerfCounters( self, tsStart, iEpoch, n_x, m ):
+        
+        tsNow = time.time()
         
         ## Elapsed (seconds)
         elapsedSeconds = int( round( tsNow - tsStart ) )
