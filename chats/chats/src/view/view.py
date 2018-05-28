@@ -26,8 +26,9 @@ class MainWindow ( Tk ):
 
         #Nb rows added
         self.nbRowsAdded = 0
-        
+
         self.buttonClicked = None
+        self.runParams = None
 
     def showAndSelectConf( self, configs ):
 
@@ -44,40 +45,32 @@ class MainWindow ( Tk ):
         frameButtons = Frame(self, borderwidth=0 )
         frameButtons.pack( side=BOTTOM, padx=10, pady=10, fill='both', expand=True )
 
-        buttonTrain = Button( 
+        buttonTrain = Button(
             frameButtons, text="Train",
-            command=lambda name="Train" : ( self.clickButton( name ) ), 
-            state=DISABLED 
+            command=lambda name="Train" : ( self.clickButton( name ) ),
+            state=DISABLED
         )
         buttonTrain.pack( side="left", padx=40 )
         buttonsToUpdate.append( buttonTrain )
 
-        buttonTune = Button( 
-            frameButtons, text="Tune", 
-            command=lambda name="Tune" : ( self.clickButton( name ) ), 
-            state=DISABLED 
-        )
-        buttonTune.pack( side="left", padx=40 )
-        buttonsToUpdate.append( buttonTune )
-
-        buttonPredict = Button( 
-            frameButtons, text="Predict", 
-            command=lambda name="Predict" : ( self.clickButton( name ) ), 
-            state=DISABLED 
+        buttonPredict = Button(
+            frameButtons, text="Predict",
+            command=lambda name="Predict" : ( self.clickButton( name ) ),
+            state=DISABLED
         )
         buttonPredict.pack( side="left", padx=40 )
         buttonsToUpdate.append( buttonPredict )
 
-        buttonCancel=Button( 
-            frameButtons, text="Cancel", 
-            command=lambda name="Cancel" : ( self.clickButton( name ) ), 
+        buttonCancel=Button(
+            frameButtons, text="Cancel",
+            command=lambda name="Cancel" : ( self.clickButton( name ) ),
         )
         buttonCancel.pack( side="right", padx=40  )
 
         self.mainloop()
 
         # return selected idConf
-        return ( self.confSelected.get(), self.buttonClicked )
+        return ( self.confSelected.get(), self.buttonClicked, self.runParams )
 
 
     def buildConfigGrid( self, frameConfigs, configs ):
@@ -149,8 +142,15 @@ class MainWindow ( Tk ):
         for colName in colNames:
 
             item = config[ colName ]
+
+            # format?
+            formatString = const.ConfigsDico.CARAC[ colName ][ 2 ]
+            if ( formatString != None ) :
+                item = formatString.format( item )
+
             ## We need a var of label values, to be able to modify labels
             varLabel = getInputVar( const.ConfigsDico.CARAC, colName )
+
             varLabel.set( item )
             colVarLabels.append( varLabel )
 
@@ -228,10 +228,20 @@ class MainWindow ( Tk ):
     def confRbClicked( self ):
         for button in buttonsToUpdate :
             self.enableEntry( button )
-            
+
     def clickButton( self, buttonName ):
         self.buttonClicked = buttonName
+
+        # Next dialog
+        if ( self.buttonClicked == "Train" ) :
+            startTrainingDialog = StartTrainDialog( self, self.doRunTraining )
+            startTrainingDialog.run()
+        else :
+            self.destroy()
+
+    def doRunTraining( self ):
         self.destroy()
+
 
 class MyDialog( Toplevel ):
     "Modal dialog window"
@@ -268,9 +278,9 @@ class MyDialog( Toplevel ):
         self.callbackFct( self, self.result )
 
     def buttonCancelClicked( self ) :
-        buttonClicked = "cancel"
+        self.buttonClicked = "cancel"
         # Bye
-        result = None
+        self.result = None
         self.do_close()
 
     def buttonOkClicked( self ) :
@@ -316,8 +326,12 @@ class ViewOrUpdateHyperParamsWindow ( MyDialog ) :
         # Add dico entries
         iRow = 1
 
+        # Format accuracy
+        strFormat = const.ConfigsDico.CARAC[ "bestAccuracy" ][ 2 ]
+        formattedBestDevAccuracy = strFormat.format( bestDevAccuracy )
+
         labelText1 = "Current\nhyper params"
-        labelText2 = "Best\nhyper params\nDEV accuracy=" + str( bestDevAccuracy )
+        labelText2 = "Best\nhyper params\nDEV accuracy=" + formattedBestDevAccuracy
         Label( frameForm, text=labelText1, borderwidth=1 ).grid( row=iRow, column=1, sticky=W, padx=10 )
         Label( frameForm, text=labelText2, borderwidth=1 ).grid( row=iRow, column=3, sticky=W, padx=10 )
 
@@ -373,10 +387,10 @@ class CreateOrUpdateConfigWindow ( MyDialog ) :
 
         # Normalize form
         if ( config == None ) :
-            config = { 
-                "name": "", "structure": "", 
-                "imageSize" : const.ConfigsDico.CARAC[ "imageSize" ][ 1 ], 
-                "machine"   : const.MachinesDico.CARAC[ "name" ][ 1 ] 
+            config = {
+                "name": "", "structure": "",
+                "imageSize" : const.ConfigsDico.CARAC[ "imageSize" ][ 1 ],
+                "machine"   : const.MachinesDico.CARAC[ "name" ][ 1 ]
             }
 
         # Table labels
@@ -436,4 +450,47 @@ def getInputVar( dicoCarac, hpName ) :
     else :
         raise ValueError( "Unknown type", hpType )
 
+class StartTrainDialog( MyDialog ):
 
+    def __init__( self, boss, callbackFct, **options ) :
+        MyDialog.__init__( self, boss, callbackFct, **options )
+
+    def run( self ) :
+
+        frameTop = Frame( self, relief=GROOVE )
+        frameTop.pack(side=TOP, padx=30, pady=30)
+
+        label = Label( frameTop, text="Start training form" )
+        label.pack()
+
+        frameForm = Frame( self, relief=GROOVE )
+        frameForm.pack( padx=30, pady=30)
+
+        frameButtons = LabelFrame( self, borderwidth=0 )
+        frameButtons.pack( side=BOTTOM, padx=30, pady=30, fill='both', expand=True )
+
+        Label( frameForm, text="Run comment", borderwidth=1 ).grid( row=1, column=1, sticky=W, padx=10 )
+        self.commentInputVar = getInputVar( const.RunsDico.CARAC, "comment" )
+        Entry( frameForm, textvariable=self.commentInputVar ).grid( row=1, column=2, sticky=W, padx=10 )
+
+        Label( frameForm, text="Tune", borderwidth=1 ).grid( row=2, column=1, sticky=W, padx=10 )
+        self.tuneInputVar = BooleanVar()
+        Checkbutton( frameForm, variable=self.tuneInputVar ).grid( row=2, column=2, sticky=W, padx=10 )
+
+        buttonRun    = Button( frameButtons, text="Run"   , command=self.buttonRunClicked   , state=NORMAL )
+        buttonCancel = Button( frameButtons, text="Cancel", command=self.buttonCancelClicked, state=NORMAL )
+
+        buttonRun.pack( side=LEFT, padx=40 )
+        buttonCancel.pack( side=RIGHT, padx=40 )
+
+    def buttonRunClicked( self ) :
+        # Give params to master
+        self.master.runParams = { "comment" : self.commentInputVar.get(), "tune": self.tuneInputVar.get() }
+        self.destroy()
+        self.master.destroy()
+
+    def buttonCancelClicked( self ) :
+        # cancel
+        self.master.clickButton( "Cancel" )
+        self.destroy()
+        self.master.destroy()
