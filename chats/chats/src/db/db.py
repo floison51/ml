@@ -207,8 +207,9 @@ def getConfigsWithMaxDevAccuracy( conn, idConfig = None ) :
     parameters = ()
 
     statement = \
-        "select c.id as id, c.name as name, c.structure as structure, c.imageSize as imageSize, " + \
-        "( select m.name from machines m where m.id=c.idMachine ) as machine, " +\
+        "select c.id as id, c.name as name, " + \
+        "( select m.name from machines m where m.id=c.idMachine ) as machine, " + \
+        "c.imageSize as imageSize, c.structure as structure, " + \
         "( select max(r.dev_accuracy) " + \
         "from runs r where r.idConf=c.id ) as bestAccuracy from configs c"
     if ( idConfig != None ) :

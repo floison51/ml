@@ -139,6 +139,14 @@ class ConfigDoer( Doer ):
         # commit
         self.conn.commit()
 
+    def showStructure( self, fenetre, idConf ):
+
+        # Get config
+        config = db.getConfig( self.conn, idConf )
+
+        dialogShowStructure = view.TextModalWindow( fenetre, None )
+        dialogShowStructure.run( config[ "structure" ], True )
+
 class RunsDoer( Doer ):
 
     def __init__( self, conn ) :

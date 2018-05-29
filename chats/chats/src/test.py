@@ -157,7 +157,8 @@ if __name__ == '__main__':
         if ( buttonClicked == "Train" ) :
             print( "Train machine", machineName )
 
-            comment = runParams[ "comment" ]
-            tune    = runParams[ "tune" ]
+            comment     = runParams[ "comment" ]
+            tune        = runParams[ "tune" ]
+            nbTuning    = runParams[ "nbTuning" ]
             
-            ml.train( conn, config, comment, tune = tune )
+            ml.train( conn, config, comment, tune = tune, nbTuning = nbTuning )

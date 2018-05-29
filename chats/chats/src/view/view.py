@@ -82,7 +82,7 @@ class MainWindow ( Tk ):
         self.frameConfigsTable = LabelFrame( frameConfigs, padx=10, pady=10)
 
         # show window
-        labels = { 1: "", 2: "Id", 3: "Name", 4: "Structure", 5: "Image Size", 6 : "Machine", 7 : "Best DEV\nAccuracy", 8: "Hyper Params", 9: "Runs" }
+        labels = { 1: "", 2: "Id", 3: "Name", 4: "Machine", 5: "Image Size", 6 : "Structure", 7 : "Best DEV\nAccuracy", 8: "Hyper Params", 9: "Runs" }
 
         for iCol in range( 1, len( labels ) + 1 ) :
             label = Label( self.frameConfigsTable, text=labels[ iCol ], borderwidth=1 ).grid( row=0, column=iCol, sticky=W, padx=10 )
@@ -145,19 +145,32 @@ class MainWindow ( Tk ):
 
             # format?
             formatString = const.ConfigsDico.CARAC[ colName ][ 2 ]
-            if ( formatString != None ) :
+            if ( ( item != None ) and ( formatString != None ) ) :
                 item = formatString.format( item )
 
-            ## We need a var of label values, to be able to modify labels
-            varLabel = getInputVar( const.ConfigsDico.CARAC, colName )
+            if ( colName == "structure" ) :
+                # special case: show button
 
-            varLabel.set( item )
-            colVarLabels.append( varLabel )
+                # Button to show structure
+                buttonShowStructure = Button( \
+                    self.frameConfigsTable, text="Show", \
+                    command= lambda idConf=idConf : self.configDoer.showStructure( self, idConf )
+                )
+                cols.append( buttonShowStructure )
+                buttonShowStructure.grid( row=iRow, column=iCol )
 
-            label = Label( self.frameConfigsTable, borderwidth=1, textvariable=varLabel )
+            else :
+                ## We need a var of label values, to be able to modify labels
+                varLabel = getInputVar( const.ConfigsDico.CARAC, colName )
 
-            cols.append( label )
-            label.grid( row=iRow, column=iCol, sticky=W, padx=10 )
+                varLabel.set( item )
+                colVarLabels.append( varLabel )
+
+                label = Label( self.frameConfigsTable, borderwidth=1, textvariable=varLabel )
+
+                cols.append( label )
+                label.grid( row=iRow, column=iCol, sticky=W, padx=10 )
+
             iCol += 1
 
         # Button to show hyper params
@@ -194,12 +207,15 @@ class MainWindow ( Tk ):
 
         iCol = 0 # 1 = offset radio-button
         for colName in colNames:
-            # associated var
-            var = varLabels[ iCol ]
-            # get and set value
-            value  = config[ colName ]
-            var.set( value )
-            iCol += 1
+            
+            if ( colName != "structure" ) :
+                # associated var
+                var = varLabels[ iCol ]
+                # get and set value
+                value  = config[ colName ]
+                var.set( value )
+                
+                iCol += 1
 
     def deleteConfigGrid( self, idConfig ):
         cols = self.rows[ idConfig ]
@@ -288,7 +304,15 @@ class MyDialog( Toplevel ):
         # Read values from form
         self.result = {}
         for key, value in self.inputs.items() :
-            self.result[ key ] = value.get()
+
+            if ( isinstance( value, Text ) ) :
+                # special set for text
+                result = value.get( "1.0", END )
+            else :
+                #Normal var
+                result = value.get()
+
+            self.result[ key ] = result
 
         # Bye
         self.do_close()
@@ -411,8 +435,24 @@ class CreateOrUpdateConfigWindow ( MyDialog ) :
 
                 label = Label( frameForm, text=key, borderwidth=1 ).grid( row=iRow, column=1, sticky=W, padx=10 )
 
-                # Pecial case for machines
-                if ( key == "machine" ) :
+                # Special case for machines
+                if ( key == "structure" ) :
+                    ## special frame
+                    frameEdit = Frame( frameForm, relief=GROOVE )
+                    # text editor
+                    text = Text( frameEdit, width=80, height=10 )
+                    scroll = Scrollbar( frameEdit, command=text.yview )
+                    text.configure( yscrollcommand=scroll.set )
+
+                    text.pack(side=LEFT)
+                    scroll.pack(side=RIGHT, fill=Y)
+
+                    frameEdit.grid( row=iRow, column=2, sticky=W, padx=10 )
+
+                    inputVar = text
+
+                # Special case for structure : edit text
+                elif ( key == "machine" ) :
                     # Combo box
                     Combobox( frameForm, textvariable = inputVar, \
                         values = machineNames, state = 'readonly').grid( row=iRow, column=2, sticky=W, padx=10 )
@@ -422,7 +462,13 @@ class CreateOrUpdateConfigWindow ( MyDialog ) :
 
             self.inputs[ key ] = inputVar
 
-            inputVar.set( value )
+            # set value
+            if ( isinstance( inputVar, Text ) ) :
+                # special set for text
+                inputVar.insert( INSERT, value )
+            else :
+                #Normal var
+                inputVar.set( value )
 
             iRow += 1
 
@@ -450,6 +496,30 @@ def getInputVar( dicoCarac, hpName ) :
     else :
         raise ValueError( "Unknown type", hpType )
 
+class TextModalWindow ( MyDialog ) :
+
+    def __init__( self, boss, callbackFct, **options ) :
+        MyDialog.__init__( self, boss, callbackFct, **options )
+
+    def run( self, structure, readOnly ) :
+        "Modal text window"
+
+        frameEdit = Frame( self, relief=GROOVE )
+        frameEdit.pack(side=TOP, padx=30, pady=30)
+
+        # text editor
+        text = Text( frameEdit, width=80, height=10 )
+        scroll = Scrollbar( frameEdit, command=text.yview )
+        text.configure( yscrollcommand=scroll.set )
+
+        text.pack(side=LEFT)
+        scroll.pack(side=RIGHT, fill=Y)
+
+        text.insert( "1.0", structure )
+
+        #Read only
+        text.config( state=DISABLED )
+
 class StartTrainDialog( MyDialog ):
 
     def __init__( self, boss, callbackFct, **options ) :
@@ -471,11 +541,16 @@ class StartTrainDialog( MyDialog ):
 
         Label( frameForm, text="Run comment", borderwidth=1 ).grid( row=1, column=1, sticky=W, padx=10 )
         self.commentInputVar = getInputVar( const.RunsDico.CARAC, "comment" )
-        Entry( frameForm, textvariable=self.commentInputVar ).grid( row=1, column=2, sticky=W, padx=10 )
+        Entry( frameForm, textvariable=self.commentInputVar, width = 40 ).grid( row=1, column=2, sticky=W, padx=10 )
 
         Label( frameForm, text="Tune", borderwidth=1 ).grid( row=2, column=1, sticky=W, padx=10 )
         self.tuneInputVar = BooleanVar()
         Checkbutton( frameForm, variable=self.tuneInputVar ).grid( row=2, column=2, sticky=W, padx=10 )
+
+        Label( frameForm, text="Nb tuning cycles", borderwidth=1 ).grid( row=3, column=1, sticky=W, padx=10 )
+        self.nbTuningInputVar = IntVar()
+        self.nbTuningInputVar.set( 20 )
+        Entry( frameForm, textvariable=self.nbTuningInputVar ).grid( row=3, column=2, sticky=W, padx=10 )
 
         buttonRun    = Button( frameButtons, text="Run"   , command=self.buttonRunClicked   , state=NORMAL )
         buttonCancel = Button( frameButtons, text="Cancel", command=self.buttonCancelClicked, state=NORMAL )
@@ -485,7 +560,11 @@ class StartTrainDialog( MyDialog ):
 
     def buttonRunClicked( self ) :
         # Give params to master
-        self.master.runParams = { "comment" : self.commentInputVar.get(), "tune": self.tuneInputVar.get() }
+        self.master.runParams = { 
+            "comment"   : self.commentInputVar.get(), 
+            "tune"      : self.tuneInputVar.get(),
+            "nbTuning"  : self.nbTuningInputVar.get() 
+        }
         self.destroy()
         self.master.destroy()
 

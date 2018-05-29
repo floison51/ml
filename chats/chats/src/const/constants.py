@@ -67,13 +67,13 @@ class ConfigsDico:
         # Type, default value
         "id"           : [ "int"    , None, None ],
         "name"         : [ "string" , None, None ],
-        "structure"    : [ "string" , None, None ],
-        "imageSize"    : [ "int"    , 64  , None ],
         "machine"      : [ "string" , None, None ],
+        "imageSize"    : [ "int"    , 64  , None ],
+        "structure"    : [ "string" , None, None ],
         "bestAccuracy" : [ "float" ,  None, "{:.2f}" ],
     }
     OBJECT_FIELDS  = [ "id", "name", "structure", "imageSize", "idMachine", "idHyperParams" ]
-    DISPLAY_FIELDS = [ "id", "name", "structure", "imageSize", "machine", "bestAccuracy" ]
+    DISPLAY_FIELDS = [ "id", "name", "machine", "imageSize", "structure", "bestAccuracy" ]
 
 class MachinesDico:
 

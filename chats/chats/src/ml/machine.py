@@ -46,7 +46,7 @@ class Machine():
         self.datasetTrn  = datasetTrn
         self.datasetDev  = datasetDev
         
-    def train( self,  conn, config, comment, tune = False ):
+    def train( self,  conn, config, comment, tune = False, nbTuning = 20 ):
         "Train the model"
 
         # hyper parameters
