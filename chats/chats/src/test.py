@@ -118,10 +118,8 @@ if __name__ == '__main__':
         # get machine name
         machineName = db.getMachineNameById( conn, config[ "idMachine" ] )
 
-        # TODO write machine main params
-        #print( "Structure:", structure )
-
-        # TODO : inistiate actual ML from conf
+        print( "Structure:" )
+        print( config[ "structure" ] )
 
         # Get machine data source
         machineDataSourceClass = configMachines.get( "DataSources", machineName )
