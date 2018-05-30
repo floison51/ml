@@ -28,9 +28,9 @@ class AbstractTensorFlowMachine( AbstractMachine ):
 
     def addPerfInfo( self, perfInfo ):
         "Add perf information"
-        
+
         super.addPerfInfo( self, perfInfo )
-        
+
         perfInfo.append(
             { const.KEY_PERF_IS_USE_TENSORBOARD       : self.isTensorboard,
               const.KEY_PERF_IS_USE_FULL_TENSORBOARD  : self.isTensorboardFull,
@@ -227,7 +227,7 @@ class AbstractTensorFlowMachine( AbstractMachine ):
 # Tensorflow basic machine : supports [48,24,1] fully connected hand-mad structure
 #*****************************************************
 class TensorFlowSimpleMachine( AbstractTensorFlowMachine ):
-    
+
     def __init__( self, params = None ):
         AbstractTensorFlowMachine.__init__( self, params )
 
@@ -242,7 +242,7 @@ class TensorFlowSimpleMachine( AbstractTensorFlowMachine ):
 
         #Get as array
         structure = eval( strStructure )
-        
+
         return structure
 
     def initialize_parameters( self, n_x ):
@@ -359,9 +359,16 @@ class TensorFlowSimpleMachine( AbstractTensorFlowMachine ):
         with tf.name_scope('cross_entropy'):
 
             # to fit the tensorflow requirement for tf.nn.softmax_cross_entropy_with_logits(...,...)
-            logits = tf.transpose( Z_last )
-            labels = tf.transpose( Y )
 
+            # if data samples per column 
+            #logits = tf.transpose( Z_last )
+            #labels = tf.transpose( Y )
+
+            # if data samples per line 
+            #ValueError: logits and labels must have the same shape ((1, 12288) vs (?, 1))
+            logits = Z_last
+            labels = Y
+            
             raw_cost = None
 
             with tf.name_scope( 'total' ):
@@ -407,7 +414,7 @@ class TensorFlowSimpleMachine( AbstractTensorFlowMachine ):
 # Tensorflow machine : supports multi-layers tf notations, including convolution
 #*****************************************************
 class TensorFlowFullMachine( AbstractTensorFlowMachine ):
-    
+
     def __init__( self, params = None ):
         super( AbstractTensorFlowMachine, self ).__init__( params )
         self.isTensorboard     = False
@@ -416,7 +423,7 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
     def parseStructure( self, strStructure ):
         ## Normalize structure
         strStructure = strStructure.strip()
-        
+
         return "TODO"
 
     def initialize_parameters( self, n_x ):
@@ -425,9 +432,9 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
     def forward_propagation( self, n_x ):
 
         curInput = self.ph_X
-        
+
         Z = tf.contrib.layers.fully_connected( inputs=curInput, num_outputs=1, activation_fn=None )
-        
+
         return Z
 
     def define_cost( self, Z_last, Y, WEIGHT, beta, n_x ):

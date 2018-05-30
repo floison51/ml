@@ -76,10 +76,9 @@ def prepareData( dataSource ):
     print ("X_test shape: "  + str( dataInfo[ const.KEY_DEV_X_SHAPE ] ) )
     print ("Y_test shape: "  + str( dataInfo[ const.KEY_DEV_Y_SHAPE ] ) )
 
-    ## TODO
 #     if ( hyperParams[ const.KEY_USE_WEIGHTS ] ) :
 #         print ( "  Weights_train shape :", WEIGHT_train.shape )
-    print ()
+#     print ()
 
     return datasetTrn, datasetDev, dataInfo
 

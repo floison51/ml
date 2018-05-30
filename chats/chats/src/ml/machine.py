@@ -167,7 +167,16 @@ class AbstractMachine():
                     maxAccuracyDev = accuracyDev
                     maxHyperParams = tuning[ j ]
                     maxIdRun = idRun
-                    
+
+                    # get or create hyperparams
+                    idMaxHp = db.getOrCreateHyperParams( conn, runHyperParams )
+                    # Update config
+                    config[ "idHyperParams" ] = idMaxHp
+                    # save config
+                    db.updateConfig( conn, config )
+                    # Commit result
+                    conn.commit() 
+
                 # print max
                 print( "Max DEV accuracy:", maxAccuracyDev )
                 print( "Max hyper params:" )
@@ -194,8 +203,8 @@ class AbstractMachine():
         print_cost = True, show_plot = True, extractImageErrors = True
     ):
         
-        (n_x, m) = self.datasetTrn.X.shape   # (n_x: input size, m : number of examples in the train set)
-        n_y = self.datasetTrn.Y.shape[ 0 ]   # n_y : output size
+        ( m, n_x ) = self.datasetTrn.X.shape   # (n_x: input size, m : number of examples in the train set)
+        ( _, n_y ) = self.datasetTrn.Y.shape   # n_y : output size
         costs = []                                        # To keep track of the cost
         DEV_accuracies = []     # for DEV accuracy graph
     
@@ -396,26 +405,31 @@ class AbstractMachine():
         np.random.seed(seed)
     
         # Step 1: Shuffle (X, Y)
-        permutation = list(np.random.permutation(m))
-        shuffled_X = X[:, permutation]
-        shuffled_Y = Y[:, permutation].reshape((Y.shape[0],m))
+        permutation = list( np.random.permutation( m ) )
+        shuffled_X = X[ permutation, : ]
+        shuffled_Y = Y[ permutation, : ].reshape( ( m, Y.shape[1] ) )
     
         # Step 2: Partition (shuffled_X, shuffled_Y). Minus the end case.
-        num_complete_minibatches = math.floor(m/mini_batch_size) # number of mini batches of size mini_batch_size in your partitionning
+        num_complete_minibatches = math.floor(m/mini_batch_size) # number of mini batches of size mini_batch_size in your partitioning
         for k in range(0, num_complete_minibatches):
-            mini_batch_X = shuffled_X[:, k * mini_batch_size : k * mini_batch_size + mini_batch_size]
-            mini_batch_Y = shuffled_Y[:, k * mini_batch_size : k * mini_batch_size + mini_batch_size]
+            mini_batch_X = shuffled_X[ k * mini_batch_size : k * mini_batch_size + mini_batch_size, : ]
+            mini_batch_Y = shuffled_Y[ k * mini_batch_size : k * mini_batch_size + mini_batch_size, : ]
+    
+            # Some check: verify maini_batch shapes are OK
+            assert ( mini_batch_X.shape[ 1 ] == X.shape[ 1 ] ) # cols nb is OK
+            assert ( mini_batch_Y.shape[ 1 ] == Y.shape[ 1 ] ) # cols nb is OK
+    
             mini_batch = (mini_batch_X, mini_batch_Y)
             mini_batches.append(mini_batch)
-    
-        # Handling the end case (last mini-batch < mini_batch_size)
-        if m % mini_batch_size != 0:
-            mini_batch_X = shuffled_X[:, num_complete_minibatches * mini_batch_size : m]
-            mini_batch_Y = shuffled_Y[:, num_complete_minibatches * mini_batch_size : m]
-            mini_batch = (mini_batch_X, mini_batch_Y)
-            mini_batches.append(mini_batch)
-    
-        return mini_batches
+        
+            # Handling the end case (last mini-batch < mini_batch_size)
+            if m % mini_batch_size != 0:
+                mini_batch_X = shuffled_X[ num_complete_minibatches * mini_batch_size : m, : ]
+                mini_batch_Y = shuffled_Y[ num_complete_minibatches * mini_batch_size : m, : ]
+                mini_batch = (mini_batch_X, mini_batch_Y)
+                mini_batches.append(mini_batch)
+        
+            return mini_batches
 
     def getPerfCounters( self, tsStart, iEpoch, n_x, m ):
         
