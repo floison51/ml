@@ -11,7 +11,7 @@ import platform
 from tkinter import *
 
 import const.constants as const
-from ml.machine import Machine
+from ml.machine import AbstractMachine
 from ml.data import DataSource, DataSet
 
 def instantiateClass( classFqName ) :
@@ -45,9 +45,6 @@ def updateMachines( conn ):
 def prepapreData( dataSource ):
     # Load data
     ( datasetTrn, datasetDev ) = dataSource.getDatasets( isLoadWeights = False );
-
-    # Save original data
-    ( X_ori, Y_ori ) = ( datasetTrn.X, datasetDev.Y )
 
     # flatten data
     datasetTrn.X = dataSource.flatten( datasetTrn.X )
