@@ -42,24 +42,28 @@ def updateMachines( conn ):
 
     return configMachines
 
-def prepapreData( dataSource ):
+def prepareData( dataSource ):
     # Load data
     ( datasetTrn, datasetDev ) = dataSource.getDatasets( isLoadWeights = False );
 
-    # flatten data
-    datasetTrn.X = dataSource.flatten( datasetTrn.X )
-    datasetDev.X = dataSource.flatten( datasetDev.X )
+    # flatten data and transpose for tensorflow
+    datasetTrn.X = dataSource.flatten( datasetTrn.X ).T
+    datasetDev.X = dataSource.flatten( datasetDev.X ).T
 
     # normalize X
     datasetTrn.X = dataSource.normalize( datasetTrn.X )
     datasetDev.X = dataSource.normalize( datasetDev.X )
+    
+    # transpose Y for tensorflow
+    datasetTrn.Y = datasetTrn.Y.T
+    datasetDev.Y = datasetDev.Y.T
 
     # Store data info in a dico
     dataInfo = {
-        const.KEY_TRN_X_SIZE    : str( datasetTrn.X.shape[1] ),
+        const.KEY_TRN_X_SIZE    : str( datasetTrn.X.shape[0] ),
         const.KEY_TRN_X_SHAPE   : str( datasetTrn.X.shape ),
         const.KEY_TRN_Y_SHAPE   : str( datasetTrn.Y.shape ),
-        const.KEY_DEV_X_SIZE    : str( datasetDev.X.shape[1] ),
+        const.KEY_DEV_X_SIZE    : str( datasetDev.X.shape[0] ),
         const.KEY_DEV_X_SHAPE   : str( datasetDev.X.shape ),
         const.KEY_DEV_Y_SHAPE   : str( datasetDev.Y.shape ),
     }
@@ -102,9 +106,14 @@ if __name__ == '__main__':
         hpDoer      = control.HyperParamsDoer( conn )
         runsDoer    = control.RunsDoer( conn )
 
-        mainWindow = view.MainWindow( configDoer, hpDoer, runsDoer )
-        ( idConfig, buttonClicked, runParams ) = mainWindow.showAndSelectConf( configs )
-
+        #mainWindow = view.MainWindow( configDoer, hpDoer, runsDoer )
+        #( idConfig, buttonClicked, runParams ) = mainWindow.showAndSelectConf( configs )
+        ( idConfig, buttonClicked, runParams ) = ( 
+            2, 
+            "Train", 
+            { "comment": "aeff", "tune": False, "showPlots": False, "nbTuning": 2 } 
+        )
+        
         # cancel?
         if ( buttonClicked == "Cancel" ) :
             print( "Operation cancelled by user" )
@@ -134,6 +143,9 @@ if __name__ == '__main__':
         # Define system infos
         systemInfos = {}
         hostname = socket.gethostname()
+        pythonVersion = sys.version_info[ 0 ]
+
+        systemInfos[ const.KEY_PYTHON_VERSION ] = pythonVersion
         systemInfos[ const.KEY_HOSTNAME ] = hostname
         systemInfos[ const.KEY_OS_NAME ]  = platform.system() + " " + platform.release()
         systemInfos[ const.KEY_TENSOR_FLOW_VERSION ] = hostname
@@ -141,7 +153,7 @@ if __name__ == '__main__':
         ml.addSystemInfo( systemInfos )
 
         # get data
-        ( datasetTrn, datasetDev, dataInfos ) = prepapreData( dataSource )
+        ( datasetTrn, datasetDev, dataInfos ) = prepareData( dataSource )
         # Set data
         ml.setData( datasetTrn, datasetDev )
 
@@ -155,5 +167,6 @@ if __name__ == '__main__':
             comment     = runParams[ "comment" ]
             tune        = runParams[ "tune" ]
             nbTuning    = runParams[ "nbTuning" ]
+            showPlots   = runParams[ "showPlots" ]
             
-            ml.train( conn, config, comment, tune = tune, nbTuning = nbTuning )
+            ml.train( conn, config, comment, tune = tune, showPlots = showPlots )

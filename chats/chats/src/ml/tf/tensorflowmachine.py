@@ -22,7 +22,7 @@ class AbstractTensorFlowMachine( AbstractMachine ):
     __metaclass__ = abc.ABCMeta
 
     def __init__( self, params = None ):
-        super( AbstractMachine, self ).__init__( params )
+        AbstractMachine.__init__( self, params )
         self.isTensorboard     = False
         self.isTensorboardFull = False
 
@@ -75,7 +75,7 @@ class AbstractTensorFlowMachine( AbstractMachine ):
         ### END CODE HERE ###
 
         # Cost function: Add cost function to tensorflow graph
-        self.compute_cost( Z_last, self.ph_Y, self.datasetTrn.weight, self.beta, n_x )
+        self.define_cost( Z_last, self.ph_Y, self.datasetTrn.weight, self.beta, n_x )
 
         # Back-propagation: Define the tensorflow optimizer. Use an AdamOptimizer.
         # Decaying learning rate
@@ -110,7 +110,7 @@ class AbstractTensorFlowMachine( AbstractMachine ):
         self.dev_writer.close()
 
     @abc.abstractmethod
-    def compute_cost( self, Z_last, Y, WEIGHT, beta, n_x ):
+    def define_cost( self, Z_last, Y, WEIGHT, beta, n_x ):
         """
         Computes the cost
 
@@ -177,8 +177,8 @@ class AbstractTensorFlowMachine( AbstractMachine ):
         """
 
         ### START CODE HERE ### (approx. 2 lines)
-        self.ph_X         = tf.placeholder( tf.float32, shape=( n_x, None ), name = "X" )
-        self.ph_Y         = tf.placeholder( tf.float32, shape=( n_y, None ), name = "Y" )
+        self.ph_X         = tf.placeholder( tf.float32, shape=( None, n_x ), name = "X" )
+        self.ph_Y         = tf.placeholder( tf.float32, shape=( None, n_y ), name = "Y" )
         self.ph_KEEP_PROB = tf.placeholder( tf.float32, name = "KEEP_PROB" )
         ### END CODE HERE ###
 
@@ -214,7 +214,6 @@ class AbstractTensorFlowMachine( AbstractMachine ):
                 #run without meta data
                 summary, _ , curCost = sess.run(
                     [ self.mergedSummaries, self.optimizer, self. cost ], feed_dict=feed_dict
-                    [ self.mergedSummaries, self.optimizer, self.cost ], feed_dict=feed_dict
                 )
                 self.train_writer.add_summary( summary, iteration )
             else :
@@ -227,12 +226,10 @@ class AbstractTensorFlowMachine( AbstractMachine ):
 #*****************************************************
 # Tensorflow basic machine : supports [48,24,1] fully connected hand-mad structure
 #*****************************************************
-class TensorFlowMachine( AbstractTensorFlowMachine ):
+class TensorFlowSimpleMachine( AbstractTensorFlowMachine ):
     
     def __init__( self, params = None ):
-        super( AbstractTensorFlowMachine, self ).__init__( params )
-        self.isTensorboard     = False
-        self.isTensorboardFull = False
+        AbstractTensorFlowMachine.__init__( self, params )
 
     def parseStructure( self, strStructure ):
         ## Normalize structure
@@ -247,69 +244,6 @@ class TensorFlowMachine( AbstractTensorFlowMachine ):
         structure = eval( strStructure )
         
         return structure
-
-    def compute_cost( self, Z_last, Y, WEIGHT, beta, n_x ):
-        """
-        Computes the cost
-
-        Arguments:
-        Z3 -- output of forward propagation (output of the last LINEAR unit), of shape (6, number of examples)
-        Y -- "true" labels vector placeholder, same shape as Z3
-
-        Returns:
-        cost - Tensor of the cost function
-        """
-
-        ## Add Level 0 : X
-        # example : 12228, 100, 24, 1
-        structure0 = [ n_x ] + self.structure
-
-        with tf.name_scope('cross_entropy'):
-
-            # to fit the tensorflow requirement for tf.nn.softmax_cross_entropy_with_logits(...,...)
-            logits = tf.transpose( Z_last )
-            labels = tf.transpose( Y )
-
-            raw_cost = None
-
-            with tf.name_scope( 'total' ):
-                if ( ( type( WEIGHT ) == int ) and ( WEIGHT == 1 ) ) :
-                    raw_cost = \
-                        tf.reduce_mean(
-                            tf.nn.sigmoid_cross_entropy_with_logits( logits = logits, labels = labels )
-                        )
-
-                else :
-                    # Use image weights to reduce false positives
-                    # pos_weight = tf.transpose( WEIGHT )
-                    raw_cost = \
-                        tf.reduce_mean(
-                            tf.nn.weighted_cross_entropy_with_logits(logits = logits, targets = labels, pos_weight = WEIGHT )
-                        )
-
-                tf.summary.scalar( 'raw_cost', raw_cost)
-
-                # Loss function using L2 Regularization
-                regularizer = None
-
-                if ( beta != 0 ) :
-                    losses = []
-                    for i in range( 1, len( structure0 ) ) :
-                        W_cur = self.parameters[ 'W' + str( i ) ]
-                        losses.append( tf.nn.l2_loss( W_cur ) )
-
-                    regularizer = tf.add_n( losses )
-
-                cost = None
-
-                if ( regularizer != None ) :
-                    cost = tf.reduce_mean( raw_cost + beta * regularizer )
-                else :
-                    cost = raw_cost
-
-                tf.summary.scalar( 'cost', cost)
-
-        self.cost = cost
 
     def initialize_parameters( self, n_x ):
         """
@@ -406,4 +340,121 @@ class TensorFlowMachine( AbstractTensorFlowMachine ):
         # For last layer (output layer): no dropout and return only Z
         return Z
 
+    def define_cost( self, Z_last, Y, WEIGHT, beta, n_x ):
+        """
+        Computes the cost
 
+        Arguments:
+        Z3 -- output of forward propagation (output of the last LINEAR unit), of shape (6, number of examples)
+        Y -- "true" labels vector placeholder, same shape as Z3
+
+        Returns:
+        cost - Tensor of the cost function
+        """
+
+        ## Add Level 0 : X
+        # example : 12228, 100, 24, 1
+        structure0 = [ n_x ] + self.structure
+
+        with tf.name_scope('cross_entropy'):
+
+            # to fit the tensorflow requirement for tf.nn.softmax_cross_entropy_with_logits(...,...)
+            logits = tf.transpose( Z_last )
+            labels = tf.transpose( Y )
+
+            raw_cost = None
+
+            with tf.name_scope( 'total' ):
+                if ( ( type( WEIGHT ) == int ) and ( WEIGHT == 1 ) ) :
+                    raw_cost = \
+                        tf.reduce_mean(
+                            tf.nn.sigmoid_cross_entropy_with_logits( logits = logits, labels = labels )
+                        )
+
+                else :
+                    # Use image weights to reduce false positives
+                    # pos_weight = tf.transpose( WEIGHT )
+                    raw_cost = \
+                        tf.reduce_mean(
+                            tf.nn.weighted_cross_entropy_with_logits(logits = logits, targets = labels, pos_weight = WEIGHT )
+                        )
+
+                tf.summary.scalar( 'raw_cost', raw_cost)
+
+                # Loss function using L2 Regularization
+                regularizer = None
+
+                if ( beta != 0 ) :
+                    losses = []
+                    for i in range( 1, len( structure0 ) ) :
+                        W_cur = self.parameters[ 'W' + str( i ) ]
+                        losses.append( tf.nn.l2_loss( W_cur ) )
+
+                    regularizer = tf.add_n( losses )
+
+                cost = None
+
+                if ( regularizer != None ) :
+                    cost = tf.reduce_mean( raw_cost + beta * regularizer )
+                else :
+                    cost = raw_cost
+
+                tf.summary.scalar( 'cost', cost)
+
+        self.cost = cost
+
+#*****************************************************
+# Tensorflow machine : supports multi-layers tf notations, including convolution
+#*****************************************************
+class TensorFlowFullMachine( AbstractTensorFlowMachine ):
+    
+    def __init__( self, params = None ):
+        super( AbstractTensorFlowMachine, self ).__init__( params )
+        self.isTensorboard     = False
+        self.isTensorboardFull = False
+
+    def parseStructure( self, strStructure ):
+        ## Normalize structure
+        strStructure = strStructure.strip()
+        
+        return "TODO"
+
+    def initialize_parameters( self, n_x ):
+        "Not needed in this model"
+
+    def forward_propagation( self, n_x ):
+
+        curInput = self.ph_X
+        
+        Z = tf.contrib.layers.fully_connected( inputs=curInput, num_outputs=1, activation_fn=None )
+        
+        return Z
+
+    def define_cost( self, Z_last, Y, WEIGHT, beta, n_x ):
+
+        with tf.name_scope('cross_entropy'):
+
+            # to fit the tensorflow requirement for tf.nn.softmax_cross_entropy_with_logits(...,...)
+            logits = tf.transpose( Z_last )
+            labels = tf.transpose( Y )
+
+            raw_cost = None
+
+            with tf.name_scope( 'total' ):
+                if ( ( type( WEIGHT ) == int ) and ( WEIGHT == 1 ) ) :
+                    raw_cost = \
+                        tf.reduce_mean(
+                            tf.nn.sigmoid_cross_entropy_with_logits( logits = logits, labels = labels )
+                        )
+
+                else :
+                    # Use image weights to reduce false positives
+                    # pos_weight = tf.transpose( WEIGHT )
+                    raw_cost = \
+                        tf.reduce_mean(
+                            tf.nn.weighted_cross_entropy_with_logits(logits = logits, targets = labels, pos_weight = WEIGHT )
+                        )
+
+                tf.summary.scalar( 'raw_cost', raw_cost)
+
+        self.cost = raw_cost

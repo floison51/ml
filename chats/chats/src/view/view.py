@@ -352,7 +352,9 @@ class ViewOrUpdateHyperParamsWindow ( MyDialog ) :
 
         # Format accuracy
         strFormat = const.ConfigsDico.CARAC[ "bestAccuracy" ][ 2 ]
-        formattedBestDevAccuracy = strFormat.format( bestDevAccuracy )
+        formattedBestDevAccuracy = None
+        if ( bestDevAccuracy != None ) :
+            strFormat.format( bestDevAccuracy )
 
         labelText1 = "Current\nhyper params"
         labelText2 = "Best\nhyper params\nDEV accuracy=" + formattedBestDevAccuracy
@@ -539,18 +541,29 @@ class StartTrainDialog( MyDialog ):
         frameButtons = LabelFrame( self, borderwidth=0 )
         frameButtons.pack( side=BOTTOM, padx=30, pady=30, fill='both', expand=True )
 
-        Label( frameForm, text="Run comment", borderwidth=1 ).grid( row=1, column=1, sticky=W, padx=10 )
+        iRow = 1
+        
+        Label( frameForm, text="Run comment", borderwidth=1 ).grid( row=iRow, column=1, sticky=W, padx=10 )
         self.commentInputVar = getInputVar( const.RunsDico.CARAC, "comment" )
-        Entry( frameForm, textvariable=self.commentInputVar, width = 40 ).grid( row=1, column=2, sticky=W, padx=10 )
+        Entry( frameForm, textvariable=self.commentInputVar, width = 40 ).grid( row=iRow, column=2, sticky=W, padx=10 )
+        iRow += 1
 
-        Label( frameForm, text="Tune", borderwidth=1 ).grid( row=2, column=1, sticky=W, padx=10 )
+        Label( frameForm, text="Show plots", borderwidth=1 ).grid( row=iRow, column=1, sticky=W, padx=10 )
+        self.showPlotsInputVar = BooleanVar()
+        self.showPlotsInputVar.set( True )
+        Checkbutton( frameForm, variable=self.showPlotsInputVar ).grid( row=iRow, column=2, sticky=W, padx=10 )
+        iRow += 1
+
+        Label( frameForm, text="Tune", borderwidth=1 ).grid( row=iRow, column=1, sticky=W, padx=10 )
         self.tuneInputVar = BooleanVar()
-        Checkbutton( frameForm, variable=self.tuneInputVar ).grid( row=2, column=2, sticky=W, padx=10 )
+        Checkbutton( frameForm, variable=self.tuneInputVar ).grid( row=iRow, column=2, sticky=W, padx=10 )
+        iRow += 1
 
-        Label( frameForm, text="Nb tuning cycles", borderwidth=1 ).grid( row=3, column=1, sticky=W, padx=10 )
+        Label( frameForm, text="Nb tuning cycles", borderwidth=1 ).grid( row=iRow, column=1, sticky=W, padx=10 )
         self.nbTuningInputVar = IntVar()
         self.nbTuningInputVar.set( 20 )
-        Entry( frameForm, textvariable=self.nbTuningInputVar ).grid( row=3, column=2, sticky=W, padx=10 )
+        Entry( frameForm, textvariable=self.nbTuningInputVar ).grid( row=iRow, column=2, sticky=W, padx=10 )
+        iRow += 1
 
         buttonRun    = Button( frameButtons, text="Run"   , command=self.buttonRunClicked   , state=NORMAL )
         buttonCancel = Button( frameButtons, text="Cancel", command=self.buttonCancelClicked, state=NORMAL )
@@ -562,8 +575,9 @@ class StartTrainDialog( MyDialog ):
         # Give params to master
         self.master.runParams = { 
             "comment"   : self.commentInputVar.get(), 
+            "showPlots" : self.showPlotsInputVar.get(), 
             "tune"      : self.tuneInputVar.get(),
-            "nbTuning"  : self.nbTuningInputVar.get() 
+            "nbTuning"  : self.nbTuningInputVar.get(),
         }
         self.destroy()
         self.master.destroy()

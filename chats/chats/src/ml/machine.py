@@ -61,8 +61,6 @@ class AbstractMachine():
 
     def addSystemInfo( self, systemInfo ):
         "Add system information"
-        pythonVersion = sys.version_info[ 0 ]
-        systemInfo[ "pythonVersion" ] = pythonVersion
     
     def addPerfInfo( self, systemInfo ):
         "Add perf information - nothing done in this class"
@@ -76,7 +74,7 @@ class AbstractMachine():
         self.datasetTrn  = datasetTrn
         self.datasetDev  = datasetDev
         
-    def train( self,  conn, config, comment, tune = False, nbTuning = 20 ):
+    def train( self,  conn, config, comment, tune = False, nbTuning = 20, showPlots = True ):
         "Train the model"
 
         # hyper parameters
@@ -150,7 +148,7 @@ class AbstractMachine():
                 conn, idRun,
                 config[ "structure" ],
                 runHyperParams,
-                show_plot = not tune, extractImageErrors = not tune
+                show_plot = showPlots and not tune, extractImageErrors = not tune
             )
     
             # Print run
@@ -199,6 +197,7 @@ class AbstractMachine():
         (n_x, m) = self.datasetTrn.X.shape   # (n_x: input size, m : number of examples in the train set)
         n_y = self.datasetTrn.Y.shape[ 0 ]   # n_y : output size
         costs = []                                        # To keep track of the cost
+        DEV_accuracies = []     # for DEV accuracy graph
     
         # Get hyper parameters from dico
         self.beta        = hyperParams[ const.KEY_BETA ]
@@ -268,9 +267,15 @@ class AbstractMachine():
                 if print_cost == True and iEpoch % 100 == 0:
                     print ("Cost after epoch %i, iteration %i: %f" % ( iEpoch, iteration, epoch_cost ) )
                     if ( iEpoch != 0 ) :
+                        
                         # Performance counters
                         curElapsedSeconds, curPerfIndex = self.getPerfCounters( tsStart, iEpoch, n_x, m )
-                        print( "  current: elapsedTime:", curElapsedSeconds, "perfIndex:", curPerfIndex ) 
+                        print( "  current: elapsedTime:", curElapsedSeconds, "perfIndex:", curPerfIndex )
+                        
+                        #  calculate DEV accuracy
+                        DEV_accuracy = self.accuracyEval( self.datasetDev.X, self.datasetDev.Y )
+                        print( "  current: DEV accuracy: %f" % ( DEV_accuracy ) )
+                        DEV_accuracies.append( DEV_accuracy )
                     
                 if print_cost == True and iEpoch % 5 == 0:
                     costs.append( epoch_cost )
@@ -327,6 +332,13 @@ class AbstractMachine():
                 plt.title("Start learning rate =" + str( self.start_learning_rate ) )
                 plt.show()
     
+                # plot the accuracies
+                plt.plot( np.squeeze( DEV_accuracies ) )
+                plt.ylabel('DEV accuracy')
+                plt.xlabel('iterations (100)')
+                plt.title("Start learning rate =" + str( self.start_learning_rate ) )
+                plt.show()
+                
             ## Errors
             resultInfo = {}
     
@@ -379,7 +391,7 @@ class AbstractMachine():
         mini_batches -- list of synchronous (mini_batch_X, mini_batch_Y)
         """
     
-        m = X.shape[1]                  # number of training examples
+        m = X.shape[0]                  # number of training examples
         mini_batches = []
         np.random.seed(seed)
     

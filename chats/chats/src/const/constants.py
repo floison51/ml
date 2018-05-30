@@ -21,6 +21,7 @@ KEY_DECAY_NB            = "decayNb"
 KEY_DECAY_PERCENT       = "decayPercent"
 
 # system info keys
+KEY_PYTHON_VERSION      = "pythonVersion"
 KEY_HOSTNAME            = "hostname"
 KEY_TENSOR_FLOW_VERSION = "tensorFlowVersion"
 KEY_OS_NAME             = "osName"

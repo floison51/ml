@@ -235,13 +235,13 @@ def createTrainAndDevSets():
     iEndTrainingSet = int( len( files ) * TRAINING_TEST_SET_PC );
     
     print( "Build TRAINING data set" )
-    buildDataSet( dataDir, transformedDir, files, 0, iEndTrainingSet, "train_signs.h5" )
+    buildDataSet( dataDir, transformedDir, files, 0, iEndTrainingSet, "train_chats.h5" )
     
     ## Build DEV data set
     buildDataSet( \
         dataDir, transformedDir, files, \
         iEndTrainingSet + 1, len( files ) - 1, \
-        "dev_signs.h5" \
+        "dev_chats.h5" \
     )
     
     print( "Finished" );
