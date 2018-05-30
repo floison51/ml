@@ -357,7 +357,7 @@ class ViewOrUpdateHyperParamsWindow ( MyDialog ) :
             strFormat.format( bestDevAccuracy )
 
         labelText1 = "Current\nhyper params"
-        labelText2 = "Best\nhyper params\nDEV accuracy=" + formattedBestDevAccuracy
+        labelText2 = "Best\nhyper params\nDEV accuracy=" + str( formattedBestDevAccuracy )
         Label( frameForm, text=labelText1, borderwidth=1 ).grid( row=iRow, column=1, sticky=W, padx=10 )
         Label( frameForm, text=labelText2, borderwidth=1 ).grid( row=iRow, column=3, sticky=W, padx=10 )
 

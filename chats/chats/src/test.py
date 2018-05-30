@@ -107,11 +107,13 @@ if __name__ == '__main__':
 
         mainWindow = view.MainWindow( configDoer, hpDoer, runsDoer )
         ( idConfig, buttonClicked, runParams ) = mainWindow.showAndSelectConf( configs )
-        ( idConfig, buttonClicked, runParams ) = ( 
-            3, 
-            "Train", 
-            { "comment": "aeff", "tune": False, "showPlots": False, "nbTuning": 2 } 
-        )
+        
+        # For debug
+#         ( idConfig, buttonClicked, runParams ) = ( 
+#             2, 
+#             "Train", 
+#             { "comment": "aeff", "tune": False, "showPlots": False, "nbTuning": 2 } 
+#         )
         
         # cancel?
         if ( buttonClicked == "Cancel" ) :

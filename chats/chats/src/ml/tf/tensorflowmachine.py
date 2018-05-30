@@ -432,7 +432,10 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
 
         curInput = self.ph_X
 
-        Z = tf.contrib.layers.fully_connected( inputs=curInput, num_outputs=1, activation_fn=None )
+        Z = tf.contrib.layers.fully_connected( \
+            inputs=curInput, num_outputs=1, activation_fn=None, \
+            weights_initializer=tf.contrib.layers.xavier_initializer( seed = 1 )
+        )
 
         return Z
 
@@ -440,9 +443,14 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
 
         with tf.name_scope('cross_entropy'):
 
-            # to fit the tensorflow requirement for tf.nn.softmax_cross_entropy_with_logits(...,...)
-            logits = tf.transpose( Z_last )
-            labels = tf.transpose( Y )
+            # if data samples per column 
+            #logits = tf.transpose( Z_last )
+            #labels = tf.transpose( Y )
+
+            # if data samples per line 
+            #ValueError: logits and labels must have the same shape ((1, 12288) vs (?, 1))
+            logits = Z_last
+            labels = Y
 
             raw_cost = None
 
