@@ -255,7 +255,7 @@ class AbstractMachine():
                     iteration += 1
     
                 else:
-                    #Minibatch mode
+                    # Minibatch mode
                     num_minibatches = int( m / self.minibatch_size ) # number of minibatches of size minibatch_size in the train set
                     seed = seed + 1
                     minibatches = self.random_mini_batches( self.datasetTrn.X, self.datasetTrn.Y, self.minibatch_size, seed )

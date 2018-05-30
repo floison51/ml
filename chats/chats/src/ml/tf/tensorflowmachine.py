@@ -275,12 +275,12 @@ class TensorFlowSimpleMachine( AbstractTensorFlowMachine ):
             with tf.name_scope( "Layer" + str( i+1 ) ):
                 # This Variable will hold the state of the weights for the layer
                 with tf.name_scope( 'weights' ):
-                    W_cur = tf.get_variable( "W" + str( i + 1 ), [ structure0[ i + 1 ], structure0[ i ] ], initializer = tf.contrib.layers.xavier_initializer(seed = 1))
+                    W_cur = tf.get_variable( "W" + str( i + 1 ), [ structure0[ i ], structure0[ i+1 ] ], initializer = tf.contrib.layers.xavier_initializer(seed = 1))
                     if self.isTensorboardFull :
                         self.variable_summaries( W_cur )
 
                 with tf.name_scope( 'bias' ):
-                    b_cur = tf.get_variable( "b" + str( i + 1 ), [ structure0[ i + 1 ], 1             ], initializer = tf.zeros_initializer())
+                    b_cur = tf.get_variable( "b" + str( i + 1 ), [ 1, structure0[ i + 1 ] ], initializer = tf.zeros_initializer())
                     if self.isTensorboardFull :
                         self.variable_summaries( b_cur )
 
@@ -304,7 +304,6 @@ class TensorFlowSimpleMachine( AbstractTensorFlowMachine ):
         # example : 12228, 100, 24, 1
         structure0 = [ n_x ] + self.structure
 
-
         Z = None
         A = None
 
@@ -324,7 +323,7 @@ class TensorFlowSimpleMachine( AbstractTensorFlowMachine ):
 
                 ## Linear part
                 with tf.name_scope( 'Z' ):
-                    Z = tf.add( tf.matmul( W_layer, curInput_drop_out  ), b_layer )
+                    Z = tf.add( tf.matmul( curInput_drop_out, W_layer ), b_layer )
                     if self.isTensorboardFull :
                         tf.summary.histogram( 'Z', Z )
 

@@ -105,10 +105,10 @@ if __name__ == '__main__':
         hpDoer      = control.HyperParamsDoer( conn )
         runsDoer    = control.RunsDoer( conn )
 
-        #mainWindow = view.MainWindow( configDoer, hpDoer, runsDoer )
-        #( idConfig, buttonClicked, runParams ) = mainWindow.showAndSelectConf( configs )
+        mainWindow = view.MainWindow( configDoer, hpDoer, runsDoer )
+        ( idConfig, buttonClicked, runParams ) = mainWindow.showAndSelectConf( configs )
         ( idConfig, buttonClicked, runParams ) = ( 
-            2, 
+            3, 
             "Train", 
             { "comment": "aeff", "tune": False, "showPlots": False, "nbTuning": 2 } 
         )
