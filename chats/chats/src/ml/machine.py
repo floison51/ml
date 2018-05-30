@@ -258,9 +258,9 @@ class AbstractMachine():
                     # Minibatch mode
                     num_minibatches = int( m / self.minibatch_size ) # number of minibatches of size minibatch_size in the train set
                     seed = seed + 1
-                    minibatches = self.random_mini_batches( self.datasetTrn.X, self.datasetTrn.Y, self.minibatch_size, seed )
+                    mini_batches = self.random_mini_batches( self.datasetTrn.X, self.datasetTrn.Y, self.minibatch_size, seed )
     
-                    for minibatch in minibatches:
+                    for minibatch in mini_batches:
     
                         # Select a minibatch
                         (minibatch_X, minibatch_Y) = minibatch
@@ -410,8 +410,9 @@ class AbstractMachine():
         shuffled_Y = Y[ permutation, : ].reshape( ( m, Y.shape[1] ) )
     
         # Step 2: Partition (shuffled_X, shuffled_Y). Minus the end case.
-        num_complete_minibatches = math.floor(m/mini_batch_size) # number of mini batches of size mini_batch_size in your partitioning
-        for k in range(0, num_complete_minibatches):
+        num_complete_minibatches = math.floor( m / mini_batch_size) # number of mini batches of size mini_batch_size in your partitioning
+        
+        for k in range( 0, num_complete_minibatches ):
             mini_batch_X = shuffled_X[ k * mini_batch_size : k * mini_batch_size + mini_batch_size, : ]
             mini_batch_Y = shuffled_Y[ k * mini_batch_size : k * mini_batch_size + mini_batch_size, : ]
     
@@ -420,16 +421,16 @@ class AbstractMachine():
             assert ( mini_batch_Y.shape[ 1 ] == Y.shape[ 1 ] ) # cols nb is OK
     
             mini_batch = (mini_batch_X, mini_batch_Y)
-            mini_batches.append(mini_batch)
+            mini_batches.append( mini_batch )
         
-            # Handling the end case (last mini-batch < mini_batch_size)
-            if m % mini_batch_size != 0:
-                mini_batch_X = shuffled_X[ num_complete_minibatches * mini_batch_size : m, : ]
-                mini_batch_Y = shuffled_Y[ num_complete_minibatches * mini_batch_size : m, : ]
-                mini_batch = (mini_batch_X, mini_batch_Y)
-                mini_batches.append(mini_batch)
+        # Handling the end case (last mini-batch < mini_batch_size)
+        if ( m % mini_batch_size != 0 ) :
+            mini_batch_X = shuffled_X[ num_complete_minibatches * mini_batch_size : m, : ]
+            mini_batch_Y = shuffled_Y[ num_complete_minibatches * mini_batch_size : m, : ]
+            mini_batch = (mini_batch_X, mini_batch_Y)
+            mini_batches.append( mini_batch )
         
-            return mini_batches
+        return mini_batches
 
     def getPerfCounters( self, tsStart, iEpoch, n_x, m ):
         
