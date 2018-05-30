@@ -4,30 +4,33 @@ Created on 27 mai 2018
 @author: fran
 '''
 import const.constants as const
-from ml.machine import Machine
+from ml.machine import AbstractMachine
 
 import tensorflow as tf
 from tensorflow.python.framework import ops
 
 import os as os
-from _ctypes import Structure
 
-TENSORFLOW_SAVE_DIR = os.getcwd().replace( "\\", "/" ) + "/run/tf-save/"  + Machine.APP_KEY
-TENSORBOARD_LOG_DIR = os.getcwd().replace( "\\", "/" ) + "/run/tf-board/" + Machine.APP_KEY
+# Abstract classes
+import abc
 
-class TensorFlowMachine( Machine ):
+TENSORFLOW_SAVE_DIR = os.getcwd().replace( "\\", "/" ) + "/run/tf-save/"  + AbstractMachine.APP_KEY
+TENSORBOARD_LOG_DIR = os.getcwd().replace( "\\", "/" ) + "/run/tf-board/" + AbstractMachine.APP_KEY
+
+class AbstractTensorFlowMachine( AbstractMachine ):
+    # Abstract class
+    __metaclass__ = abc.ABCMeta
 
     def __init__( self, params = None ):
-        super( TensorFlowMachine, self ).__init__( params )
+        super( AbstractMachine, self ).__init__( params )
         self.isTensorboard     = False
         self.isTensorboardFull = False
 
-    def addSystemInfo( self, systemInfo ):
-        "Add system information"
-        # TODO
-
     def addPerfInfo( self, perfInfo ):
         "Add perf information"
+        
+        super.addPerfInfo( self, perfInfo )
+        
         perfInfo.append(
             { const.KEY_PERF_IS_USE_TENSORBOARD       : self.isTensorboard,
               const.KEY_PERF_IS_USE_FULL_TENSORBOARD  : self.isTensorboardFull,
@@ -37,7 +40,7 @@ class TensorFlowMachine( Machine ):
     def getSession( self ):
 
         sess = tf.Session()
-
+        self.sessionInit( sess )
         return sess
 
     def sessionInit( self, sess ):
@@ -48,19 +51,9 @@ class TensorFlowMachine( Machine ):
         init = tf.global_variables_initializer()
         sess.run( init )
 
+    @abc.abstractmethod
     def parseStructure( self, strStructure ):
-        ## Normalize structure
-        strStructure = strStructure.strip()
-        if strStructure[ 0 ] != "[" :
-            raise ValueError( "Structure syntax: [48,24,1]" )
-
-        if strStructure[ -1 ] != "]" :
-            raise ValueError( "Structure syntax: [48,24,1]" )
-
-        #Get as array
-        structure = eval( strStructure )
-        
-        return structure
+        "Parse provided string structure into machine dependent model"
 
     def modelInit( self, strStructure, n_x, n_y ):
 
@@ -115,6 +108,144 @@ class TensorFlowMachine( Machine ):
         # Close tensorboard streams
         self.train_writer.close()
         self.dev_writer.close()
+
+    @abc.abstractmethod
+    def compute_cost( self, Z_last, Y, WEIGHT, beta, n_x ):
+        """
+        Computes the cost
+
+        Arguments:
+        Z3 -- output of forward propagation (output of the last LINEAR unit), of shape (6, number of examples)
+        Y -- "true" labels vector placeholder, same shape as Z3
+
+        Returns:
+        cost - Tensor of the cost function
+        """
+
+    def defineAccuracy( self, Y, Z_last ):
+        with tf.name_scope('accuracy'):
+            # To calculate the correct predictions
+            prediction = tf.round( tf.sigmoid( Z_last ) )
+            with tf.name_scope('correct_prediction'):
+                correct_prediction = tf.equal( prediction, Y )
+            with tf.name_scope('accuracy'):
+                # Calculate accuracy on the test set
+                accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
+
+        if self.isTensorboard :
+            tf.summary.scalar('accuracy', accuracy)
+
+        return accuracy, correct_prediction
+
+    def persistParams( self, sess, idRun ):
+
+        # lets save the parameters in a variable
+        #sess.run( self.parameters )
+
+        # Serialize parameters
+        save_dir = TENSORFLOW_SAVE_DIR + "/" + str( idRun ) + "/save"
+        if tf.gfile.Exists( save_dir ):
+            tf.gfile.DeleteRecursively( save_dir )
+        tf.gfile.MakeDirs( save_dir )
+
+        save_path = self.tfSaver.save( sess, save_dir )
+        print( "Model saved in path: %s" % save_path)
+
+    def accuracyEval( self, X, Y ):
+        accuracy = self.accuracy.eval( { self.ph_X: X, self.ph_Y: Y, self.ph_KEEP_PROB: 1.0 } )
+        return accuracy
+
+    def correctPredictionEval( self, X, Y ):
+        correct_prediction = self.correct_prediction.eval( { self.ph_X: X, self.ph_Y: Y, self.ph_KEEP_PROB: 1.0 } )
+        return correct_prediction
+
+    def create_placeholders( self, n_x, n_y ):
+        """
+        Creates the placeholders for the tensorflow session.
+
+        Arguments:
+        n_x -- scalar, size of an image vector (num_px * num_px = 64 * 64 * 3 = 12288)
+        n_y -- scalar, number of classes (from 0 to 5, so -> 6)
+
+        Returns:
+        X -- placeholder for the data input, of shape [n_x, None] and dtype "float"
+        Y -- placeholder for the input labels, of shape [n_y, None] and dtype "float"
+
+        Tips:
+        - You will use None because it let's us be flexible on the number of examples you will for the placeholders.
+          In fact, the number of examples during test/train is different.
+        """
+
+        ### START CODE HERE ### (approx. 2 lines)
+        self.ph_X         = tf.placeholder( tf.float32, shape=( n_x, None ), name = "X" )
+        self.ph_Y         = tf.placeholder( tf.float32, shape=( n_y, None ), name = "Y" )
+        self.ph_KEEP_PROB = tf.placeholder( tf.float32, name = "KEEP_PROB" )
+        ### END CODE HERE ###
+
+    @abc.abstractmethod
+    def initialize_parameters( self, n_x ):
+        "Initialize parameters given X lines dimension"
+
+    @abc.abstractmethod
+    def forward_propagation( self, n_x ):
+        "Define the forward propagation"
+
+    def runIteration(
+        self,
+        iteration, num_minibatches, sess,
+        X, Y, keep_prob,
+    ):
+
+        feed_dict = { self.ph_X: X, self.ph_Y: Y, self.ph_KEEP_PROB: keep_prob }
+
+        # No mini-batch
+        if ( self.isTensorboard and ( iteration % ( 100 * num_minibatches ) == 100 * num_minibatches - 1 ) ):  # Record execution stats
+            run_options = tf.RunOptions( trace_level = tf.RunOptions.FULL_TRACE )
+            run_metadata = tf.RunMetadata()
+            summary, _ , curCost = sess.run(
+                [ self.mergedSummaries, self.optimizer, self.cost ], feed_dict=feed_dict,
+                options=run_options,run_metadata=run_metadata
+            )
+            self.train_writer.add_run_metadata( run_metadata, 'step%03d' % iteration )
+            self.train_writer.add_summary( summary, iteration )
+        else :
+
+            if ( self.isTensorboard ) :
+                #run without meta data
+                summary, _ , curCost = sess.run(
+                    [ self.mergedSummaries, self.optimizer, self.cost ], feed_dict=feed_dict
+                )
+                self.train_writer.add_summary( summary, iteration )
+            else :
+                _ , curCost = sess.run(
+                    [ self.optimizer, self.cost], feed_dict=feed_dict
+                )
+
+        return curCost
+
+#*****************************************************
+# Tensorflow basic machine : supports [48,24,1] fully connected hand-mad structure
+#*****************************************************
+class TensorFlowMachine( AbstractTensorFlowMachine ):
+    
+    def __init__( self, params = None ):
+        super( AbstractTensorFlowMachine, self ).__init__( params )
+        self.isTensorboard     = False
+        self.isTensorboardFull = False
+
+    def parseStructure( self, strStructure ):
+        ## Normalize structure
+        strStructure = strStructure.strip()
+        if strStructure[ 0 ] != "[" :
+            raise ValueError( "Structure syntax: [48,24,1]" )
+
+        if strStructure[ -1 ] != "]" :
+            raise ValueError( "Structure syntax: [48,24,1]" )
+
+        #Get as array
+        structure = eval( strStructure )
+        
+        return structure
 
     def compute_cost( self, Z_last, Y, WEIGHT, beta, n_x ):
         """
@@ -179,66 +310,6 @@ class TensorFlowMachine( Machine ):
 
         self.cost = cost
 
-    def defineAccuracy( self, Y, Z_last ):
-        with tf.name_scope('accuracy'):
-            # To calculate the correct predictions
-            prediction = tf.round( tf.sigmoid( Z_last ) )
-            with tf.name_scope('correct_prediction'):
-                correct_prediction = tf.equal( prediction, Y )
-            with tf.name_scope('accuracy'):
-                # Calculate accuracy on the test set
-                accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
-
-        if self.isTensorboard :
-            tf.summary.scalar('accuracy', accuracy)
-
-        return accuracy, correct_prediction
-
-    def persistParams( self, sess, idRun ):
-
-        # lets save the parameters in a variable
-        #sess.run( self.parameters )
-
-        # Serialize parameters
-        save_dir = TENSORFLOW_SAVE_DIR + "/" + str( idRun ) + "/save"
-        if tf.gfile.Exists( save_dir ):
-            tf.gfile.DeleteRecursively( save_dir )
-        tf.gfile.MakeDirs( save_dir )
-
-        save_path = self.tfSaver.save( sess, save_dir )
-        print( "Model saved in path: %s" % save_path)
-
-    def accuracyEval( self, X, Y ):
-        accuracy = self.accuracy.eval( { self.ph_X: X, self.ph_Y: Y, self.ph_KEEP_PROB: 1.0 } )
-        return accuracy
-
-    def correctPredictionEval( self, X, Y ):
-        correct_prediction = self.correct_prediction.eval( { self.ph_X: X, self.ph_Y: Y, self.ph_KEEP_PROB: 1.0 } )
-        return correct_prediction
-
-    def create_placeholders( self, n_x, n_y ):
-        """
-        Creates the placeholders for the tensorflow session.
-
-        Arguments:
-        n_x -- scalar, size of an image vector (num_px * num_px = 64 * 64 * 3 = 12288)
-        n_y -- scalar, number of classes (from 0 to 5, so -> 6)
-
-        Returns:
-        X -- placeholder for the data input, of shape [n_x, None] and dtype "float"
-        Y -- placeholder for the input labels, of shape [n_y, None] and dtype "float"
-
-        Tips:
-        - You will use None because it let's us be flexible on the number of examples you will for the placeholders.
-          In fact, the number of examples during test/train is different.
-        """
-
-        ### START CODE HERE ### (approx. 2 lines)
-        self.ph_X         = tf.placeholder( tf.float32, shape=( n_x, None ), name = "X" )
-        self.ph_Y         = tf.placeholder( tf.float32, shape=( n_y, None ), name = "Y" )
-        self.ph_KEEP_PROB = tf.placeholder( tf.float32, name = "KEEP_PROB" )
-        ### END CODE HERE ###
-
     def initialize_parameters( self, n_x ):
         """
         Initializes parameters to build a neural network with tensorflow. The shapes are:
@@ -280,7 +351,6 @@ class TensorFlowMachine( Machine ):
 
             self.parameters[ "W" + str( i + 1 ) ] = W_cur
             self.parameters[ "b" + str( i + 1 ) ] = b_cur
-
 
     def forward_propagation( self, n_x ):
         """
@@ -335,36 +405,4 @@ class TensorFlowMachine( Machine ):
         # For last layer (output layer): no dropout and return only Z
         return Z
 
-    def runIteration(
-        self,
-        iteration, num_minibatches, sess,
-        X, Y, keep_prob,
-    ):
-
-        feed_dict = { self.ph_X: X, self.ph_Y: Y, self.ph_KEEP_PROB: keep_prob }
-
-        # No mini-batch
-        if ( self.isTensorboard and ( iteration % ( 100 * num_minibatches ) == 100 * num_minibatches - 1 ) ):  # Record execution stats
-            run_options = tf.RunOptions( trace_level = tf.RunOptions.FULL_TRACE )
-            run_metadata = tf.RunMetadata()
-            summary, _ , curCost = sess.run(
-                [ self.mergedSummaries, self.optimizer, self.cost ], feed_dict=feed_dict,
-                options=run_options,run_metadata=run_metadata
-            )
-            self.train_writer.add_run_metadata( run_metadata, 'step%03d' % iteration )
-            self.train_writer.add_summary( summary, iteration )
-        else :
-
-            if ( self.isTensorboard ) :
-                #run without meta data
-                summary, _ , curCost = sess.run(
-                    [ self.mergedSummaries, self.optimizer, cost], feed_dict=feed_dict
-                )
-                self.train_writer.add_summary( summary, iteration )
-            else :
-                _ , curCost = sess.run(
-                    [ self.optimizer, self.cost], feed_dict=feed_dict
-                )
-
-        return curCost
 

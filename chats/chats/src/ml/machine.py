@@ -15,9 +15,14 @@ from collections import OrderedDict
 
 import const.constants as const
 import db.db as db
-from setuptools.msvc import SystemInfo
 
-class Machine():
+# Abtract classes
+import abc
+
+# Abstract class
+class AbstractMachine():
+    # Abstract class
+    __metaclass__ = abc.ABCMeta
 
     APP_KEY = "chats"
 
@@ -30,13 +35,38 @@ class Machine():
         Constructor
         '''
         
+    @abc.abstractmethod
+    def modelInit( self, n_x, n_y ):
+        "Initializse the model"
+    
+    @abc.abstractmethod
+    def getSession( self ):
+        "Get a new calculation session"
+          
+    @abc.abstractmethod
+    def modelOptimizeEnd( self ):
+        "End of model optimization"
+    
+    @abc.abstractmethod
+    def persistParams( self ):
+        "Persist parameters"
+    
+    @abc.abstractmethod
+    def accuracyEval( self, X, Y ):
+        "Evaluate accurary"
+    
+    @abc.abstractmethod
+    def correctPredictionEval( self, X, Y ):
+        "Return a 0/1 vector containing correct predictions"   
 
     def addSystemInfo( self, systemInfo ):
         "Add system information"
-        # TODO
+        pythonVersion = sys.version_info[ 0 ]
+        systemInfo[ "pythonVersion" ] = pythonVersion
     
     def addPerfInfo( self, systemInfo ):
-        "Add perf information"
+        "Add perf information - nothing done in this class"
+        pass
     
     def setInfos( self, systemInfo, dataInfo ):
         self.systemInfo = systemInfo
@@ -116,7 +146,7 @@ class Machine():
             )
     
             # Run model and update DB run with extra info
-            accuracyDev, accuracyTrain = self.model(
+            accuracyDev, accuracyTrain = self.optimizeModel(
                 conn, idRun,
                 config[ "structure" ],
                 runHyperParams,
@@ -159,35 +189,7 @@ class Machine():
     
         print( "Finished in", globalElapsedSeconds, "seconds" )
 
-    def modelInit( self, n_x, n_y ):
-        # Abstract methode
-        raise ValueError( "Abstract method" )
-    
-    def getSession( self ):
-        # Abstract methode
-        raise ValueError( "Abstract method" )
-          
-    def sessionInit( self, sess ):
-        # Abstract methode
-        raise ValueError( "Abstract method" )
-          
-    def modelEnd( self ):
-        # Abstract methode
-        raise ValueError( "Abstract method" )
-    
-    def persistParams( self ):
-        # Abstract methode
-        raise ValueError( "Abstract method" )
-    
-    def accuracyEval( self, X, Y ):
-        # Abstract methode
-        raise ValueError( "Abstract method" )
-    
-    def correctPredictionEval( self, X, Y ):
-        # Abstract methode
-        raise ValueError( "Abstract method" )
-    
-    def model(
+    def optimizeModel(
         self, conn, idRun,
         structure,
         hyperParams,
@@ -216,9 +218,6 @@ class Machine():
         
         with self.getSession() as sess:
     
-            # init session
-            self.sessionInit( sess )
-            
             # current iteration
             iteration = 0
     
@@ -299,7 +298,7 @@ class Machine():
                         # finished
                         finished = True
     
-            self.modelEnd()
+            self.modelOptimizeEnd()
     
             # Final cost
             print ("Parameters have been trained!")
