@@ -214,6 +214,7 @@ class AbstractTensorFlowMachine( AbstractMachine ):
                 #run without meta data
                 summary, _ , curCost = sess.run(
                     [ self.mergedSummaries, self.optimizer, self. cost ], feed_dict=feed_dict
+                    [ self.mergedSummaries, self.optimizer, self.cost ], feed_dict=feed_dict
                 )
                 self.train_writer.add_summary( summary, iteration )
             else :
