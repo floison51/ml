@@ -129,15 +129,15 @@ if __name__ == '__main__':
         runsDoer     = control.RunsDoer       ( conn )
         startRunDoer = control.StartRunDoer   ( conn, confMachinesForms )
 
-        mainWindow = view.MainWindow( configDoer, hpDoer, runsDoer, startRunDoer )
-        ( idConfig, buttonClicked, runParams ) = mainWindow.showAndSelectConf( configs )
+#         mainWindow = view.MainWindow( configDoer, hpDoer, runsDoer, startRunDoer )
+#         ( idConfig, buttonClicked, runParams ) = mainWindow.showAndSelectConf( configs )
 
         # For debug
-#         ( idConfig, buttonClicked, runParams ) = (
-#             3,
-#             "Train",
-#             { "comment": "aeff", "tune": False, "showPlots": False, "nbTuning": 2 }
-#         )
+        ( idConfig, buttonClicked, runParams ) = (
+            3,
+            "Train",
+            { "comment": "aeff", "tune": False, "showPlots": False, "nbTuning": 2, "isTensorboard": False, "isTensorboardFull": False }
+        )
 
         # cancel?
         if ( buttonClicked == "Cancel" ) :

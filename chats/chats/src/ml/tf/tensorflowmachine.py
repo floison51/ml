@@ -30,7 +30,7 @@ class AbstractTensorFlowMachine( AbstractMachine ):
         # tensorboard
         self.isTensorboard     = runParams[ "isTensorboard"     ]
         self.isTensorboardFull = runParams[ "isTensorboardFull" ]
-        
+
     def addPerfInfo( self, perfInfo ):
         "Add perf information"
 
@@ -364,15 +364,15 @@ class TensorFlowSimpleMachine( AbstractTensorFlowMachine ):
 
             # to fit the tensorflow requirement for tf.nn.softmax_cross_entropy_with_logits(...,...)
 
-            # if data samples per column 
+            # if data samples per column
             #logits = tf.transpose( Z_last )
             #labels = tf.transpose( Y )
 
-            # if data samples per line 
+            # if data samples per line
             #ValueError: logits and labels must have the same shape ((1, 12288) vs (?, 1))
             logits = Z_last
             labels = Y
-            
+
             raw_cost = None
 
             with tf.name_scope( 'total' ):
@@ -428,33 +428,85 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
         ## Normalize structure
         strStructure = strStructure.strip()
 
-        return "TODO"
+        # Browse lines
+        lines = strStructure.split( "\r" )
+        isLastLine = False
+
+        result = []
+
+        for line in lines :
+
+            if ( isLastLine ) :
+                raise ValueError( "fullyConnected network must be last line" )
+            line = line.strip()
+
+            # FullyConnected network
+            if ( line.startswith( "fullyConnected[" ) ) :
+
+                # Last line
+                isLastLine = True
+
+                # parse fc network
+                line = line[ len( "fullyConnected" ) : ]
+
+                if line[ 0 ] != "[" :
+                    raise ValueError( "Structure syntax: fullyConnected[48,24,1]" )
+
+                if line[ -1 ] != "]" :
+                    raise ValueError( "Structure syntax: fullyConnected[48,24,1]" )
+
+                #Get as array
+                structure = eval( line )
+                result.append( ( "fullyConnected", structure ) )
+
+        return result
 
     def initialize_parameters( self, n_x ):
         "Not needed in this model"
 
     def forward_propagation( self, n_x ):
-        
+
         # Prepare normalizer tensor
         regularizer_l2 = None
         if ( self.beta != 0 ) :
             regularizer_l2 = tf.contrib.layers.l2_regularizer( self.beta )
 
-        curInput = None
-        
-        # filter input by keep prob if needed
-        if ( self.keep_prob == 1 ) :
-            # No drop out
-            curInput = self.ph_X
-        else:
-            curInput = tf.contrib.layers.dropout( self.ph_X, self.ph_KEEP_PROB )
+        curInput = self.ph_X
 
-        # current fully connected layer
-        Z = tf.contrib.layers.fully_connected( \
-            inputs=curInput, num_outputs=1, activation_fn=None, \
-            weights_initializer=tf.contrib.layers.xavier_initializer( seed = 1 ), \
-            weights_regularizer= regularizer_l2
-        )
+        # Browse structure
+        for structureItem in self.structure :
+
+            if ( structureItem[ 0 ] == "fullyConnected" ) :
+                numLayers = structureItem[ 1 ]
+                # add input layer
+                numLayers.insert( 0, n_x )
+                
+                # browse layers
+                iLayer = -1
+                for numLayer in numLayers:
+                    iLayer += 1
+                    # last layer
+                    lastLayer = ( iLayer == ( len( numLayers ) - 1 ) )
+                    
+                    # filter input by keep prob if needed
+                    if ( self.keep_prob != 1 ) :
+                        curInput = tf.contrib.layers.dropout( curInput, self.ph_KEEP_PROB )
+                    
+                    # Activation function
+                    if ( lastLayer ) :
+                        activationFunction = None
+                    else :
+                        activationFunction = tf.nn.relu
+                        
+                    # current fully connected layer
+                    Z = tf.contrib.layers.fully_connected( \
+                        inputs=curInput, num_outputs=numLayer, activation_fn=activationFunction, \
+                        weights_initializer=tf.contrib.layers.xavier_initializer( seed = 1 ), \
+                        weights_regularizer= regularizer_l2
+                    )
+                    
+                    # next input in Z
+                    curInput = Z
 
         return Z
 
@@ -462,11 +514,11 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
 
         with tf.name_scope('cross_entropy'):
 
-            # if data samples per column 
+            # if data samples per column
             #logits = tf.transpose( Z_last )
             #labels = tf.transpose( Y )
 
-            # if data samples per line 
+            # if data samples per line
             #ValueError: logits and labels must have the same shape ((1, 12288) vs (?, 1))
             logits = Z_last
             labels = Y
@@ -497,6 +549,6 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
             # regCostTerm = tf.contrib.layers.apply_regularization()
             regCostTerm = tf.losses.get_regularization_loss()
             self.cost = raw_cost + regCostTerm
-            
+
         else :
             self.cost = raw_cost
