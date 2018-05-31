@@ -429,12 +429,26 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
         "Not needed in this model"
 
     def forward_propagation( self, n_x ):
+        
+        # Prepare normalizer tensor
+        regularizer_l2 = None
+        if ( self.beta != 0 ) :
+            regularizer_l2 = tf.contrib.layers.l2_regularizer( self.beta )
 
-        curInput = self.ph_X
+        curInput = None
+        
+        # filter input by keep prob if needed
+        if ( self.keep_prob == 1 ) :
+            # No drop out
+            curInput = self.ph_X
+        else:
+            curInput = tf.contrib.layers.dropout( self.ph_X, self.ph_KEEP_PROB )
 
+        # current fully connected layer
         Z = tf.contrib.layers.fully_connected( \
             inputs=curInput, num_outputs=1, activation_fn=None, \
-            weights_initializer=tf.contrib.layers.xavier_initializer( seed = 1 )
+            weights_initializer=tf.contrib.layers.xavier_initializer( seed = 1 ), \
+            weights_regularizer= regularizer_l2
         )
 
         return Z

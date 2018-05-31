@@ -271,6 +271,11 @@ class AbstractMachine():
                         )
     
                         epoch_cost += minibatch_cost / num_minibatches
+                        
+                        if ( iteration == 0 ) :
+                            # Display iteration 0 to allow verify cost calculation accross machines
+                            print ("Cost after epoch %i, iteration %i: %f" % ( iEpoch, iteration, epoch_cost ) )
+                            
                         iteration += 1
     
                 if print_cost == True and iEpoch % 100 == 0:
