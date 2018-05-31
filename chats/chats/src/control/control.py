@@ -166,3 +166,21 @@ class RunsDoer( Doer ):
         # launch view
         viewRuns.run( idConf, runs )
 
+class StartRunDoer( Doer ):
+
+    def __init__( self, conn, confMachinesForms ) :
+        super().__init__( conn )
+        self.confMachinesForms = confMachinesForms
+
+    def startRun( self, fenetre, idConfig ) :
+        # Get form fields for machine
+        config = db.getConfig( self.conn, idConfig )
+
+        # Get machine name
+        machineName = db.getMachineNameById( self.conn, config[ "idMachine" ] )
+        # Get fields
+        machineFields = self.confMachinesForms[ machineName ]
+        
+        # Launch run dialog
+        startTrainingDialog = view.StartTrainDialog( fenetre, fenetre.doRunTraining, machineFields )
+        startTrainingDialog.run()

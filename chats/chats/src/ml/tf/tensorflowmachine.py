@@ -26,6 +26,11 @@ class AbstractTensorFlowMachine( AbstractMachine ):
         self.isTensorboard     = False
         self.isTensorboardFull = False
 
+    def setRunParams( self, runParams ):
+        # tensorboard
+        self.isTensorboard     = runParams[ "isTensorboard"     ]
+        self.isTensorboardFull = runParams[ "isTensorboardFull" ]
+        
     def addPerfInfo( self, perfInfo ):
         "Add perf information"
 
@@ -429,10 +434,27 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
         "Not needed in this model"
 
     def forward_propagation( self, n_x ):
+        
+        # Prepare normalizer tensor
+        regularizer_l2 = None
+        if ( self.beta != 0 ) :
+            regularizer_l2 = tf.contrib.layers.l2_regularizer( self.beta )
 
-        curInput = self.ph_X
+        curInput = None
+        
+        # filter input by keep prob if needed
+        if ( self.keep_prob == 1 ) :
+            # No drop out
+            curInput = self.ph_X
+        else:
+            curInput = tf.contrib.layers.dropout( self.ph_X, self.ph_KEEP_PROB )
 
-        Z = tf.contrib.layers.fully_connected( inputs=curInput, num_outputs=1, activation_fn=None )
+        # current fully connected layer
+        Z = tf.contrib.layers.fully_connected( \
+            inputs=curInput, num_outputs=1, activation_fn=None, \
+            weights_initializer=tf.contrib.layers.xavier_initializer( seed = 1 ), \
+            weights_regularizer= regularizer_l2
+        )
 
         return Z
 
@@ -440,9 +462,14 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
 
         with tf.name_scope('cross_entropy'):
 
-            # to fit the tensorflow requirement for tf.nn.softmax_cross_entropy_with_logits(...,...)
-            logits = tf.transpose( Z_last )
-            labels = tf.transpose( Y )
+            # if data samples per column 
+            #logits = tf.transpose( Z_last )
+            #labels = tf.transpose( Y )
+
+            # if data samples per line 
+            #ValueError: logits and labels must have the same shape ((1, 12288) vs (?, 1))
+            logits = Z_last
+            labels = Y
 
             raw_cost = None
 
@@ -463,4 +490,13 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
 
                 tf.summary.scalar( 'raw_cost', raw_cost)
 
-        self.cost = raw_cost
+        # Add regularization cost
+        if ( self.beta != 0 ) :
+            # Variables participating to regularization
+            # regVariables = tf.get_collection( tf.GraphKeys.REGULARIZATION_LOSSES )
+            # regCostTerm = tf.contrib.layers.apply_regularization()
+            regCostTerm = tf.losses.get_regularization_loss()
+            self.cost = raw_cost + regCostTerm
+            
+        else :
+            self.cost = raw_cost

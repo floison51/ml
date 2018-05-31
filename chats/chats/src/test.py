@@ -30,17 +30,40 @@ def updateMachines( conn ):
     configMachines.optionxform = str
     configMachines.read( "machines.ini" )
 
+    # Read init file of forms
+    configMachinesForms = configparser.ConfigParser()
+    # Leave keys unchanged
+    configMachinesForms.optionxform = str
+    configMachinesForms.read( "machinesForms.ini" )
+
+    configMachineFormsResult = {}
+
     # get machines section
     machines = configMachines.items( "Classes" )
 
     for machine_class in machines :
+
+        machineName  = machine_class[ 0 ]
+        machineClass = machine_class[ 1 ]
+
         # update db
-        db.addUniqueMachineName( conn, machine_class[ 0 ] )
+        db.addUniqueMachineName( conn, machineName )
+
+        # get forms
+        forms = configMachinesForms.items( machineClass )
+        dicoFields = {}
+        for form in forms :
+            key = form[ 0 ]
+            field = eval( form[ 1 ] )
+            dicoFields[ key ] = field
+
+        # register forms by machine name
+        configMachineFormsResult[ machineName ] = dicoFields
 
     # commit result
     conn.commit()
 
-    return configMachines
+    return configMachines, configMachineFormsResult
 
 def prepareData( dataSource ):
     # Load data
@@ -53,7 +76,7 @@ def prepareData( dataSource ):
     # normalize X
     datasetTrn.X = dataSource.normalize( datasetTrn.X )
     datasetDev.X = dataSource.normalize( datasetDev.X )
-    
+
     # transpose Y for tensorflow
     datasetTrn.Y = datasetTrn.Y.T
     datasetDev.Y = datasetDev.Y.T
@@ -96,23 +119,26 @@ if __name__ == '__main__':
         #db.test( conn )
 
         # update machines
-        configMachines = updateMachines( conn )
+        ( configMachines, confMachinesForms ) = updateMachines( conn )
 
         # Read configurations
         configs = db.getConfigsWithMaxDevAccuracy( conn )
 
-        configDoer  = control.ConfigDoer     ( conn )
-        hpDoer      = control.HyperParamsDoer( conn )
-        runsDoer    = control.RunsDoer( conn )
+        configDoer   = control.ConfigDoer     ( conn )
+        hpDoer       = control.HyperParamsDoer( conn )
+        runsDoer     = control.RunsDoer       ( conn )
+        startRunDoer = control.StartRunDoer   ( conn, confMachinesForms )
 
-        mainWindow = view.MainWindow( configDoer, hpDoer, runsDoer )
+        mainWindow = view.MainWindow( configDoer, hpDoer, runsDoer, startRunDoer )
         ( idConfig, buttonClicked, runParams ) = mainWindow.showAndSelectConf( configs )
-        ( idConfig, buttonClicked, runParams ) = ( 
-            3, 
-            "Train", 
-            { "comment": "aeff", "tune": False, "showPlots": False, "nbTuning": 2 } 
-        )
-        
+
+        # For debug
+#         ( idConfig, buttonClicked, runParams ) = (
+#             3,
+#             "Train",
+#             { "comment": "aeff", "tune": False, "showPlots": False, "nbTuning": 2 }
+#         )
+
         # cancel?
         if ( buttonClicked == "Cancel" ) :
             print( "Operation cancelled by user" )
@@ -167,5 +193,8 @@ if __name__ == '__main__':
             tune        = runParams[ "tune" ]
             nbTuning    = runParams[ "nbTuning" ]
             showPlots   = runParams[ "showPlots" ]
-            
+
+            # set run params
+            ml.setRunParams( runParams )
+             
             ml.train( conn, config, comment, tune = tune, showPlots = showPlots )

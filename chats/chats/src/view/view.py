@@ -12,13 +12,14 @@ buttonsToUpdate = []
 
 class MainWindow ( Tk ):
 
-    def __init__( self, configDoer, hpDoer, runsDoer ) :
+    def __init__( self, configDoer, hpDoer, runsDoer, startRunDoer ) :
 
         Tk.__init__(self)
 
         self.configDoer = configDoer
         self.hpDoer = hpDoer
         self.runsDoer = runsDoer
+        self.startRunDoer = startRunDoer
 
         # From conf radio-buttons
         self.confSelected = IntVar()
@@ -207,14 +208,14 @@ class MainWindow ( Tk ):
 
         iCol = 0 # 1 = offset radio-button
         for colName in colNames:
-            
+
             if ( colName != "structure" ) :
                 # associated var
                 var = varLabels[ iCol ]
                 # get and set value
                 value  = config[ colName ]
                 var.set( value )
-                
+
                 iCol += 1
 
     def deleteConfigGrid( self, idConfig ):
@@ -250,14 +251,12 @@ class MainWindow ( Tk ):
 
         # Next dialog
         if ( self.buttonClicked == "Train" ) :
-            startTrainingDialog = StartTrainDialog( self, self.doRunTraining )
-            startTrainingDialog.run()
+            self.startRunDoer.startRun( self, self.confSelected.get() )
         else :
             self.destroy()
 
     def doRunTraining( self ):
         self.destroy()
-
 
 class MyDialog( Toplevel ):
     "Modal dialog window"
@@ -357,7 +356,7 @@ class ViewOrUpdateHyperParamsWindow ( MyDialog ) :
             strFormat.format( bestDevAccuracy )
 
         labelText1 = "Current\nhyper params"
-        labelText2 = "Best\nhyper params\nDEV accuracy=" + formattedBestDevAccuracy
+        labelText2 = "Best\nhyper params\nDEV accuracy=" + str( formattedBestDevAccuracy )
         Label( frameForm, text=labelText1, borderwidth=1 ).grid( row=iRow, column=1, sticky=W, padx=10 )
         Label( frameForm, text=labelText2, borderwidth=1 ).grid( row=iRow, column=3, sticky=W, padx=10 )
 
@@ -487,16 +486,19 @@ def getInputVar( dicoCarac, hpName ) :
     # Get type
     hpType = hpCarac[ 0 ]
 
-    if ( hpType == "int" ) :
+    return getInputVarForType( hpType )
+
+def getInputVarForType( type ):
+    if ( type == "int" ) :
         return IntVar()
-    elif ( hpType == "string" ) :
+    elif ( type == "string" ) :
         return StringVar()
-    elif ( hpType == "float" ) :
+    elif ( type == "float" ) :
         return DoubleVar()
-    elif ( hpType == "boolean" ) :
+    elif ( type == "boolean" ) :
         return BooleanVar()
     else :
-        raise ValueError( "Unknown type", hpType )
+        raise ValueError( "Unknown type", type )
 
 class TextModalWindow ( MyDialog ) :
 
@@ -524,8 +526,9 @@ class TextModalWindow ( MyDialog ) :
 
 class StartTrainDialog( MyDialog ):
 
-    def __init__( self, boss, callbackFct, **options ) :
+    def __init__( self, boss, callbackFct, machineFields, **options ) :
         MyDialog.__init__( self, boss, callbackFct, **options )
+        self.machineFields = machineFields
 
     def run( self ) :
 
@@ -542,7 +545,7 @@ class StartTrainDialog( MyDialog ):
         frameButtons.pack( side=BOTTOM, padx=30, pady=30, fill='both', expand=True )
 
         iRow = 1
-        
+
         Label( frameForm, text="Run comment", borderwidth=1 ).grid( row=iRow, column=1, sticky=W, padx=10 )
         self.commentInputVar = getInputVar( const.RunsDico.CARAC, "comment" )
         Entry( frameForm, textvariable=self.commentInputVar, width = 40 ).grid( row=iRow, column=2, sticky=W, padx=10 )
@@ -565,6 +568,26 @@ class StartTrainDialog( MyDialog ):
         Entry( frameForm, textvariable=self.nbTuningInputVar ).grid( row=iRow, column=2, sticky=W, padx=10 )
         iRow += 1
 
+        # Machine fields
+        self.inputMachineFields = {}
+
+        for ( key, machineField ) in self.machineFields.items() :
+            #Label
+            Label( frameForm, text=machineField[ 0 ], borderwidth=1 ).grid( row=iRow, column=1, sticky=W, padx=10 )
+            #Input var
+            inputVar = getInputVarForType( machineField[ 1 ] )
+            #save it
+            self.inputMachineFields[ key ] = inputVar
+
+            # Default value
+            inputVar.set( machineField[ 2 ] )
+            # field
+            if ( machineField[ 1 ] == "boolean" ) :
+                Checkbutton( frameForm, variable=inputVar ).grid( row=iRow, column=2, sticky=W, padx=10 )
+            else :
+                Entry( frameForm, textvariable=inputVar ).grid( row=iRow, column=2, sticky=W, padx=10 )
+            iRow += 1
+
         buttonRun    = Button( frameButtons, text="Run"   , command=self.buttonRunClicked   , state=NORMAL )
         buttonCancel = Button( frameButtons, text="Cancel", command=self.buttonCancelClicked, state=NORMAL )
 
@@ -573,12 +596,16 @@ class StartTrainDialog( MyDialog ):
 
     def buttonRunClicked( self ) :
         # Give params to master
-        self.master.runParams = { 
-            "comment"   : self.commentInputVar.get(), 
-            "showPlots" : self.showPlotsInputVar.get(), 
+        self.master.runParams = {
+            "comment"   : self.commentInputVar.get(),
+            "showPlots" : self.showPlotsInputVar.get(),
             "tune"      : self.tuneInputVar.get(),
             "nbTuning"  : self.nbTuningInputVar.get(),
         }
+        #add machine specific fields
+        for ( key, inputVar ) in self.inputMachineFields.items() :
+            self.master.runParams[ key ] = inputVar.get()
+            
         self.destroy()
         self.master.destroy()
 
