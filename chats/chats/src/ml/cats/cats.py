@@ -11,22 +11,22 @@ import h5py
 import numpy as np
 import sys
 
-class CatDataSource( DataSource ):
-    "Get cats data set, read from files"
+class CatRawDataSource( DataSource ):
+    "Get cats raw data set, read from files"
 
     def __init__( self, params = None ):
-        super( CatDataSource, self ).__init__( params )
+        super( CatRawDataSource, self ).__init__( params )
         
     def getDatasets( self, isLoadWeights ):
     
         # Base dir for cats and not cats images
         baseDir = os.getcwd()
     
-        trn_dataset = h5py.File( baseDir + '/data/prepared/train_chats.h5', "r")
+        trn_dataset = h5py.File( baseDir + "/data/prepared/train_chats-" + str( self.pxWidth ) + ".h5", "r" )
         trn_set_x_orig = np.array(trn_dataset["x"][:]) # your train set features
         trn_set_y_orig = np.array(trn_dataset["y"][:]) # your train set labels
     
-        dev_dataset = h5py.File( baseDir + '/data/prepared/dev_chats.h5', "r")
+        dev_dataset = h5py.File( baseDir + "/data/prepared/dev_chats-" + str( self.pxWidth ) + ".h5", "r")
         dev_set_x_orig = np.array( dev_dataset["x"][:] ) # your test set features
         dev_set_y_orig = np.array( dev_dataset["y"][:] ) # your test set labels
     
@@ -64,6 +64,10 @@ class CatDataSource( DataSource ):
         # Create data sets
         trnDataSet = DataSet( trn_set_x_orig, trn_set_x, trn_set_y, trn_imgPath, trn_set_tag, trn_set_weight )
         devDataSet = DataSet( dev_set_x_orig, dev_set_x  , dev_set_y  , dev_imgPath  , dev_set_tag )
+        
+        # For tensor flow, we need to transpose data
+        self.transpose( trnDataSet )
+        self.transpose( devDataSet )
         
         return ( trnDataSet, devDataSet )
 
@@ -105,4 +109,24 @@ class CatDataSource( DataSource ):
     
         return n_weights
 
+class CatFlattenNormalizedDataSource( CatRawDataSource ):
+    "Get cats row data set, flatten and normalize it"
+
+    def __init__( self, params = None ):
+        super( CatRawDataSource, self ).__init__( params )
+        
+    def getDatasets( self, isLoadWeights ):
+        # ancestor
+        ( datasetTrn, datasetDev ) = super().getDatasets( isLoadWeights )
+        
+        # flatten data 
+        datasetTrn.X = self.flatten( datasetTrn.X )
+        datasetDev.X = self.flatten( datasetDev.X )
+    
+        # normalize X
+        datasetTrn.X = self.normalize( datasetTrn.X )
+        datasetDev.X = self.normalize( datasetDev.X )
+
+        return ( datasetTrn, datasetDev )
+        
         

@@ -26,10 +26,10 @@ def instantiateClass( classFqName ) :
 def updateMachines( conn ):
 
     # Read init file
-    configMachines = configparser.ConfigParser()
+    iniMachines = configparser.ConfigParser()
     # Leave keys unchanged
-    configMachines.optionxform = str
-    configMachines.read( "machines.ini" )
+    iniMachines.optionxform = str
+    iniMachines.read( "machines.ini" )
 
     # Read init file of forms
     configMachinesForms = configparser.ConfigParser()
@@ -40,12 +40,12 @@ def updateMachines( conn ):
     configMachineFormsResult = {}
 
     # get machines section
-    machines = configMachines.items( "Classes" )
+    machines = iniMachines.items( "Classes" )
 
-    for machine_class in machines :
+    for machineConf in machines :
 
-        machineName  = machine_class[ 0 ]
-        machineClass = machine_class[ 1 ]
+        machineName  = machineConf[ 0 ]
+        machineClass = machineConf[ 1 ]
 
         # update db
         db.addUniqueMachineName( conn, machineName )
@@ -64,42 +64,31 @@ def updateMachines( conn ):
     # commit result
     conn.commit()
 
-    return configMachines, configMachineFormsResult
+    # Data sources
+    configDatasourceResult = []
+    
+    # get data source section
+    dataSourceConfs = iniMachines.items( "DataSources" )
+
+    for dataSourceConf in dataSourceConfs :
+
+        machineName    = dataSourceConf[ 0 ]
+        datasourceLine = dataSourceConf[ 1 ]
+
+        # machine value is class, image width
+        datasourceValues     = datasourceLine.split( "," )
+        datasourceClass      = datasourceValues[ 0 ]
+        datasourceImageWidth = int( datasourceValues[ 1 ] )
+
+        # save to conf
+        configDatasourceResult[ machineName ] = ( datasourceClass, datasourceImageWidth )
+    
+    return iniMachines, configDatasourceResult, configMachineFormsResult
 
 def prepareData( dataSource ):
+
     # Load data
     ( datasetTrn, datasetDev ) = dataSource.getDatasets( isLoadWeights = False );
-
-    # flatten data and transpose for tensorflow
-    # TODO
-    #datasetTrn.X = dataSource.flatten( datasetTrn.X ).T
-    #datasetDev.X = dataSource.flatten( datasetDev.X ).T
-
-    # normalize X
-    datasetTrn.X = dataSource.normalize( datasetTrn.X )
-    datasetDev.X = dataSource.normalize( datasetDev.X )
-
-    # transpose Y for tensorflow
-    datasetTrn.Y = datasetTrn.Y.T
-    datasetDev.Y = datasetDev.Y.T
-
-    # Transpose for tensorflow
-    if ( not ( datasetTrn.imgPath is None ) ) :
-        datasetTrn.imgPath = datasetTrn.imgPath.T
-    if ( not ( datasetDev.imgPath is None ) ) :
-        datasetDev.imgPath = datasetDev.imgPath.T
-
-    if ( not ( datasetTrn.tag is None ) ) :
-        datasetTrn.tag = datasetTrn.tag.T
-    if ( not ( datasetDev.tag is None ) ) :
-        datasetDev.tag = datasetDev.tag.T
-
-    if ( not ( datasetTrn.weight is None ) ) :
-        if ( type( datasetTrn.weight ) != int ) :
-            datasetTrn.weight = datasetTrn.weight.T
-    if ( not ( datasetDev.weight is None ) ) :
-        if ( type( datasetDev.weight ) != int ) :
-            datasetDev.weight = datasetDev.weight.T
 
     # Store data info in a dico
     dataInfo = {
@@ -139,7 +128,7 @@ if __name__ == '__main__':
         #db.test( conn )
 
         # update machines
-        ( configMachines, confMachinesForms ) = updateMachines( conn )
+        ( iniMachines, configDatasources, configMachinesForms ) = updateMachines( conn )
 
         # Read configurations
         configs = db.getConfigsWithMaxDevAccuracy( conn )
@@ -147,16 +136,16 @@ if __name__ == '__main__':
         configDoer   = control.ConfigDoer     ( conn )
         hpDoer       = control.HyperParamsDoer( conn )
         runsDoer     = control.RunsDoer       ( conn )
-        startRunDoer = control.StartRunDoer   ( conn, confMachinesForms )
+        startRunDoer = control.StartRunDoer   ( conn, configMachinesForms )
 
         # For debug
-        screen = True
+        screen = False
         if ( screen ) :
             mainWindow = view.MainWindow( configDoer, hpDoer, runsDoer, startRunDoer )
             ( idConfig, buttonClicked, runParams ) = mainWindow.showAndSelectConf( configs )
         else :
             ( idConfig, buttonClicked, runParams ) = (
-                4,
+                1,
                 "Train",
                 { "comment": "", "tune": False, "showPlots": False, "nbTuning": 2, "isTensorboard": False, "isTensorboardFull": False }
             )
@@ -175,18 +164,21 @@ if __name__ == '__main__':
         print( config[ "structure" ] )
 
         # Get machine data source
-        machineDataSourceClass = configMachines.get( "DataSources", machineName )
+        machineDataSourceClass = configDatasources[ machineName ][ 0 ]
         if ( machineDataSourceClass == None ) :
             raise ValueError( "Unknown machine data source class", machineName )
 
+        dataSource = instantiateClass( machineDataSourceClass )
+        # set image width
+        dataSource.setImageWidth( configDatasources[ machineName ][ 1 ] )
+
         # Get machine class
-        machineClass = configMachines.get( "Classes", machineName )
+        machineClass = iniMachines.get( "Classes", machineName )
         if ( machineClass == None ) :
             raise ValueError( "Unknown machine class", machineClass )
 
-        dataSource = instantiateClass( machineDataSourceClass )
         ml = instantiateClass( machineClass )
-
+        
         # Define system infos
         systemInfos = {}
         hostname = socket.gethostname()

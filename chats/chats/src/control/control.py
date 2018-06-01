@@ -168,9 +168,9 @@ class RunsDoer( Doer ):
 
 class StartRunDoer( Doer ):
 
-    def __init__( self, conn, confMachinesForms ) :
+    def __init__( self, conn, configMachinesForms ) :
         super().__init__( conn )
-        self.confMachinesForms = confMachinesForms
+        self.confMachinesForms = configMachinesForms
 
     def startRun( self, fenetre, idConfig ) :
         # Get form fields for machine

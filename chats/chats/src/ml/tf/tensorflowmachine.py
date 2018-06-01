@@ -181,9 +181,8 @@ class AbstractTensorFlowMachine( AbstractMachine ):
           In fact, the number of examples during test/train is different.
         """
 
-        ### START CODE HERE ### (approx. 2 lines)
-        self.ph_X         = tf.placeholder( tf.float32, shape=( None, X_shape ), name = "X" )
-        self.ph_Y         = tf.placeholder( tf.float32, shape=( None, X_shape ), name = "Y" )
+        self.ph_X         = tf.placeholder( tf.float32, shape=X_shape, name = "X" )
+        self.ph_Y         = tf.placeholder( tf.float32, shape=X_shape, name = "Y" )
         self.ph_KEEP_PROB = tf.placeholder( tf.float32, name = "KEEP_PROB" )
         ### END CODE HERE ###
 
@@ -439,7 +438,7 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
             if ( isLastLine ) :
                 raise ValueError( "fullyConnected network must be last line" )
             line = line.strip()
-            
+
             if ( not( line ) ) :
                 # empty line
                 continue;
@@ -468,11 +467,11 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
                 # Add tf prefix
                 line = "tf.layers." + line
                 result.append( ( "tensor", line ) )
-            
+
             elif ( line == "flatten" ) :
-                result.append( ( "flatten", ) )
-            
-            else : 
+                result.append( ( "flatten", "" ) )
+
+            else :
                 raise ValueError( "Can't parse structure line '" + line )
 
         return result
@@ -491,21 +490,26 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
 
         # Browse structure
         for structureItem in self.structure :
-            
-            key = structureItem[ 0 ]
+
+            key   = structureItem[ 0 ]
             value = structureItem[ 1 ]
-            
+
             if ( key == "tensor" ) :
                 # value is a tensorwflow tensor
                 AZ = eval( value )
-            
+
             elif ( key == "flatten" ) :
                 # flatten data
                 # get input shape
                 curShape = curInput.shape
-                
-                AZ = tf.reshape( curInput, [-1, curShape[ 0 ] ] )
-            
+
+                # get flat dimension
+                flatDim = 1
+                for dim in curShape.dims[ 1: ] :
+                    flatDim *= dim.value
+                    
+                AZ = tf.reshape( curInput, [-1, flatDim ] )
+
             elif ( key == "fullyConnected" ) :
 
                 numLayers = value
@@ -538,7 +542,7 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
                     curInput = AZ
             else :
                 raise ValueError( "Can't parse structure key '" + key + "'" )
-                
+
         return AZ
 
     def define_cost( self, Z_last, Y, WEIGHT, beta, n_x ):
