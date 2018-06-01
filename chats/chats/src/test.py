@@ -9,6 +9,7 @@ import socket
 import platform
 
 from tkinter import *
+import numpy as np
 
 import const.constants as const
 from ml.machine import AbstractMachine
@@ -70,8 +71,9 @@ def prepareData( dataSource ):
     ( datasetTrn, datasetDev ) = dataSource.getDatasets( isLoadWeights = False );
 
     # flatten data and transpose for tensorflow
-    datasetTrn.X = dataSource.flatten( datasetTrn.X ).T
-    datasetDev.X = dataSource.flatten( datasetDev.X ).T
+    # TODO
+    #datasetTrn.X = dataSource.flatten( datasetTrn.X ).T
+    #datasetDev.X = dataSource.flatten( datasetDev.X ).T
 
     # normalize X
     datasetTrn.X = dataSource.normalize( datasetTrn.X )
@@ -80,6 +82,24 @@ def prepareData( dataSource ):
     # transpose Y for tensorflow
     datasetTrn.Y = datasetTrn.Y.T
     datasetDev.Y = datasetDev.Y.T
+
+    # Transpose for tensorflow
+    if ( not ( datasetTrn.imgPath is None ) ) :
+        datasetTrn.imgPath = datasetTrn.imgPath.T
+    if ( not ( datasetDev.imgPath is None ) ) :
+        datasetDev.imgPath = datasetDev.imgPath.T
+
+    if ( not ( datasetTrn.tag is None ) ) :
+        datasetTrn.tag = datasetTrn.tag.T
+    if ( not ( datasetDev.tag is None ) ) :
+        datasetDev.tag = datasetDev.tag.T
+
+    if ( not ( datasetTrn.weight is None ) ) :
+        if ( type( datasetTrn.weight ) != int ) :
+            datasetTrn.weight = datasetTrn.weight.T
+    if ( not ( datasetDev.weight is None ) ) :
+        if ( type( datasetDev.weight ) != int ) :
+            datasetDev.weight = datasetDev.weight.T
 
     # Store data info in a dico
     dataInfo = {
@@ -129,15 +149,17 @@ if __name__ == '__main__':
         runsDoer     = control.RunsDoer       ( conn )
         startRunDoer = control.StartRunDoer   ( conn, confMachinesForms )
 
-#         mainWindow = view.MainWindow( configDoer, hpDoer, runsDoer, startRunDoer )
-#         ( idConfig, buttonClicked, runParams ) = mainWindow.showAndSelectConf( configs )
-
         # For debug
-        ( idConfig, buttonClicked, runParams ) = (
-            3,
-            "Train",
-            { "comment": "aeff", "tune": False, "showPlots": False, "nbTuning": 2, "isTensorboard": False, "isTensorboardFull": False }
-        )
+        screen = True
+        if ( screen ) :
+            mainWindow = view.MainWindow( configDoer, hpDoer, runsDoer, startRunDoer )
+            ( idConfig, buttonClicked, runParams ) = mainWindow.showAndSelectConf( configs )
+        else :
+            ( idConfig, buttonClicked, runParams ) = (
+                4,
+                "Train",
+                { "comment": "", "tune": False, "showPlots": False, "nbTuning": 2, "isTensorboard": False, "isTensorboardFull": False }
+            )
 
         # cancel?
         if ( buttonClicked == "Cancel" ) :
@@ -196,5 +218,5 @@ if __name__ == '__main__':
 
             # set run params
             ml.setRunParams( runParams )
-             
+
             ml.train( conn, config, comment, tune = tune, showPlots = showPlots )

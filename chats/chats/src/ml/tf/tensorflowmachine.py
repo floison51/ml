@@ -60,7 +60,7 @@ class AbstractTensorFlowMachine( AbstractMachine ):
     def parseStructure( self, strStructure ):
         "Parse provided string structure into machine dependent model"
 
-    def modelInit( self, strStructure, n_x, n_y ):
+    def modelInit( self, strStructure, X_shape ):
 
         ops.reset_default_graph()                         # to be able to rerun the model without overwriting tf variables
         tf.set_random_seed( 1 )                             # to keep consistent results
@@ -69,18 +69,18 @@ class AbstractTensorFlowMachine( AbstractMachine ):
         self.structure = self.parseStructure( strStructure )
 
         # Create Placeholders of shape (n_x, n_y)
-        self.create_placeholders( n_x, n_y )
+        self.create_placeholders( X_shape )
 
         # Initialize parameters
-        self.initialize_parameters( n_x )
+        self.initialize_parameters( X_shape )
 
         # Forward propagation: Build the forward propagation in the tensorflow graph
         ### START CODE HERE ### (1 line)
-        Z_last = self.forward_propagation( n_x )
+        Z_last = self.forward_propagation( X_shape )
         ### END CODE HERE ###
 
         # Cost function: Add cost function to tensorflow graph
-        self.define_cost( Z_last, self.ph_Y, self.datasetTrn.weight, self.beta, n_x )
+        self.define_cost( Z_last, self.ph_Y, self.datasetTrn.weight, self.beta, X_shape )
 
         # Back-propagation: Define the tensorflow optimizer. Use an AdamOptimizer.
         # Decaying learning rate
@@ -164,7 +164,7 @@ class AbstractTensorFlowMachine( AbstractMachine ):
         correct_prediction = self.correct_prediction.eval( { self.ph_X: X, self.ph_Y: Y, self.ph_KEEP_PROB: 1.0 } )
         return correct_prediction
 
-    def create_placeholders( self, n_x, n_y ):
+    def create_placeholders( self, X_shape ):
         """
         Creates the placeholders for the tensorflow session.
 
@@ -182,17 +182,17 @@ class AbstractTensorFlowMachine( AbstractMachine ):
         """
 
         ### START CODE HERE ### (approx. 2 lines)
-        self.ph_X         = tf.placeholder( tf.float32, shape=( None, n_x ), name = "X" )
-        self.ph_Y         = tf.placeholder( tf.float32, shape=( None, n_y ), name = "Y" )
+        self.ph_X         = tf.placeholder( tf.float32, shape=( None, X_shape ), name = "X" )
+        self.ph_Y         = tf.placeholder( tf.float32, shape=( None, X_shape ), name = "Y" )
         self.ph_KEEP_PROB = tf.placeholder( tf.float32, name = "KEEP_PROB" )
         ### END CODE HERE ###
 
     @abc.abstractmethod
-    def initialize_parameters( self, n_x ):
+    def initialize_parameters( self, X_shape ):
         "Initialize parameters given X lines dimension"
 
     @abc.abstractmethod
-    def forward_propagation( self, n_x ):
+    def forward_propagation( self, X_shape ):
         "Define the forward propagation"
 
     def runIteration(
@@ -429,7 +429,7 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
         strStructure = strStructure.strip()
 
         # Browse lines
-        lines = strStructure.split( "\r" )
+        lines = strStructure.splitlines()
         isLastLine = False
 
         result = []
@@ -439,6 +439,10 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
             if ( isLastLine ) :
                 raise ValueError( "fullyConnected network must be last line" )
             line = line.strip()
+            
+            if ( not( line ) ) :
+                # empty line
+                continue;
 
             # FullyConnected network
             if ( line.startswith( "fullyConnected[" ) ) :
@@ -459,12 +463,24 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
                 structure = eval( line )
                 result.append( ( "fullyConnected", structure ) )
 
+            elif ( line.startswith( "conv2d(" ) or line.startswith( "max_pooling2d(" ) ) :
+                # 2D convolution : conv2d( curInput, filters=32, kernel_size=[5, 5], padding="same",  activation=tf.nn.relu )
+                # Add tf prefix
+                line = "tf.layers." + line
+                result.append( ( "tensor", line ) )
+            
+            elif ( line == "flatten" ) :
+                result.append( ( "flatten", ) )
+            
+            else : 
+                raise ValueError( "Can't parse structure line '" + line )
+
         return result
 
-    def initialize_parameters( self, n_x ):
+    def initialize_parameters( self, X_shape ):
         "Not needed in this model"
 
-    def forward_propagation( self, n_x ):
+    def forward_propagation( self, X_shape ):
 
         # Prepare normalizer tensor
         regularizer_l2 = None
@@ -475,40 +491,55 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
 
         # Browse structure
         for structureItem in self.structure :
-
-            if ( structureItem[ 0 ] == "fullyConnected" ) :
-                numLayers = structureItem[ 1 ]
-                # add input layer
-                numLayers.insert( 0, n_x )
+            
+            key = structureItem[ 0 ]
+            value = structureItem[ 1 ]
+            
+            if ( key == "tensor" ) :
+                # value is a tensorwflow tensor
+                AZ = eval( value )
+            
+            elif ( key == "flatten" ) :
+                # flatten data
+                # get input shape
+                curShape = curInput.shape
                 
+                AZ = tf.reshape( curInput, [-1, curShape[ 0 ] ] )
+            
+            elif ( key == "fullyConnected" ) :
+
+                numLayers = value
+
                 # browse layers
                 iLayer = -1
                 for numLayer in numLayers:
                     iLayer += 1
                     # last layer
                     lastLayer = ( iLayer == ( len( numLayers ) - 1 ) )
-                    
+
                     # filter input by keep prob if needed
-                    if ( self.keep_prob != 1 ) :
+                    if ( self.keep_prob != 1 and not lastLayer ) :
                         curInput = tf.contrib.layers.dropout( curInput, self.ph_KEEP_PROB )
-                    
+
                     # Activation function
                     if ( lastLayer ) :
                         activationFunction = None
                     else :
                         activationFunction = tf.nn.relu
-                        
+
                     # current fully connected layer
-                    Z = tf.contrib.layers.fully_connected( \
+                    AZ = tf.contrib.layers.fully_connected( \
                         inputs=curInput, num_outputs=numLayer, activation_fn=activationFunction, \
                         weights_initializer=tf.contrib.layers.xavier_initializer( seed = 1 ), \
                         weights_regularizer= regularizer_l2
                     )
-                    
-                    # next input in Z
-                    curInput = Z
 
-        return Z
+                    # next input in AZ
+                    curInput = AZ
+            else :
+                raise ValueError( "Can't parse structure key '" + key + "'" )
+                
+        return AZ
 
     def define_cost( self, Z_last, Y, WEIGHT, beta, n_x ):
 

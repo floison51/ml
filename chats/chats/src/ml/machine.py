@@ -36,7 +36,7 @@ class AbstractMachine():
         '''
 
     @abc.abstractmethod
-    def modelInit( self, n_x, n_y ):
+    def modelInit( self, X_shape ):
         "Initializse the model"
 
     @abc.abstractmethod
@@ -207,10 +207,9 @@ class AbstractMachine():
         print_cost = True, show_plot = True, extractImageErrors = True
     ):
 
-        ( m, n_x ) = self.datasetTrn.X.shape   # (n_x: input size, m : number of examples in the train set)
-        ( _, n_y ) = self.datasetTrn.Y.shape   # n_y : output size
-        costs = []                                        # To keep track of the cost
-        DEV_accuracies = []     # for DEV accuracy graph
+        m = self.datasetTrn.X.shape[ 0 ]       # m : number of examples in the train set)
+        costs = []                             # To keep track of the cost
+        DEV_accuracies = []                    # for DEV accuracy graph
 
         # Get hyper parameters from dico
         self.beta        = hyperParams[ const.KEY_BETA ]
@@ -219,7 +218,7 @@ class AbstractMachine():
         self.minibatch_size      = hyperParams[ const.KEY_MINIBATCH_SIZE ]
         self.start_learning_rate = hyperParams[ const.KEY_START_LEARNING_RATE ]
 
-        self.modelInit( structure, n_x, n_y )
+        self.modelInit( structure, self.datasetTrn.X.shape )
 
         seed = 3 # to keep consistent results
 
@@ -288,7 +287,7 @@ class AbstractMachine():
                     if ( iEpoch != 0 ) :
 
                         # Performance counters
-                        curElapsedSeconds, curPerfIndex = self.getPerfCounters( tsStart, iEpoch, n_x, m )
+                        curElapsedSeconds, curPerfIndex = self.getPerfCounters( tsStart, iEpoch, self.datasetTrn.X.shape, m )
                         print( "  current: elapsedTime:", curElapsedSeconds, "perfIndex:", curPerfIndex )
 
                         #  calculate DEV accuracy
@@ -329,7 +328,7 @@ class AbstractMachine():
             print( "Final cost:", epoch_cost )
 
             ## Elapsed (seconds)
-            elapsedSeconds, perfIndex = self.getPerfCounters( tsStart, iEpoch, n_x, m )
+            elapsedSeconds, perfIndex = self.getPerfCounters( tsStart, iEpoch, self.datasetTrn.X.shape, m )
             perfInfo = {}
 
             print( "Elapsed (s):", elapsedSeconds )
@@ -475,12 +474,12 @@ class AbstractMachine():
         imgBase = os.getcwd().replace( "\\", "/" ) + "/data/transformed"
 
         # Extract errors
-        for i in range( 0, correct.shape[ 1 ] - 1 ):
+        for i in range( 0, correct.shape[ 0 ] ):
             # Is an error?
-            if ( not( correct[ 0, i ] ) ) :
+            if ( not( correct[ i, 0 ] ) ) :
 
                 # Add nb
-                label = str( TAG[ 0, i ] )
+                label = str( TAG[ i, 0 ] )
                 try:
                     nb = mapErrorNbByTag[ label ]
                 except KeyError as e:
@@ -547,7 +546,7 @@ class AbstractMachine():
         print( "Nb errors by tag for", key, ": ", mapErrorNbByTagSorted )
 
         # Build %age map
-        nbSamples = oks.shape[ 1 ]
+        nbSamples = oks.shape[ 0 ]
 
         mapErrorPercentNbByTag = {}
 
