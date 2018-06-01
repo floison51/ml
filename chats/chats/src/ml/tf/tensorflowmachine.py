@@ -60,7 +60,7 @@ class AbstractTensorFlowMachine( AbstractMachine ):
     def parseStructure( self, strStructure ):
         "Parse provided string structure into machine dependent model"
 
-    def modelInit( self, strStructure, X_shape ):
+    def modelInit( self, strStructure, X_shape, Y_shape ):
 
         ops.reset_default_graph()                         # to be able to rerun the model without overwriting tf variables
         tf.set_random_seed( 1 )                             # to keep consistent results
@@ -69,7 +69,7 @@ class AbstractTensorFlowMachine( AbstractMachine ):
         self.structure = self.parseStructure( strStructure )
 
         # Create Placeholders of shape (n_x, n_y)
-        self.create_placeholders( X_shape )
+        self.create_placeholders( X_shape, Y_shape )
 
         # Initialize parameters
         self.initialize_parameters( X_shape )
@@ -80,7 +80,7 @@ class AbstractTensorFlowMachine( AbstractMachine ):
         ### END CODE HERE ###
 
         # Cost function: Add cost function to tensorflow graph
-        self.define_cost( Z_last, self.ph_Y, self.datasetTrn.weight, self.beta, X_shape )
+        self.define_cost( Z_last, self.ph_Y, self.datasetTrn.weight )
 
         # Back-propagation: Define the tensorflow optimizer. Use an AdamOptimizer.
         # Decaying learning rate
@@ -115,7 +115,7 @@ class AbstractTensorFlowMachine( AbstractMachine ):
         self.dev_writer.close()
 
     @abc.abstractmethod
-    def define_cost( self, Z_last, Y, WEIGHT, beta, n_x ):
+    def define_cost( self, Z_last, Y, WEIGHT ):
         """
         Computes the cost
 
@@ -164,7 +164,7 @@ class AbstractTensorFlowMachine( AbstractMachine ):
         correct_prediction = self.correct_prediction.eval( { self.ph_X: X, self.ph_Y: Y, self.ph_KEEP_PROB: 1.0 } )
         return correct_prediction
 
-    def create_placeholders( self, X_shape ):
+    def create_placeholders( self, X_shape, Y_shape ):
         """
         Creates the placeholders for the tensorflow session.
 
@@ -181,9 +181,8 @@ class AbstractTensorFlowMachine( AbstractMachine ):
           In fact, the number of examples during test/train is different.
         """
 
-        ### START CODE HERE ### (approx. 2 lines)
-        self.ph_X         = tf.placeholder( tf.float32, shape=( None, X_shape ), name = "X" )
-        self.ph_Y         = tf.placeholder( tf.float32, shape=( None, X_shape ), name = "Y" )
+        self.ph_X         = tf.placeholder( tf.float32, shape=X_shape, name = "X" )
+        self.ph_Y         = tf.placeholder( tf.float32, shape=Y_shape, name = "Y" )
         self.ph_KEEP_PROB = tf.placeholder( tf.float32, name = "KEEP_PROB" )
         ### END CODE HERE ###
 
@@ -250,7 +249,7 @@ class TensorFlowSimpleMachine( AbstractTensorFlowMachine ):
 
         return structure
 
-    def initialize_parameters( self, n_x ):
+    def initialize_parameters( self, shape_X ):
         """
         Initializes parameters to build a neural network with tensorflow. The shapes are:
                             W1 : [25, 12288]
@@ -268,7 +267,8 @@ class TensorFlowSimpleMachine( AbstractTensorFlowMachine ):
 
         ## Add Level 0 : X
         # example : 12228, 100, 24, 1
-        structure0 = [ n_x ] + self.structure
+        self.n_x = shape_X[ 1 ]
+        structure0 = [ self.n_x ] + self.structure
 
         # parameters
         self.parameters = {}
@@ -344,7 +344,7 @@ class TensorFlowSimpleMachine( AbstractTensorFlowMachine ):
         # For last layer (output layer): no dropout and return only Z
         return Z
 
-    def define_cost( self, Z_last, Y, WEIGHT, beta, n_x ):
+    def define_cost( self, Z_last, Y, WEIGHT ):
         """
         Computes the cost
 
@@ -358,7 +358,7 @@ class TensorFlowSimpleMachine( AbstractTensorFlowMachine ):
 
         ## Add Level 0 : X
         # example : 12228, 100, 24, 1
-        structure0 = [ n_x ] + self.structure
+        structure0 = [ self.n_x ] + self.structure
 
         with tf.name_scope('cross_entropy'):
 
@@ -395,7 +395,7 @@ class TensorFlowSimpleMachine( AbstractTensorFlowMachine ):
                 # Loss function using L2 Regularization
                 regularizer = None
 
-                if ( beta != 0 ) :
+                if ( self.beta != 0 ) :
                     losses = []
                     for i in range( 1, len( structure0 ) ) :
                         W_cur = self.parameters[ 'W' + str( i ) ]
@@ -406,7 +406,7 @@ class TensorFlowSimpleMachine( AbstractTensorFlowMachine ):
                 cost = None
 
                 if ( regularizer != None ) :
-                    cost = tf.reduce_mean( raw_cost + beta * regularizer )
+                    cost = tf.reduce_mean( raw_cost + self.beta * regularizer )
                 else :
                     cost = raw_cost
 
@@ -439,7 +439,7 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
             if ( isLastLine ) :
                 raise ValueError( "fullyConnected network must be last line" )
             line = line.strip()
-            
+
             if ( not( line ) ) :
                 # empty line
                 continue;
@@ -468,11 +468,11 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
                 # Add tf prefix
                 line = "tf.layers." + line
                 result.append( ( "tensor", line ) )
-            
+
             elif ( line == "flatten" ) :
-                result.append( ( "flatten", ) )
-            
-            else : 
+                result.append( ( "flatten", "" ) )
+
+            else :
                 raise ValueError( "Can't parse structure line '" + line )
 
         return result
@@ -491,21 +491,26 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
 
         # Browse structure
         for structureItem in self.structure :
-            
-            key = structureItem[ 0 ]
+
+            key   = structureItem[ 0 ]
             value = structureItem[ 1 ]
-            
+
             if ( key == "tensor" ) :
                 # value is a tensorwflow tensor
                 AZ = eval( value )
-            
+
             elif ( key == "flatten" ) :
                 # flatten data
                 # get input shape
                 curShape = curInput.shape
-                
-                AZ = tf.reshape( curInput, [-1, curShape[ 0 ] ] )
-            
+
+                # get flat dimension
+                flatDim = 1
+                for dim in curShape.dims[ 1: ] :
+                    flatDim *= dim.value
+                    
+                AZ = tf.reshape( curInput, [-1, flatDim ] )
+
             elif ( key == "fullyConnected" ) :
 
                 numLayers = value
@@ -538,10 +543,10 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
                     curInput = AZ
             else :
                 raise ValueError( "Can't parse structure key '" + key + "'" )
-                
+
         return AZ
 
-    def define_cost( self, Z_last, Y, WEIGHT, beta, n_x ):
+    def define_cost( self, Z_last, Y, WEIGHT ):
 
         with tf.name_scope('cross_entropy'):
 

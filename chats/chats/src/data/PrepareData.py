@@ -48,8 +48,6 @@ TRAINING_TEST_SET_PC = 0.90
 # Small traning set to rapid iterations
 #TRAINING_TEST_SET_PC = 0.10
 
-RESIZE_PX = 64
-
 class CLIError(Exception):
     '''Generic exception to raise and log different fatal errors.'''
     def __init__(self, msg):
@@ -149,7 +147,7 @@ def transformImages( fromDir, toDir ):
 
 # Create dev and test sets
 
-def buildDataSet( dataDir, baseDir, files, iStart, iEnd, outFileName ):
+def buildDataSet( dataDir, baseDir, files, iStart, iEnd, size, outFileName ):
     # images list
     imagesList = []
 # y : cat or non-cat
@@ -179,11 +177,11 @@ def buildDataSet( dataDir, baseDir, files, iStart, iEnd, outFileName ):
         # load image
         img = Image.open(curImage)
         # Resize image
-        resizedImg = img.resize( ( RESIZE_PX, RESIZE_PX ) )
+        resizedImg = img.resize( ( size, size ) )
         # populate lists
         pix = np.array(resizedImg)
         # pix.spahe = (64, 64, 3 ) pour éviter les images monochromes
-        if (pix.shape != ( RESIZE_PX, RESIZE_PX, 3 ) ):
+        if (pix.shape != ( size, size, 3 ) ):
             print("Skipping image", curImage)
             print("It's not a (NxNx3) image.")
         else:
@@ -198,7 +196,7 @@ def buildDataSet( dataDir, baseDir, files, iStart, iEnd, outFileName ):
     for i in range( len( imagesList ) ) :
         image = imagesList[ i ]
         imageShape = image.shape
-        if ( imageShape != ( 64, 64, 3 ) ) :
+        if ( imageShape != ( size, size, 3 ) ) :
             print( "Wrong image:", path[ i ] )
             sys.exit( 1 )
         
@@ -213,10 +211,10 @@ def buildDataSet( dataDir, baseDir, files, iStart, iEnd, outFileName ):
 
 def createTrainAndDevSets():
     
+    input( "Type enter to continue" )
+    
     # current dir for data
     dataDir = os.getcwd().replace( "\\", "/" )
-    # TODO
-    dataDir = "C:/Users/fran/local-git/ml/chats/chats/data"
     
     # Base dir for cats and not cats images
     baseDir = dataDir + "/images"
@@ -234,15 +232,24 @@ def createTrainAndDevSets():
     print( "Build DEV data set" )
     iEndTrainingSet = int( len( files ) * TRAINING_TEST_SET_PC );
     
-    print( "Build TRAINING data set" )
-    buildDataSet( dataDir, transformedDir, files, 0, iEndTrainingSet, "train_chats.h5" )
+    sizes = ( 64, 128, 256 )
     
-    ## Build DEV data set
-    buildDataSet( \
-        dataDir, transformedDir, files, \
-        iEndTrainingSet + 1, len( files ) - 1, \
-        "dev_chats.h5" \
-    )
+    for size in sizes :
+        print( "Build TRAINING data set - size", size )
+        
+        ## Build TRN data set
+        buildDataSet( \
+            dataDir, transformedDir, files, \
+            0, iEndTrainingSet, \
+            size, "train_chats-" + str( size) + ".h5" \
+        )
+        
+        ## Build DEV data set
+        buildDataSet( \
+            dataDir, transformedDir, files, \
+            iEndTrainingSet + 1, len( files ) - 1, \
+            size, "dev_chats-" + str( size) + ".h5" \
+        )
     
     print( "Finished" );
 

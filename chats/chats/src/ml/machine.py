@@ -77,7 +77,7 @@ class AbstractMachine():
     def setRunParams( self, runParams ):
         # Nothing to do
         pass
-        
+
     def train( self,  conn, config, comment, tune = False, nbTuning = 20, showPlots = True ):
         "Train the model"
 
@@ -218,7 +218,14 @@ class AbstractMachine():
         self.minibatch_size      = hyperParams[ const.KEY_MINIBATCH_SIZE ]
         self.start_learning_rate = hyperParams[ const.KEY_START_LEARNING_RATE ]
 
-        self.modelInit( structure, self.datasetTrn.X.shape )
+        # Convert ( nbLines, dims... ) to ( None, dims... )
+        X_shape = [ None ]
+        X_shape.extend( self.datasetTrn.X.shape[ 1: ] )
+
+        Y_shape = [ None ]
+        Y_shape.extend( self.datasetTrn.Y.shape[ 1: ] )
+
+        self.modelInit( structure, X_shape, Y_shape )
 
         seed = 3 # to keep consistent results
 
@@ -275,11 +282,11 @@ class AbstractMachine():
                         )
 
                         epoch_cost += minibatch_cost / num_minibatches
-                        
+
                         if ( iteration == 0 ) :
                             # Display iteration 0 to allow verify cost calculation accross machines
                             print ("Cost after epoch %i, iteration %i: %f" % ( iEpoch, iteration, epoch_cost ) )
-                            
+
                         iteration += 1
 
                 if print_cost == True and iEpoch % 100 == 0:
@@ -287,7 +294,7 @@ class AbstractMachine():
                     if ( iEpoch != 0 ) :
 
                         # Performance counters
-                        curElapsedSeconds, curPerfIndex = self.getPerfCounters( tsStart, iEpoch, self.datasetTrn.X.shape, m )
+                        curElapsedSeconds, curPerfIndex = self.getPerfCounters( tsStart, iEpoch, self.datasetTrn.X.shape )
                         print( "  current: elapsedTime:", curElapsedSeconds, "perfIndex:", curPerfIndex )
 
                         #  calculate DEV accuracy
@@ -328,7 +335,7 @@ class AbstractMachine():
             print( "Final cost:", epoch_cost )
 
             ## Elapsed (seconds)
-            elapsedSeconds, perfIndex = self.getPerfCounters( tsStart, iEpoch, self.datasetTrn.X.shape, m )
+            elapsedSeconds, perfIndex = self.getPerfCounters( tsStart, iEpoch, self.datasetTrn.X.shape )
             perfInfo = {}
 
             print( "Elapsed (s):", elapsedSeconds )
@@ -420,7 +427,7 @@ class AbstractMachine():
 
         # Step 2: Partition (shuffled_X, shuffled_Y). Minus the end case.
         num_complete_minibatches = math.floor( m / mini_batch_size) # number of mini batches of size mini_batch_size in your partitioning
-        
+
         for k in range( 0, num_complete_minibatches ):
             mini_batch_X = shuffled_X[ k * mini_batch_size : k * mini_batch_size + mini_batch_size, : ]
             mini_batch_Y = shuffled_Y[ k * mini_batch_size : k * mini_batch_size + mini_batch_size, : ]
@@ -431,24 +438,30 @@ class AbstractMachine():
 
             mini_batch = (mini_batch_X, mini_batch_Y)
             mini_batches.append( mini_batch )
-        
+
         # Handling the end case (last mini-batch < mini_batch_size)
         if ( m % mini_batch_size != 0 ) :
             mini_batch_X = shuffled_X[ num_complete_minibatches * mini_batch_size : m, : ]
             mini_batch_Y = shuffled_Y[ num_complete_minibatches * mini_batch_size : m, : ]
             mini_batch = (mini_batch_X, mini_batch_Y)
             mini_batches.append( mini_batch )
-        
+
         return mini_batches
 
-    def getPerfCounters( self, tsStart, iEpoch, n_x, m ):
+    def getPerfCounters( self, tsStart, iEpoch, X_real_shape ):
 
         tsNow = time.time()
 
         ## Elapsed (seconds)
         elapsedSeconds = int( round( tsNow - tsStart ) )
+
+        # caculate volume : mutiply dimensions
+        import operator
+        import functools
+        volume = functools.reduce( operator.mul, X_real_shape, 1 )
+        
         # performance index : per iEpoth - per samples
-        perfIndex = 1 / ( elapsedSeconds / iEpoch / ( n_x * m ) ) * 1e-6
+        perfIndex = 1 / ( elapsedSeconds / iEpoch / volume ) * 1e-6
 
         return elapsedSeconds, perfIndex
 
