@@ -360,6 +360,24 @@ def createRun( conn, idConfig, runHyperParams ) :
 
     return idRun
 
+def updateRun( conn, idRun, runHyperParams ) :
+
+    c = conn.cursor();
+
+    # Get hyperparams
+    idRunHyperParams = getOrCreateHyperParams( conn, runHyperParams );
+
+    cursor = c.execute( \
+        "update runs set idHyperParams=? where id=?", \
+        ( idRunHyperParams, idRun, )
+    )
+
+    idRun = cursor.lastrowid
+
+    c.close();
+
+    return idRun
+
 def updateRunBefore(
     conn, idRun,
     comment = "?",

@@ -14,8 +14,10 @@ import const.constants as const
 
 # For debug
 debugUseScreen = True
-debugIdConconfig = 4
+debugIdConconfig = 1
 
+DB_DIR = os.getcwd().replace( "\\", "/" ) + "/run/db/chats-debug"
+APP_KEY = "chats"
 
 def instantiateClass( classFqName ) :
     module_name, class_name = classFqName.rsplit(".", 1)
@@ -113,9 +115,6 @@ def prepareData( dataSource ):
 
 if __name__ == '__main__':
 
-    DB_DIR = os.getcwd().replace( "\\", "/" ) + "/run/db/chats"
-    APP_KEY = "chats"
-
         # Init DB
     print( "Db dir:", DB_DIR )
 
@@ -142,7 +141,7 @@ if __name__ == '__main__':
             ( idConfig, buttonClicked, runParams ) = (
                 debugIdConconfig,
                 "Train",
-                { "comment": "", "tune": False, "showPlots": False, "nbTuning": 2, "isTensorboard": False, "isTensorboardFull": False }
+                { "comment": "", "tune": False, "showPlots": False, "nbTuning": 2, "isTensorboard": True, "isTensorboardFull": True }
             )
 
         # cancel?

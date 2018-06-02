@@ -48,9 +48,16 @@ class AbstractTensorFlowMachine( AbstractMachine ):
         self.sessionInit( sess )
         return sess
 
+    def getTensorBoardFolder( self, what ) :
+        # root TFB folder + runID to get a name in TFB
+        folder = TENSORBOARD_LOG_DIR + "/" + what + "/" + str( self.idRun )
+        return folder
+
     def sessionInit( self, sess ):
-        self.train_writer = tf.summary.FileWriter( TENSORBOARD_LOG_DIR + '/train', sess.graph )
-        self.dev_writer   = tf.summary.FileWriter( TENSORBOARD_LOG_DIR + '/dev', sess.graph )
+
+        if ( self.isTensorboard ) :
+            self.trn_writer = tf.summary.FileWriter( self.getTensorBoardFolder( "trn" ), sess.graph )
+            self.dev_writer = tf.summary.FileWriter( self.getTensorBoardFolder( "dev" ), sess.graph )
 
         # Run the initialization
         init = tf.global_variables_initializer()
@@ -60,7 +67,7 @@ class AbstractTensorFlowMachine( AbstractMachine ):
     def parseStructure( self, strStructure ):
         "Parse provided string structure into machine dependent model"
 
-    def modelInit( self, strStructure, X_shape, Y_shape ):
+    def modelInit( self, strStructure, X_shape, Y_shape, training ):
 
         ops.reset_default_graph()                         # to be able to rerun the model without overwriting tf variables
         tf.set_random_seed( 1 )                             # to keep consistent results
@@ -76,7 +83,7 @@ class AbstractTensorFlowMachine( AbstractMachine ):
 
         # Forward propagation: Build the forward propagation in the tensorflow graph
         ### START CODE HERE ### (1 line)
-        Z_last = self.forward_propagation( X_shape )
+        Z_last = self.forward_propagation( X_shape, training )
         ### END CODE HERE ###
 
         # Cost function: Add cost function to tensorflow graph
@@ -86,22 +93,27 @@ class AbstractTensorFlowMachine( AbstractMachine ):
         # Decaying learning rate
         global_step = tf.Variable( 0 )  # count the number of steps taken.
 
-        with tf.name_scope('cross_entropy'):
-            with tf.name_scope( 'total' ):
-                learning_rate = tf.train.exponential_decay(
-                    # todo : use hp
-                    self.start_learning_rate, global_step, 10000, 0.96, staircase=True
-                )
-                tf.summary.scalar( 'learning_rate', learning_rate )
-
-        # fixed learning rate
-        # learning_rate = start_learning_rate
+        learning_rate = tf.train.exponential_decay(
+            self.start_learning_rate, global_step, self.learning_rate_decay_nb, self.learning_rate_decay_percent, staircase=True
+        )
 
         # Adam optimizer
         self.optimizer = tf.train.AdamOptimizer( learning_rate ).minimize( self.cost, global_step = global_step )
 
         # Accuracy and correct prediction
         self.accuracy, self.correct_prediction = self.defineAccuracy( self.ph_Y, Z_last )
+
+        # Tensorboard summaries
+        with tf.name_scope( 'LearningRate' ):
+            if ( self.isTensorboard ) :
+                tf.summary.scalar( 'Step', global_step )
+                tf.summary.scalar( 'learning_rate', learning_rate )
+
+        with tf.name_scope( 'Result' ):
+            if ( self.isTensorboard ) :
+                tf.summary.scalar( 'Cost', self.cost )
+                tf.summary.scalar( 'TRN Accuracy', self.accuracy )
+                tf.summary.scalar( 'DEV Accuracy', self.var_DEV_accuracy )
 
         # Merge all the summaries and write them out to /tmp/mnist_logs (by default)
         self.mergedSummaries = tf.summary.merge_all()
@@ -111,8 +123,10 @@ class AbstractTensorFlowMachine( AbstractMachine ):
 
     def modelEnd( self ):
         # Close tensorboard streams
-        self.train_writer.close()
-        self.dev_writer.close()
+        if ( self.trn_writer != None ) :
+            self.trn_writer.close()
+        if ( self.dev_writer != None ) :
+            self.dev_writer.close()
 
     @abc.abstractmethod
     def define_cost( self, Z_last, Y, WEIGHT ):
@@ -128,19 +142,19 @@ class AbstractTensorFlowMachine( AbstractMachine ):
         """
 
     def defineAccuracy( self, Y, Z_last ):
-        with tf.name_scope('accuracy'):
-            # To calculate the correct predictions
-            prediction = tf.round( tf.sigmoid( Z_last ) )
-            with tf.name_scope('correct_prediction'):
-                correct_prediction = tf.equal( prediction, Y )
-            with tf.name_scope('accuracy'):
-                # Calculate accuracy on the test set
-                accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
 
-        if self.isTensorboard :
-            tf.summary.scalar('accuracy', accuracy)
+        # To calculate the correct predictions
+        prediction = tf.round( tf.sigmoid( Z_last ) )
+        correct_prediction = tf.equal( prediction, Y )
+        # Calculate accuracy on the test set
+        accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
 
         return accuracy, correct_prediction
+
+    def devAccuracyUpdated( self, devAccuracy ):
+        "Updated accuracy"
+        # save it placeholder to have graph in tensorboard
+        tf.assign( self.var_DEV_accuracy, devAccuracy )
 
     def persistParams( self, sess, idRun ):
 
@@ -184,14 +198,19 @@ class AbstractTensorFlowMachine( AbstractMachine ):
         self.ph_X         = tf.placeholder( tf.float32, shape=X_shape, name = "X" )
         self.ph_Y         = tf.placeholder( tf.float32, shape=Y_shape, name = "Y" )
         self.ph_KEEP_PROB = tf.placeholder( tf.float32, name = "KEEP_PROB" )
-        ### END CODE HERE ###
+
+        # DEV accuracy estimation
+        self.var_DEV_accuracy = tf.get_variable( "DEV_accuracy", [] , dtype=tf.float32, trainable=False )
+
+        # Assign value
+        self.var_DEV_accuracy.assign( 0 )
 
     @abc.abstractmethod
     def initialize_parameters( self, X_shape ):
         "Initialize parameters given X lines dimension"
 
     @abc.abstractmethod
-    def forward_propagation( self, X_shape ):
+    def forward_propagation( self, X_shape, training ):
         "Define the forward propagation"
 
     def runIteration(
@@ -210,8 +229,8 @@ class AbstractTensorFlowMachine( AbstractMachine ):
                 [ self.mergedSummaries, self.optimizer, self.cost ], feed_dict=feed_dict,
                 options=run_options,run_metadata=run_metadata
             )
-            self.train_writer.add_run_metadata( run_metadata, 'step%03d' % iteration )
-            self.train_writer.add_summary( summary, iteration )
+            self.trn_writer.add_run_metadata( run_metadata, 'step%03d' % iteration )
+            self.trn_writer.add_summary( summary, iteration )
         else :
 
             if ( self.isTensorboard ) :
@@ -219,13 +238,27 @@ class AbstractTensorFlowMachine( AbstractMachine ):
                 summary, _ , curCost = sess.run(
                     [ self.mergedSummaries, self.optimizer, self. cost ], feed_dict=feed_dict
                 )
-                self.train_writer.add_summary( summary, iteration )
+                self.trn_writer.add_summary( summary, iteration )
             else :
                 _ , curCost = sess.run(
                     [ self.optimizer, self.cost], feed_dict=feed_dict
                 )
 
         return curCost
+
+    def variable_summaries( self, var ):
+      """Attach a lot of summaries to a Tensor (for TensorBoard visualization)."""
+      if ( self.isTensorboardFull ) :
+          with tf.name_scope('summaries'):
+            mean = tf.reduce_mean(var)
+            tf.summary.scalar('mean', mean)
+            with tf.name_scope('stddev'):
+              stddev = tf.sqrt(tf.reduce_mean(tf.square(var - mean)))
+            tf.summary.scalar('stddev', stddev)
+            tf.summary.scalar('max', tf.reduce_max(var))
+            tf.summary.scalar('min', tf.reduce_min(var))
+            tf.summary.histogram('histogram', var)
+
 
 #*****************************************************
 # Tensorflow basic machine : supports [48,24,1] fully connected hand-mad structure
@@ -292,7 +325,7 @@ class TensorFlowSimpleMachine( AbstractTensorFlowMachine ):
             self.parameters[ "W" + str( i + 1 ) ] = W_cur
             self.parameters[ "b" + str( i + 1 ) ] = b_cur
 
-    def forward_propagation( self, n_x ):
+    def forward_propagation( self, X_shape, training ):
         """
         Implements the forward propagation for the model: LINEAR -> RELU -> LINEAR -> RELU -> LINEAR -> SOFTMAX
 
@@ -305,8 +338,13 @@ class TensorFlowSimpleMachine( AbstractTensorFlowMachine ):
         Z3 -- the output of the last LINEAR unit
         """
 
+        # check
+        if ( self.useBatchNormalization ) :
+            raise ValueError( "This machine doesn't support '" + const.KEY_USE_BATCH_NORMALIZATION + "' hyper-parameter" )
+
         ## Add Level 0 : X
         # example : 12228, 100, 24, 1
+        n_x = X_shape[ 1 ]
         structure0 = [ n_x ] + self.structure
 
         Z = None
@@ -360,57 +398,50 @@ class TensorFlowSimpleMachine( AbstractTensorFlowMachine ):
         # example : 12228, 100, 24, 1
         structure0 = [ self.n_x ] + self.structure
 
-        with tf.name_scope('cross_entropy'):
+        # to fit the tensorflow requirement for tf.nn.softmax_cross_entropy_with_logits(...,...)
 
-            # to fit the tensorflow requirement for tf.nn.softmax_cross_entropy_with_logits(...,...)
+        # if data samples per column
+        #logits = tf.transpose( Z_last )
+        #labels = tf.transpose( Y )
 
-            # if data samples per column
-            #logits = tf.transpose( Z_last )
-            #labels = tf.transpose( Y )
+        # if data samples per line
+        #ValueError: logits and labels must have the same shape ((1, 12288) vs (?, 1))
+        logits = Z_last
+        labels = Y
 
-            # if data samples per line
-            #ValueError: logits and labels must have the same shape ((1, 12288) vs (?, 1))
-            logits = Z_last
-            labels = Y
+        raw_cost = None
 
-            raw_cost = None
+        if ( ( type( WEIGHT ) == int ) and ( WEIGHT == 1 ) ) :
+            raw_cost = \
+                tf.reduce_mean(
+                    tf.nn.sigmoid_cross_entropy_with_logits( logits = logits, labels = labels )
+                )
 
-            with tf.name_scope( 'total' ):
-                if ( ( type( WEIGHT ) == int ) and ( WEIGHT == 1 ) ) :
-                    raw_cost = \
-                        tf.reduce_mean(
-                            tf.nn.sigmoid_cross_entropy_with_logits( logits = logits, labels = labels )
-                        )
+        else :
+            # Use image weights to reduce false positives
+            # pos_weight = tf.transpose( WEIGHT )
+            raw_cost = \
+                tf.reduce_mean(
+                    tf.nn.weighted_cross_entropy_with_logits(logits = logits, targets = labels, pos_weight = WEIGHT )
+                )
 
-                else :
-                    # Use image weights to reduce false positives
-                    # pos_weight = tf.transpose( WEIGHT )
-                    raw_cost = \
-                        tf.reduce_mean(
-                            tf.nn.weighted_cross_entropy_with_logits(logits = logits, targets = labels, pos_weight = WEIGHT )
-                        )
+        # Loss function using L2 Regularization
+        regularizer = None
 
-                tf.summary.scalar( 'raw_cost', raw_cost)
+        if ( self.beta != 0 ) :
+            losses = []
+            for i in range( 1, len( structure0 ) ) :
+                W_cur = self.parameters[ 'W' + str( i ) ]
+                losses.append( tf.nn.l2_loss( W_cur ) )
 
-                # Loss function using L2 Regularization
-                regularizer = None
+            regularizer = tf.add_n( losses )
 
-                if ( self.beta != 0 ) :
-                    losses = []
-                    for i in range( 1, len( structure0 ) ) :
-                        W_cur = self.parameters[ 'W' + str( i ) ]
-                        losses.append( tf.nn.l2_loss( W_cur ) )
+        cost = None
 
-                    regularizer = tf.add_n( losses )
-
-                cost = None
-
-                if ( regularizer != None ) :
-                    cost = tf.reduce_mean( raw_cost + self.beta * regularizer )
-                else :
-                    cost = raw_cost
-
-                tf.summary.scalar( 'cost', cost)
+        if ( regularizer != None ) :
+            cost = tf.reduce_mean( raw_cost + self.beta * regularizer )
+        else :
+            cost = raw_cost
 
         self.cost = cost
 
@@ -480,7 +511,7 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
     def initialize_parameters( self, X_shape ):
         "Not needed in this model"
 
-    def forward_propagation( self, X_shape ):
+    def forward_propagation( self, X_shape, training ):
 
         # Prepare normalizer tensor
         regularizer_l2 = None
@@ -488,7 +519,7 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
             regularizer_l2 = tf.contrib.layers.l2_regularizer( self.beta )
 
         curInput = self.ph_X
-        
+
         # Browse structure
         for structureItem in self.structure :
 
@@ -508,7 +539,7 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
                 flatDim = 1
                 for dim in curShape.dims[ 1: ] :
                     flatDim *= dim.value
-                    
+
                 AZ = tf.reshape( curInput, [-1, flatDim ] )
 
             elif ( key == "fullyConnected" ) :
@@ -526,18 +557,29 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
                     if ( self.keep_prob != 1 and not lastLayer ) :
                         curInput = tf.contrib.layers.dropout( curInput, self.ph_KEEP_PROB )
 
-                    # Activation function
-                    if ( lastLayer ) :
-                        activationFunction = None
-                    else :
-                        activationFunction = tf.nn.relu
-
-                    # current fully connected layer
-                    AZ = tf.contrib.layers.fully_connected( \
-                        inputs=curInput, num_outputs=numLayer, activation_fn=activationFunction, \
+                    # Z function
+                    Z0 = tf.contrib.layers.fully_connected( \
+                        inputs=curInput, num_outputs=numLayer, activation_fn=None, \
                         weights_initializer=tf.contrib.layers.xavier_initializer( seed = 1 ), \
                         weights_regularizer= regularizer_l2
                     )
+
+                    if ( self.useBatchNormalization ) :
+                        # Add batch normalization to speed-up gradiend descent convergence
+                        # Not for training
+                        Z1 = tf.layers.batch_normalization( Z0, training=training )
+                    else :
+                        Z1 = Z0
+
+                    if ( lastLayer ) :
+                        # No activation function
+                        AZ = Z1
+                    else :
+                        # activation function
+                        AZ = tf.nn.relu( Z1 )
+
+                    # next input in AZ
+                    curInput = AZ
 
             else :
                 raise ValueError( "Can't parse structure key '" + key + "'" )
@@ -549,35 +591,31 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
 
     def define_cost( self, Z_last, Y, WEIGHT ):
 
-        with tf.name_scope('cross_entropy'):
+        # if data samples per column
+        #logits = tf.transpose( Z_last )
+        #labels = tf.transpose( Y )
 
-            # if data samples per column
-            #logits = tf.transpose( Z_last )
-            #labels = tf.transpose( Y )
+        # if data samples per line
+        #ValueError: logits and labels must have the same shape ((1, 12288) vs (?, 1))
+        logits = Z_last
+        labels = Y
 
-            # if data samples per line
-            #ValueError: logits and labels must have the same shape ((1, 12288) vs (?, 1))
-            logits = Z_last
-            labels = Y
+        raw_cost = None
 
-            raw_cost = None
+        if ( ( type( WEIGHT ) == int ) and ( WEIGHT == 1 ) ) :
+            raw_cost = \
+                tf.reduce_mean(
+                    tf.nn.sigmoid_cross_entropy_with_logits( logits = logits, labels = labels )
+                )
 
-            with tf.name_scope( 'total' ):
-                if ( ( type( WEIGHT ) == int ) and ( WEIGHT == 1 ) ) :
-                    raw_cost = \
-                        tf.reduce_mean(
-                            tf.nn.sigmoid_cross_entropy_with_logits( logits = logits, labels = labels )
-                        )
+        else :
+            # Use image weights to reduce false positives
+            # pos_weight = tf.transpose( WEIGHT )
+            raw_cost = \
+                tf.reduce_mean(
+                    tf.nn.weighted_cross_entropy_with_logits(logits = logits, targets = labels, pos_weight = WEIGHT )
+                )
 
-                else :
-                    # Use image weights to reduce false positives
-                    # pos_weight = tf.transpose( WEIGHT )
-                    raw_cost = \
-                        tf.reduce_mean(
-                            tf.nn.weighted_cross_entropy_with_logits(logits = logits, targets = labels, pos_weight = WEIGHT )
-                        )
-
-                tf.summary.scalar( 'raw_cost', raw_cost)
 
         # Add regularization cost
         if ( self.beta != 0 ) :

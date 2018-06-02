@@ -17,8 +17,9 @@ KEY_USE_WEIGHTS         = "isUseWeights"
 KEY_START_LEARNING_RATE = "start_learning_rate"
 KEY_BETA                = "beta"
 KEY_KEEP_PROB           = "keepProb"
-KEY_DECAY_NB            = "decayNb"
-KEY_DECAY_PERCENT       = "decayPercent"
+KEY_LEARNING_RATE_DECAY_NB      = "decayNb"
+KEY_LEARNING_RATE_DECAY_PERCENT = "decayPercent"
+KEY_USE_BATCH_NORMALIZATION     = "useBatchNormalization"
 
 # system info keys
 KEY_PYTHON_VERSION      = "pythonVersion"
@@ -57,8 +58,11 @@ class HyperParamsDico:
         KEY_START_LEARNING_RATE : [ "float"     , 0.0001 , "{0:.0000000f}" ],
         KEY_BETA                : [ "float"     , 0.     , "{0:.0000000f}" ],
         KEY_KEEP_PROB           : [ "float"     , 1.     , "{0:.00f}"      ],
-        KEY_DECAY_NB            : [ "int"       , 10000  , None            ],
-        KEY_DECAY_PERCENT       : [ "float"     , 0.96   , "{0:.00f}%"     ],
+        
+        KEY_LEARNING_RATE_DECAY_NB      : [ "int"       , 10000  , None            ],
+        KEY_LEARNING_RATE_DECAY_PERCENT : [ "float"     , 0.96   , "{0:.00f}%"     ],
+        
+        KEY_USE_BATCH_NORMALIZATION : [ "boolean", False, None ]
     }
 
 class ConfigsDico:

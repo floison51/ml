@@ -353,7 +353,7 @@ class ViewOrUpdateHyperParamsWindow ( MyDialog ) :
         strFormat = const.ConfigsDico.CARAC[ "bestAccuracy" ][ 2 ]
         formattedBestDevAccuracy = None
         if ( bestDevAccuracy != None ) :
-            strFormat.format( bestDevAccuracy )
+            formattedBestDevAccuracy = strFormat.format( bestDevAccuracy )
 
         labelText1 = "Current\nhyper params"
         labelText2 = "Best\nhyper params\nDEV accuracy=" + str( formattedBestDevAccuracy )

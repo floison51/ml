@@ -19,6 +19,9 @@ import db.db as db
 # Abtract classes
 import abc
 
+#To debug run iterations
+debugRun = False
+
 # Abstract class
 class AbstractMachine():
     # Abstract class
@@ -36,7 +39,7 @@ class AbstractMachine():
         '''
 
     @abc.abstractmethod
-    def modelInit( self, X_shape ):
+    def modelInit( self, X_shape, training ):
         "Initializse the model"
 
     @abc.abstractmethod
@@ -54,6 +57,10 @@ class AbstractMachine():
     @abc.abstractmethod
     def accuracyEval( self, X, Y ):
         "Evaluate accurary"
+
+    @abc.abstractmethod
+    def devAccuracyUpdated( self, devAccuracy ):
+        "Updated accurary"
 
     @abc.abstractmethod
     def correctPredictionEval( self, X, Y ):
@@ -138,25 +145,25 @@ class AbstractMachine():
 
             # Create run
 
-            idRun = db.createRun( conn, config[ "id" ],  runHyperParams )
+            self.idRun = db.createRun( conn, config[ "id" ],  runHyperParams )
 
             # Update run before calling model
             db.updateRunBefore(
-                conn, idRun,
+                conn, self.idRun,
                 comment=comment,
                 system_info=self.systemInfo, data_info=self.dataInfo
             )
 
             # Run model and update DB run with extra info
             accuracyDev, accuracyTrain = self.optimizeModel(
-                conn, idRun,
+                conn, self.idRun,
                 config[ "structure" ],
                 runHyperParams,
                 show_plot = showPlots and not tune, extractImageErrors = not tune
             )
 
             # Print run
-            run = db.getRun( conn, idRun )
+            run = db.getRun( conn, self.idRun )
             print( "Run stored in DB:", str( run ) )
 
             if tune :
@@ -170,7 +177,7 @@ class AbstractMachine():
                 if ( accuracyDev > maxAccuracyDev ) :
                     maxAccuracyDev = accuracyDev
                     maxHyperParams = tuning[ j ]
-                    maxIdRun = idRun
+                    maxIdRun = self.idRun
 
                     # get or create hyperparams
                     idMaxHp = db.getOrCreateHyperParams( conn, runHyperParams )
@@ -200,6 +207,11 @@ class AbstractMachine():
 
         print( "Finished in", globalElapsedSeconds, "seconds" )
 
+    # Stuff to catch Ctrl-C
+    def signal_handler( self, signal, frame ):
+        print( "Please, wait an epoch before training stops" )
+        self.interrupted = True
+
     def optimizeModel(
         self, conn, idRun,
         structure,
@@ -212,11 +224,16 @@ class AbstractMachine():
         DEV_accuracies = []                    # for DEV accuracy graph
 
         # Get hyper parameters from dico
-        self.beta        = hyperParams[ const.KEY_BETA ]
-        self.keep_prob   = hyperParams[ const.KEY_KEEP_PROB ]
-        self.num_epochs  = hyperParams[ const.KEY_NUM_EPOCHS ]
-        self.minibatch_size      = hyperParams[ const.KEY_MINIBATCH_SIZE ]
-        self.start_learning_rate = hyperParams[ const.KEY_START_LEARNING_RATE ]
+        self.beta           = hyperParams[ const.KEY_BETA ]
+        self.keep_prob      = hyperParams[ const.KEY_KEEP_PROB ]
+        self.num_epochs     = hyperParams[ const.KEY_NUM_EPOCHS ]
+        self.minibatch_size = hyperParams[ const.KEY_MINIBATCH_SIZE ]
+
+        self.start_learning_rate         = hyperParams[ const.KEY_START_LEARNING_RATE ]
+        self.learning_rate_decay_nb      = hyperParams[ const.KEY_LEARNING_RATE_DECAY_NB ]
+        self.learning_rate_decay_percent = hyperParams[ const.KEY_LEARNING_RATE_DECAY_PERCENT ]
+
+        self.useBatchNormalization = hyperParams[ const.KEY_USE_BATCH_NORMALIZATION ]
 
         # Convert ( nbLines, dims... ) to ( None, dims... )
         X_shape = [ None ]
@@ -225,7 +242,7 @@ class AbstractMachine():
         Y_shape = [ None ]
         Y_shape.extend( self.datasetTrn.Y.shape[ 1: ] )
 
-        self.modelInit( structure, X_shape, Y_shape )
+        self.modelInit( structure, X_shape, Y_shape, training=True )
 
         seed = 3 # to keep consistent results
 
@@ -248,8 +265,13 @@ class AbstractMachine():
             minCostFinalization = 99999999999999
             finished = False
 
+            # intercept Ctrl-C
+            self.interrupted = False
+            import signal
+            signal.signal( signal.SIGINT, self.signal_handler )
+
             # Do the training loop
-            while ( not finished and ( iEpoch <= current_num_epochs ) ) :
+            while ( not self.interrupted and not finished and ( iEpoch <= current_num_epochs ) ) :
 
                 epoch_cost = 0.                       # Defines a cost related to an epoch
 
@@ -271,7 +293,14 @@ class AbstractMachine():
 
                     minibatches = self.random_mini_batches( self.datasetTrn.X, self.datasetTrn.Y, self.minibatch_size, seed )
 
+                    # When to show debug info : 4 by minibatch
+                    debugIterationShow = num_minibatches // 4
+
+                    iterationMinibatch = 0
+
                     for minibatch in minibatches:
+
+                        iterationMinibatch += 1
 
                         # Select a minibatch
                         (minibatch_X, minibatch_Y) = minibatch
@@ -283,13 +312,18 @@ class AbstractMachine():
 
                         epoch_cost += minibatch_cost / num_minibatches
 
-                        if ( iteration == 0 ) :
+                        if ( print_cost and iteration == 0 ) :
                             # Display iteration 0 to allow verify cost calculation accross machines
                             print ("Cost after epoch %i, iteration %i: %f" % ( iEpoch, iteration, epoch_cost ) )
 
+                        if ( debugRun and ( iterationMinibatch % debugIterationShow ) == 0 ) :
+
+                            # Display iteration 0 to allow verify cost calculation accross machines
+                            print ("DEBUG : cost after epoch %i, iteration %i, iterationMinibatch %i / %i: %f" % ( iEpoch, iteration, iterationMinibatch, num_minibatches, epoch_cost ) )
+
                         iteration += 1
 
-                if print_cost == True and iEpoch % 100 == 0:
+                if print_cost and iEpoch % 100 == 0:
                     print ("Cost after epoch %i, iteration %i: %f" % ( iEpoch, iteration, epoch_cost ) )
                     if ( iEpoch != 0 ) :
 
@@ -301,6 +335,9 @@ class AbstractMachine():
                         DEV_accuracy = self.accuracyEval( self.datasetDev.X, self.datasetDev.Y )
                         print( "  current: DEV accuracy: %f" % ( DEV_accuracy ) )
                         DEV_accuracies.append( DEV_accuracy )
+
+                        # tell it to rest of world
+                        self.devAccuracyUpdated( DEV_accuracy )
 
                 if print_cost == True and iEpoch % 5 == 0:
                     costs.append( epoch_cost )
@@ -329,6 +366,20 @@ class AbstractMachine():
                         finished = True
 
             self.modelOptimizeEnd()
+
+            if ( self.interrupted ) :
+                print( "Training has been interrupted by Ctrl-C" )
+                print( "Store current epoch number '" + str( iEpoch ) + "' in run hyper parameters" )
+                # Get runs and hps
+                run = db.getRun( self.conn, self.idRun )
+                idRunHps = run[ "idHyperParams" ]
+                runHps = db.getHyperParams( self.conn, idRunHps )
+                # Modify num epochs
+                runHps[ const.KEY_NUM_EPOCHS ] = iEpoch
+                # save hps
+                idRunHps = db.getOrCreateHyperParams( conn, runHps )
+                # update run
+                db.updateRun( self.conn, self.idRun, idRunHps )
 
             # Final cost
             print ("Parameters have been trained!")
@@ -459,7 +510,7 @@ class AbstractMachine():
         import operator
         import functools
         volume = functools.reduce( operator.mul, X_real_shape, 1 )
-        
+
         # performance index : per iEpoth - per samples
         perfIndex = 1 / ( elapsedSeconds / iEpoch / volume ) * 1e-6
 
