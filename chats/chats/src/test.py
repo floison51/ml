@@ -16,7 +16,7 @@ import const.constants as const
 debugUseScreen = True
 debugIdConconfig = 1
 
-DB_DIR = os.getcwd().replace( "\\", "/" ) + "/run/db/chats-debug"
+DB_DIR = os.getcwd().replace( "\\", "/" ) + "/run/db/chats"
 APP_KEY = "chats"
 
 def instantiateClass( classFqName ) :
