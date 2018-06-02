@@ -139,17 +139,34 @@ if __name__ == '__main__':
         # Read configurations
         configs = db.getConfigsWithMaxDevAccuracy( conn )
 
+<<<<<<< HEAD
         if ( debugUseScreen ) :
             configDoer   = control.ConfigDoer     ( conn )
             hpDoer       = control.HyperParamsDoer( conn )
             runsDoer     = control.RunsDoer       ( conn )
             startRunDoer = control.StartRunDoer   ( conn, configMachinesForms )
+=======
+        configDoer   = control.ConfigDoer     ( conn )
+        hpDoer       = control.HyperParamsDoer( conn )
+        runsDoer     = control.RunsDoer       ( conn )
+        startRunDoer = control.StartRunDoer   ( conn, configMachinesForms )
+>>>>>>> branch 'master' of https://github.com/loizbak/ml.git
 
+<<<<<<< HEAD
+=======
+        # For debug
+        screen = False
+        if ( screen ) :
+>>>>>>> branch 'master' of https://github.com/loizbak/ml.git
             mainWindow = view.MainWindow( configDoer, hpDoer, runsDoer, startRunDoer )
             ( idConfig, buttonClicked, runParams ) = mainWindow.showAndSelectConf( configs )
         else :
             ( idConfig, buttonClicked, runParams ) = (
+<<<<<<< HEAD
                 debugIdConconfig,
+=======
+                1,
+>>>>>>> branch 'master' of https://github.com/loizbak/ml.git
                 "Train",
                 { "comment": "", "tune": False, "showPlots": False, "nbTuning": 2, "isTensorboard": False, "isTensorboardFull": False }
             )
