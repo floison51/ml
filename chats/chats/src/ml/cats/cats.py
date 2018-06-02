@@ -11,11 +11,11 @@ import h5py
 import numpy as np
 import sys
 
-class CatRawDataSource( DataSource ):
+class CatNormalizedDataSource( DataSource ):
     "Get cats raw data set, read from files"
 
     def __init__( self, params = None ):
-        super( CatRawDataSource, self ).__init__( params )
+        super().__init__( params )
         
     def getDatasets( self, isLoadWeights ):
     
@@ -69,6 +69,10 @@ class CatRawDataSource( DataSource ):
         self.transpose( trnDataSet )
         self.transpose( devDataSet )
         
+        # normalizetrnDataSet X
+        trnDataSet.X = self.normalize( trnDataSet.X )
+        devDataSet.X = self.normalize( devDataSet.X )
+
         return ( trnDataSet, devDataSet )
 
     def getWeights( self, tags ):
@@ -109,11 +113,11 @@ class CatRawDataSource( DataSource ):
     
         return n_weights
 
-class CatFlattenNormalizedDataSource( CatRawDataSource ):
+class CatFlattenNormalizedDataSource( CatNormalizedDataSource ):
     "Get cats row data set, flatten and normalize it"
 
     def __init__( self, params = None ):
-        super( CatRawDataSource, self ).__init__( params )
+        super( CatNormalizedDataSource, self ).__init__( params )
         
     def getDatasets( self, isLoadWeights ):
         # ancestor
@@ -123,10 +127,6 @@ class CatFlattenNormalizedDataSource( CatRawDataSource ):
         datasetTrn.X = self.flatten( datasetTrn.X )
         datasetDev.X = self.flatten( datasetDev.X )
     
-        # normalize X
-        datasetTrn.X = self.normalize( datasetTrn.X )
-        datasetDev.X = self.normalize( datasetDev.X )
-
         return ( datasetTrn, datasetDev )
         
         

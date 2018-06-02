@@ -488,7 +488,7 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
             regularizer_l2 = tf.contrib.layers.l2_regularizer( self.beta )
 
         curInput = self.ph_X
-
+        
         # Browse structure
         for structureItem in self.structure :
 
@@ -539,10 +539,11 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
                         weights_regularizer= regularizer_l2
                     )
 
-                    # next input in AZ
-                    curInput = AZ
             else :
                 raise ValueError( "Can't parse structure key '" + key + "'" )
+
+            # next input in AZ
+            curInput = AZ
 
         return AZ
 

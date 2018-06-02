@@ -9,17 +9,13 @@ import socket
 import platform
 
 from tkinter import *
-import numpy as np
 
 import const.constants as const
-from ml.machine import AbstractMachine
 
 # For debug
 debugUseScreen = True
-debugIdConconfig = 1
-        
+debugIdConconfig = 4
 
-from ml.data import DataSource, DataSet
 
 def instantiateClass( classFqName ) :
     module_name, class_name = classFqName.rsplit(".", 1)
@@ -72,23 +68,18 @@ def updateMachines( conn ):
 
     # Data sources
     configDatasourceResult = {}
-    
+
     # get data source section
     dataSourceConfs = iniMachines.items( "DataSources" )
 
     for dataSourceConf in dataSourceConfs :
 
-        machineName    = dataSourceConf[ 0 ]
-        datasourceLine = dataSourceConf[ 1 ]
-
-        # machine value is class, image width
-        datasourceValues     = datasourceLine.split( "," )
-        datasourceClass      = datasourceValues[ 0 ]
-        datasourceImageWidth = int( datasourceValues[ 1 ] )
+        machineName     = dataSourceConf[ 0 ]
+        datasourceClass = dataSourceConf[ 1 ]
 
         # save to conf
-        configDatasourceResult[ machineName ] = ( datasourceClass, datasourceImageWidth )
-    
+        configDatasourceResult[ machineName ] = datasourceClass
+
     return iniMachines, configDatasourceResult, configMachineFormsResult
 
 def prepareData( dataSource ):
@@ -139,34 +130,17 @@ if __name__ == '__main__':
         # Read configurations
         configs = db.getConfigsWithMaxDevAccuracy( conn )
 
-<<<<<<< HEAD
         if ( debugUseScreen ) :
             configDoer   = control.ConfigDoer     ( conn )
             hpDoer       = control.HyperParamsDoer( conn )
             runsDoer     = control.RunsDoer       ( conn )
             startRunDoer = control.StartRunDoer   ( conn, configMachinesForms )
-=======
-        configDoer   = control.ConfigDoer     ( conn )
-        hpDoer       = control.HyperParamsDoer( conn )
-        runsDoer     = control.RunsDoer       ( conn )
-        startRunDoer = control.StartRunDoer   ( conn, configMachinesForms )
->>>>>>> branch 'master' of https://github.com/loizbak/ml.git
 
-<<<<<<< HEAD
-=======
-        # For debug
-        screen = False
-        if ( screen ) :
->>>>>>> branch 'master' of https://github.com/loizbak/ml.git
             mainWindow = view.MainWindow( configDoer, hpDoer, runsDoer, startRunDoer )
             ( idConfig, buttonClicked, runParams ) = mainWindow.showAndSelectConf( configs )
         else :
             ( idConfig, buttonClicked, runParams ) = (
-<<<<<<< HEAD
                 debugIdConconfig,
-=======
-                1,
->>>>>>> branch 'master' of https://github.com/loizbak/ml.git
                 "Train",
                 { "comment": "", "tune": False, "showPlots": False, "nbTuning": 2, "isTensorboard": False, "isTensorboardFull": False }
             )
@@ -185,13 +159,13 @@ if __name__ == '__main__':
         print( config[ "structure" ] )
 
         # Get machine data source
-        machineDataSourceClass = configDatasources[ machineName ][ 0 ]
+        machineDataSourceClass = configDatasources[ machineName ]
         if ( machineDataSourceClass == None ) :
             raise ValueError( "Unknown machine data source class", machineName )
 
         dataSource = instantiateClass( machineDataSourceClass )
         # set image width
-        dataSource.setImageWidth( configDatasources[ machineName ][ 1 ] )
+        dataSource.setImageWidth( config[ "imageSize" ] )
 
         # Get machine class
         machineClass = iniMachines.get( "Classes", machineName )
@@ -199,7 +173,7 @@ if __name__ == '__main__':
             raise ValueError( "Unknown machine class", machineClass )
 
         ml = instantiateClass( machineClass )
-        
+
         # Define system infos
         systemInfos = {}
         hostname = socket.gethostname()
