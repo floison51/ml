@@ -13,6 +13,9 @@ from collections import OrderedDict
 
 import const.constants as const
 
+# Current DB version
+DB_VERSION = 2
+
 def createConfig( conn, name, structure, imageSize, machineName, hyper_params ) :
 
     # Id machine
@@ -118,7 +121,7 @@ def getOrCreateHyperParams( conn, hyper_params ) :
 def getConfig( conn, idConfig ) :
 
     from model.mlconfig import MlConfig
-    
+
     c = conn.cursor()
 
     cursor = c.execute(
@@ -129,10 +132,10 @@ def getConfig( conn, idConfig ) :
     result = MlConfig()
 
     for row in cursor :
-        
+
         iCol = 0;
-        
-        for colName in const.ConfigsDico.OBJECT_FIELDS :    
+
+        for colName in const.ConfigsDico.OBJECT_FIELDS :
             result[ colName ] = row[ iCol ]
             iCol += 1
 
@@ -231,8 +234,8 @@ def getConfigsWithMaxDevAccuracy( conn, idConfig = None ) :
         result = MlConfig()
 
         iCol = 0
-        
-        for colName in const.ConfigsDico.DISPLAY_FIELDS : 
+
+        for colName in const.ConfigsDico.DISPLAY_FIELDS :
             result[ colName ] = row[ iCol ]
             iCol += 1
 
@@ -321,16 +324,16 @@ def getMachineIdByName( conn, machineName ):
 def addUniqueMachineName( conn, machineName ) :
 
     c = conn.cursor();
-    
+
     # exists?
     idMachine = getMachineIdByName( conn, machineName )
-    
+
     if ( idMachine == None ) :
         cursor = c.execute( '''
             INSERT INTO machines ( name ) VALUES ( ? )''',
             ( machineName, )
         )
-    
+
         idMachine = cursor.lastrowid
 
     c.close();
@@ -347,11 +350,14 @@ def createRun( conn, idConfig, runHyperParams ) :
     config = getConfig( conn, idConfig )
 
     # Get hyperparams
-    idRunHyperParams = getOrCreateHyperParams( conn, runHyperParams );
+    idRunHyperParams = getOrCreateHyperParams( conn, runHyperParams )
+
+    # Save conf
+    json_conf_saved = json.dumps( config )
 
     cursor = c.execute( '''
-        INSERT INTO runs ( idConf, idHyperParams, date ) VALUES ( ?, ?, ? )''',
-        ( config[ "id" ], idRunHyperParams, datetime.datetime.now(), )
+        INSERT INTO runs ( idConf, json_conf_saved, idHyperParams, date ) VALUES ( ?, ?, ?, ? )''',
+        ( config[ "id" ], json_conf_saved, idRunHyperParams, datetime.datetime.now(), )
     )
 
     idRun = cursor.lastrowid
@@ -458,10 +464,11 @@ def getRunFromRow(row):
     result["elapsed_second"] = row[6]
     result["train_accuracy"] = row[7]
     result["dev_accuracy"] = row[8]
-    result["system_info"] = json.loads(row[9])
-    result["data_info"] = json.loads(row[10])
-    result["perf_info"] = json.loads(row[11])
-    result["result_info"] = json.loads(row[12])
+    result["conf_saved"] = json.loads(row[9])
+    result["system_info"] = json.loads(row[10])
+    result["data_info"] = json.loads(row[11])
+    result["perf_info"] = json.loads(row[12])
+    result["result_info"] = json.loads(row[13])
     return result
 
 def getRuns( conn, idConf ) :
@@ -478,11 +485,11 @@ def getRuns( conn, idConf ) :
 
     # TODO use dico
     for row in cursor :
-        
+
         result = getRunFromRow( row )
 
         results.append( result )
-        
+
     c.close();
 
     return results
@@ -506,6 +513,23 @@ def getRun( conn, idRun ) :
 
     return result
 
+def getDbVersion( c ) :
+
+    # Update run
+    cursor = c.execute( "select max( version ) from versions" )
+
+    result = None
+
+    for row in cursor :
+        result = row[ 0 ]
+
+    return result
+    
+def setDbVersion( c, dbVersion ) :
+
+    # Add version
+    c.execute( "INSERT INTO versions ( version ) VALUES ( ?)", ( dbVersion, ) )
+
 def initDb( key, dbFolder ) :
 
     # create dbFolder if needed
@@ -516,19 +540,63 @@ def initDb( key, dbFolder ) :
 
     c = conn.cursor();
 
-    # initialized?
+    # versions initialized ?
     try :
-        c.execute( "select * from runs" )
+        c.execute( "select * from versions" )
     except sqlite3.OperationalError as e :
         # init tables
-        if ( str( e ) == "no such table: runs" ) :
-            initTables( c )
+        if ( str( e ) == "no such table: versions" ) :
+            initVersionTable( c )
             # Save (commit) the changes
             conn.commit()
-
+            
+    # upgrade DB if needed
+    upgradeDb( c )
+    
     c.close();
 
+    # commit
+    conn.commit();
+            
     return conn;
+
+def upgradeDb( c ):
+    # Get current version
+    curDbVersion = getDbVersion( c )
+    while ( curDbVersion < DB_VERSION ) :
+
+        curDbVersion += 1
+
+        # execute patch
+        if ( curDbVersion == 1 ) :
+            initTables( c )
+        elif ( curDbVersion == 2 ) :
+            modifRunAddConfInfo( c )
+            
+        setDbVersion( c, curDbVersion )
+
+    
+def initVersionTable( c ):
+    "Init version table"
+
+    # create table dbVersion
+    c.execute( '''CREATE TABLE IF NOT EXISTS versions
+        (
+           id integer PRIMARY KEY AUTOINCREMENT,
+           version integer not null unique
+         )'''
+    )
+
+    c.execute( '''CREATE INDEX IF NOT EXISTS idx_versions_id on versions( id ) ''' )
+    c.execute( '''CREATE INDEX IF NOT EXISTS idx_versions_version on versions( version ) ''' )
+
+    ## Create default value
+    c.execute(
+        "insert into versions values( null, ? )",
+        (
+            0,   # Initial version
+        )
+    )
 
 def initTables( c ) :
 
@@ -579,34 +647,31 @@ def initTables( c ) :
            json_data_info text,
            json_perf_info text,
            json_result_info text,
+           json_conf_saved text,
            FOREIGN KEY (idConf) REFERENCES confs( id ),
            FOREIGN KEY (idHyperParams) REFERENCES hyperparams( id )
          )'''
     )
 
     # Indexes
-    c.execute( '''CREATE INDEX idx_machines_id on machines( id ) ''' )
-    c.execute( '''CREATE INDEX idx_machines_name on machines( name ) ''' )
+    c.execute( '''CREATE INDEX IF NOT EXISTS idx_machines_id on machines( id ) ''' )
+    c.execute( '''CREATE INDEX IF NOT EXISTS idx_machines_name on machines( name ) ''' )
 
-    c.execute( '''CREATE INDEX idx_configs_id on configs( id ) ''' )
-    c.execute( '''CREATE INDEX idx_configs_structure on configs( structure ) ''' )
+    c.execute( '''CREATE INDEX IF NOT EXISTS idx_configs_id on configs( id ) ''' )
+    c.execute( '''CREATE INDEX IF NOT EXISTS idx_configs_structure on configs( structure ) ''' )
 
-    c.execute( '''CREATE INDEX idx_hyperparams_id on hyperparams( id ) ''' )
-    c.execute( '''CREATE INDEX idx_hyperparams_structure on hyperparams( id ) ''' )
+    c.execute( '''CREATE INDEX IF NOT EXISTS idx_hyperparams_id on hyperparams( id ) ''' )
+    c.execute( '''CREATE INDEX IF NOT EXISTS idx_hyperparams_structure on hyperparams( id ) ''' )
 
-    c.execute( '''CREATE INDEX idx_runs_id on runs( id ) ''' )
-    c.execute( '''CREATE INDEX idx_runs_perf_index on runs( perf_index ) ''' )
-    c.execute( '''CREATE INDEX idx_runs_elapsed_second on runs( elapsed_second ) ''' )
-    c.execute( '''CREATE INDEX idx_runs_train_accuracy on runs( train_accuracy ) ''' )
-    c.execute( '''CREATE INDEX idx_runs_dev_accuracy on runs( dev_accuracy ) ''' )
+    c.execute( '''CREATE INDEX IF NOT EXISTS idx_runs_id on runs( id ) ''' )
+    c.execute( '''CREATE INDEX IF NOT EXISTS idx_runs_perf_index on runs( perf_index ) ''' )
+    c.execute( '''CREATE INDEX IF NOT EXISTS idx_runs_elapsed_second on runs( elapsed_second ) ''' )
+    c.execute( '''CREATE INDEX IF NOT EXISTS idx_runs_train_accuracy on runs( train_accuracy ) ''' )
+    c.execute( '''CREATE INDEX IF NOT EXISTS idx_runs_dev_accuracy on runs( dev_accuracy ) ''' )
 
-    ## Create default values
-    c.execute(
-        "insert into machines values( null, ? )",
-        ( 
-            const.MachinesDico.CARAC[ "name"  ][ 1 ],   #default value for name
-        ) 
-    )
+def modifRunAddConfInfo( c ) :
+    
+    c.execute( "alter table runs add column json_conf_saved text" )
 
 def test( conn ):
 
@@ -615,31 +680,31 @@ def test( conn ):
 
 #     # Create config
 #     hyperParams = { "beta": 100 }
-# 
+#
 #     idConfig = getOrCreateConfig( conn, "Hello conf 100", "[1]", hyperParams )
-# 
+#
 #     systemInfo = { "host": "12345678" }
 #     dataInfo = { "data": "chats" }
 #     perfInfo = { "perf": 4567 }
-# 
-# 
+#
+#
 #     runHyperParams = { const.KEY_BETA: 10, const.KEY_KEEP_PROB: 0.5 }
 #     idRun = createRun( conn, idConfig, runHyperParams )
-# 
+#
 #     updateRunBefore(
 #         conn, idRun,
 #         comment="comment",
 #         system_info=systemInfo, data_info=dataInfo
 #     )
-# 
+#
 #     run = getRun( conn, idRun )
 #     print( "Before:", str( run ) )
-# 
+#
 #     updateRunAfter(
 #         conn, idRun,
 #         perf_info = perfInfo, result_info={ "errors": [1,2,3] },
 #         perf_index=10, elapsed_second=20, train_accuracy=0.5, dev_accuracy=0.9
 #     )
-# 
+#
 #     run = getRun( conn, idRun )
 #     print( "After :", str( run ) )

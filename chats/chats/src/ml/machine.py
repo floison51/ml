@@ -20,7 +20,7 @@ import db.db as db
 import abc
 
 #To debug run iterations
-debugRun = False
+debugRun = True
 
 # Abstract class
 class AbstractMachine():
@@ -273,6 +273,8 @@ class AbstractMachine():
             # Do the training loop
             while ( not self.interrupted and not finished and ( iEpoch <= current_num_epochs ) ) :
 
+                self.interrupted = True
+                
                 epoch_cost = 0.                       # Defines a cost related to an epoch
 
                 if ( self.minibatch_size < 0 ) :
@@ -371,15 +373,13 @@ class AbstractMachine():
                 print( "Training has been interrupted by Ctrl-C" )
                 print( "Store current epoch number '" + str( iEpoch ) + "' in run hyper parameters" )
                 # Get runs and hps
-                run = db.getRun( self.conn, self.idRun )
+                run = db.getRun( conn, self.idRun )
                 idRunHps = run[ "idHyperParams" ]
-                runHps = db.getHyperParams( self.conn, idRunHps )
+                runHps = db.getHyperParams( conn, idRunHps )[ "hyperParameters" ]
                 # Modify num epochs
                 runHps[ const.KEY_NUM_EPOCHS ] = iEpoch
-                # save hps
-                idRunHps = db.getOrCreateHyperParams( conn, runHps )
                 # update run
-                db.updateRun( self.conn, self.idRun, idRunHps )
+                db.updateRun( conn, self.idRun, runHps )
 
             # Final cost
             print ("Parameters have been trained!")
