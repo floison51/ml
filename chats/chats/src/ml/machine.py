@@ -273,8 +273,6 @@ class AbstractMachine():
             # Do the training loop
             while ( not self.interrupted and not finished and ( iEpoch <= current_num_epochs ) ) :
 
-                self.interrupted = True
-                
                 epoch_cost = 0.                       # Defines a cost related to an epoch
 
                 if ( self.minibatch_size < 0 ) :
