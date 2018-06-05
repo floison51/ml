@@ -94,19 +94,20 @@ class RunsDico:
     KEYS = { "id", "idConf", "idHyperParams" }
     CARAC = {
         # Type, default value
-        "id"                : [ "int"      , None, None     ],
-        "dateTime"          : [ "datetime" , None, None     ],
-        "comment"           : [ "string"   , None, None     ],
-        "perf_index"        : [ "float"    , None, "{:.1f}" ],
-        "elapsed_second"    : [ "int"      , None, None ],
-        "train_accuracy"    : [ "float"    , None, "{:.2f}" ],
-        "dev_accuracy"      : [ "float"    , None, "{:.2f}" ],
-        "json_system_info"  : [ "json"     , None, None     ],
-        "json_data_info"    : [ "json"     , None, None     ],
-        "json_perf_info"    : [ "json"     , None, None     ],
-        "json_result_info"  : [ "json"     , None, None     ],
+        "id"                    : [ "int"      , None, None     ],
+        "dateTime"              : [ "datetime" , None, None     ],
+        "comment"               : [ "string"   , None, None     ],
+        "perf_index"            : [ "float"    , None, "{:.1f}" ],
+        "elapsed_second"        : [ "int"      , None, None ],
+        "train_accuracy"        : [ "float"    , None, "{:.2f}" ],
+        "dev_accuracy"          : [ "float"    , None, "{:.2f}" ],
+        "json_conf_saved_info"  : [ "json"     , None, None     ],
+        "json_system_info"      : [ "json"     , None, None     ],
+        "json_data_info"        : [ "json"     , None, None     ],
+        "json_perf_info"        : [ "json"     , None, None     ],
+        "json_result_info"      : [ "json"     , None, None     ],
         
     }
-    OBJECT_FIELDS  = [ "id", "dateTime", "comment", "perf_index", "elapsed_second", "train_accuracy", "dev_accuracy", "json_system_info", "json_data_info", "json_perf_info", "json_result_info" ]
-    DISPLAY_FIELDS = [ "comment", "train_accuracy", "dev_accuracy", "perf_index", "elapsed_second", "dateTime", "system_info", "data_info", "perf_info", "result_info" ]
+    OBJECT_FIELDS  = [ "id", "dateTime", "comment", "perf_index", "elapsed_second", "train_accuracy", "dev_accuracy", "json_conf_saved_info", "json_system_info", "json_data_info", "json_perf_info", "json_result_info" ]
+    DISPLAY_FIELDS = [ "comment", "train_accuracy", "dev_accuracy", "perf_index", "elapsed_second", "dateTime", "conf_saved_info", "system_info", "data_info", "perf_info", "result_info" ]
 

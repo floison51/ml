@@ -20,7 +20,7 @@ import db.db as db
 import abc
 
 #To debug run iterations
-debugRun = True
+debugRun = False
 
 # Abstract class
 class AbstractMachine():
@@ -57,10 +57,6 @@ class AbstractMachine():
     @abc.abstractmethod
     def accuracyEval( self, X, Y ):
         "Evaluate accurary"
-
-    @abc.abstractmethod
-    def devAccuracyUpdated( self, devAccuracy ):
-        "Updated accurary"
 
     @abc.abstractmethod
     def correctPredictionEval( self, X, Y ):
@@ -323,7 +319,7 @@ class AbstractMachine():
 
                         iteration += 1
 
-                if print_cost and iEpoch % 100 == 0:
+                if print_cost and iEpoch % 25 == 0:
                     print ("Cost after epoch %i, iteration %i: %f" % ( iEpoch, iteration, epoch_cost ) )
                     if ( iEpoch != 0 ) :
 
@@ -335,9 +331,6 @@ class AbstractMachine():
                         DEV_accuracy = self.accuracyEval( self.datasetDev.X, self.datasetDev.Y )
                         print( "  current: DEV accuracy: %f" % ( DEV_accuracy ) )
                         DEV_accuracies.append( DEV_accuracy )
-
-                        # tell it to rest of world
-                        self.devAccuracyUpdated( DEV_accuracy )
 
                 if print_cost == True and iEpoch % 5 == 0:
                     costs.append( epoch_cost )

@@ -455,20 +455,25 @@ def updateRunAfter(
 def getRunFromRow(row):
     # TODO : use dico
     result = {}
-    result["id"] = row[0]
-    result["idConf"] = row[1]
-    result["idHyperParams"] = row[2]
-    result["dateTime"] = row[3]
-    result["comment"] = row[4]
-    result["perf_index"] = row[5]
-    result["elapsed_second"] = row[6]
-    result["train_accuracy"] = row[7]
-    result["dev_accuracy"] = row[8]
-    result["conf_saved"] = json.loads(row[9])
-    result["system_info"] = json.loads(row[10])
-    result["data_info"] = json.loads(row[11])
-    result["perf_info"] = json.loads(row[12])
-    result["result_info"] = json.loads(row[13])
+    result["id"]                = row[0]
+    result["idConf"]            = row[1]
+    result["idHyperParams"]     = row[2]
+    result["dateTime"]          = row[3]
+    result["comment"]           = row[4]
+    result["perf_index"]        = row[5]
+    result["elapsed_second"]    = row[6]
+    result["train_accuracy"]    = row[7]
+    result["dev_accuracy"]      = row[8]
+    result["system_info"]       = json.loads(row[9])
+    result["data_info"]         = json.loads(row[10])
+    result["perf_info"]         = json.loads(row[11])
+    result["result_info"]       = json.loads(row[12])
+    raw_conf_saved = row[ 13 ]
+    if ( raw_conf_saved == None ) :
+        result["conf_saved_info"]    = {}
+    else :
+        result["conf_saved_info"]    = json.loads( raw_conf_saved )
+    
     return result
 
 def getRuns( conn, idConf ) :

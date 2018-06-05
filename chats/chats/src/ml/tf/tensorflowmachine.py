@@ -56,8 +56,21 @@ class AbstractTensorFlowMachine( AbstractMachine ):
     def sessionInit( self, sess ):
 
         if ( self.isTensorboard ) :
-            self.trn_writer = tf.summary.FileWriter( self.getTensorBoardFolder( "trn" ), sess.graph )
-            self.dev_writer = tf.summary.FileWriter( self.getTensorBoardFolder( "dev" ), sess.graph )
+
+            # delete files in run folder
+            trnFolder = self.getTensorBoardFolder( "trn" )
+            if tf.gfile.Exists( trnFolder ):
+                tf.gfile.DeleteRecursively( trnFolder )
+            tf.gfile.MakeDirs( trnFolder )
+
+            self.trn_writer = tf.summary.FileWriter( trnFolder, sess.graph )
+
+            devFolder = self.getTensorBoardFolder( "dev" )
+            if tf.gfile.Exists( devFolder ):
+                tf.gfile.DeleteRecursively( devFolder )
+            tf.gfile.MakeDirs( devFolder )
+
+            self.dev_writer = tf.summary.FileWriter( devFolder, sess.graph )
 
         # Run the initialization
         init = tf.global_variables_initializer()
@@ -113,8 +126,7 @@ class AbstractTensorFlowMachine( AbstractMachine ):
             if ( self.isTensorboard ) :
                 tf.summary.scalar( 'Cost', self.cost )
                 tf.summary.scalar( 'TRN Accuracy', self.accuracy )
-                tf.summary.scalar( 'DEV Accuracy', self.var_DEV_accuracy )
-
+ 
         # Merge all the summaries and write them out to /tmp/mnist_logs (by default)
         self.mergedSummaries = tf.summary.merge_all()
 
@@ -151,11 +163,6 @@ class AbstractTensorFlowMachine( AbstractMachine ):
 
         return accuracy, correct_prediction
 
-    def devAccuracyUpdated( self, devAccuracy ):
-        "Updated accuracy"
-        # save it placeholder to have graph in tensorboard
-        tf.assign( self.var_DEV_accuracy, devAccuracy )
-
     def persistParams( self, sess, idRun ):
 
         # lets save the parameters in a variable
@@ -171,11 +178,13 @@ class AbstractTensorFlowMachine( AbstractMachine ):
         print( "Model saved in path: %s" % save_path)
 
     def accuracyEval( self, X, Y ):
-        accuracy = self.accuracy.eval( { self.ph_X: X, self.ph_Y: Y, self.ph_KEEP_PROB: 1.0 } )
+        #Make sure KEEP_PROB = 1 and TRN_MODE = False
+        accuracy = self.accuracy.eval( { self.ph_X: X, self.ph_Y: Y, self.ph_KEEP_PROB: 1.0, self.ph_TRN_MODE: False } )
         return accuracy
 
     def correctPredictionEval( self, X, Y ):
-        correct_prediction = self.correct_prediction.eval( { self.ph_X: X, self.ph_Y: Y, self.ph_KEEP_PROB: 1.0 } )
+        #Make sure KEEP_PROB = 1 and TRN_MODE = False
+        correct_prediction = self.correct_prediction.eval( { self.ph_X: X, self.ph_Y: Y, self.ph_KEEP_PROB: 1.0, self.ph_TRN_MODE: False } )
         return correct_prediction
 
     def create_placeholders( self, X_shape, Y_shape ):
@@ -198,12 +207,8 @@ class AbstractTensorFlowMachine( AbstractMachine ):
         self.ph_X         = tf.placeholder( tf.float32, shape=X_shape, name = "X" )
         self.ph_Y         = tf.placeholder( tf.float32, shape=Y_shape, name = "Y" )
         self.ph_KEEP_PROB = tf.placeholder( tf.float32, name = "KEEP_PROB" )
-
-        # DEV accuracy estimation
-        self.var_DEV_accuracy = tf.get_variable( "DEV_accuracy", [] , dtype=tf.float32, trainable=False )
-
-        # Assign value
-        self.var_DEV_accuracy.assign( 0 )
+        # Training mode
+        self.ph_TRN_MODE  = tf.placeholder( tf.bool, name = "TRN_MODE" )
 
     @abc.abstractmethod
     def initialize_parameters( self, X_shape ):
@@ -219,7 +224,7 @@ class AbstractTensorFlowMachine( AbstractMachine ):
         X, Y, keep_prob,
     ):
 
-        feed_dict = { self.ph_X: X, self.ph_Y: Y, self.ph_KEEP_PROB: keep_prob }
+        feed_dict = { self.ph_X: X, self.ph_Y: Y, self.ph_KEEP_PROB: keep_prob, self.ph_TRN_MODE: True }
 
         # No mini-batch
         if ( self.isTensorboard and ( iteration % ( 100 * num_minibatches ) == 100 * num_minibatches - 1 ) ):  # Record execution stats
@@ -567,7 +572,7 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
                     if ( self.useBatchNormalization ) :
                         # Add batch normalization to speed-up gradiend descent convergence
                         # Not for training
-                        Z1 = tf.layers.batch_normalization( Z0, training=training )
+                        Z1 = tf.layers.batch_normalization( Z0, training=self.ph_TRN_MODE )
                     else :
                         Z1 = Z0
 
