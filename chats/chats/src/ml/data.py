@@ -13,6 +13,7 @@ class DataSource():
         '''
         Constructor
         '''
+        self.params = params
     
     def setImageWidth( self, nbPixels ):
         self.pxWidth = nbPixels
@@ -58,4 +59,7 @@ class DataSet() :
         self.imgPath = imgPath
         self.tag = tag;
         self.weight = weight
-            
+        self.isSupportBatchStreaming = False
+        
+
+           

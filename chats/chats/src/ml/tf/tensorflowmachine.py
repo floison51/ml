@@ -11,8 +11,21 @@ from tensorflow.python.framework import ops
 
 import os as os
 
+import math
+import numpy as np
+import matplotlib.pyplot as plt
+import random
+import sys
+import time
+import os
+import shutil
+from collections import OrderedDict
+
+import db.db as db
+
 # Abstract classes
 import abc
+from ml.tf.tfdatasource import TensorFlowDataSource
 
 TENSORFLOW_SAVE_DIR = os.getcwd().replace( "\\", "/" ) + "/run/tf-save/"  + AbstractMachine.APP_KEY
 TENSORBOARD_LOG_DIR = os.getcwd().replace( "\\", "/" ) + "/run/tf-board/" + AbstractMachine.APP_KEY
@@ -45,7 +58,6 @@ class AbstractTensorFlowMachine( AbstractMachine ):
     def getSession( self ):
 
         sess = tf.Session()
-        self.sessionInit( sess )
         return sess
 
     def getTensorBoardFolder( self, what ) :
@@ -53,7 +65,7 @@ class AbstractTensorFlowMachine( AbstractMachine ):
         folder = TENSORBOARD_LOG_DIR + "/" + what + "/" + str( self.idRun )
         return folder
 
-    def sessionInit( self, sess ):
+    def initVariables( self, sess ):
 
         if ( self.isTensorboard ) :
 
@@ -76,20 +88,20 @@ class AbstractTensorFlowMachine( AbstractMachine ):
         init = tf.global_variables_initializer()
         sess.run( init )
 
+
     @abc.abstractmethod
     def parseStructure( self, strStructure ):
         "Parse provided string structure into machine dependent model"
 
-    def modelInit( self, strStructure, X_shape, Y_shape, training ):
+    def modelInit( self, strStructure, X_shape, X_type, Y_shape, Y_type, training ):
 
-        ops.reset_default_graph()                         # to be able to rerun the model without overwriting tf variables
         tf.set_random_seed( 1 )                             # to keep consistent results
 
         # parse structure
         self.structure = self.parseStructure( strStructure )
 
         # Create Placeholders of shape (n_x, n_y)
-        self.create_placeholders( X_shape, Y_shape )
+        self.create_placeholders( X_shape, X_type, Y_shape, Y_type )
 
         # Initialize parameters
         self.initialize_parameters( X_shape )
@@ -100,7 +112,8 @@ class AbstractTensorFlowMachine( AbstractMachine ):
         ### END CODE HERE ###
 
         # Cost function: Add cost function to tensorflow graph
-        self.define_cost( Z_last, self.ph_Y, self.datasetTrn.weight )
+        # TODO weight
+        self.define_cost( Z_last, self.Y, 1 )
 
         # Back-propagation: Define the tensorflow optimizer. Use an AdamOptimizer.
         # Decaying learning rate
@@ -114,19 +127,23 @@ class AbstractTensorFlowMachine( AbstractMachine ):
         self.optimizer = tf.train.AdamOptimizer( learning_rate ).minimize( self.cost, global_step = global_step )
 
         # Accuracy and correct prediction
-        self.accuracy, self.correct_prediction = self.defineAccuracy( self.ph_Y, Z_last )
+        self.accuracy, self.correct_prediction = self.defineAccuracy( self.Y, Z_last )
 
         # Tensorboard summaries
         with tf.name_scope( 'LearningRate' ):
             if ( self.isTensorboard ) :
+                tf.summary.scalar( 'Num epoch', self.var_numEpoch )
                 tf.summary.scalar( 'Step', global_step )
                 tf.summary.scalar( 'learning_rate', learning_rate )
 
         with tf.name_scope( 'Result' ):
             if ( self.isTensorboard ) :
                 tf.summary.scalar( 'Cost', self.cost )
+
+                #Don'a dd accuracy as it is re-used DEV accuracy, this mismatches graph
                 tf.summary.scalar( 'TRN Accuracy', self.accuracy )
- 
+                tf.summary.scalar( 'DEV Accuracy', self.var_DEV_accuracy )
+
         # Merge all the summaries and write them out to /tmp/mnist_logs (by default)
         self.mergedSummaries = tf.summary.merge_all()
 
@@ -177,17 +194,22 @@ class AbstractTensorFlowMachine( AbstractMachine ):
         save_path = self.tfSaver.save( sess, save_dir )
         print( "Model saved in path: %s" % save_path)
 
-    def accuracyEval( self, X, Y ):
+    def accuracyEval( self, handle, what ):
         #Make sure KEEP_PROB = 1 and TRN_MODE = False
-        accuracy = self.accuracy.eval( { self.ph_X: X, self.ph_Y: Y, self.ph_KEEP_PROB: 1.0, self.ph_TRN_MODE: False } )
+        accuracy = self.accuracy.eval( { self.datasetHandle: handle, self.ph_KEEP_PROB: 1.0, self.ph_TRN_MODE: False } )
+
+        if ( what == "dev" ) :
+            # Update accuracy dev variable
+            self.var_DEV_accuracy.load( accuracy )
+
         return accuracy
 
-    def correctPredictionEval( self, X, Y ):
+    def correctPredictionEval( self, handle ):
         #Make sure KEEP_PROB = 1 and TRN_MODE = False
-        correct_prediction = self.correct_prediction.eval( { self.ph_X: X, self.ph_Y: Y, self.ph_KEEP_PROB: 1.0, self.ph_TRN_MODE: False } )
+        correct_prediction = self.correct_prediction.eval( { self.datasetHandle: handle, self.ph_KEEP_PROB: 1.0, self.ph_TRN_MODE: False } )
         return correct_prediction
 
-    def create_placeholders( self, X_shape, Y_shape ):
+    def create_placeholders( self, X_shape, X_type, Y_shape, Y_type ):
         """
         Creates the placeholders for the tensorflow session.
 
@@ -204,11 +226,35 @@ class AbstractTensorFlowMachine( AbstractMachine ):
           In fact, the number of examples during test/train is different.
         """
 
-        self.ph_X         = tf.placeholder( tf.float32, shape=X_shape, name = "X" )
-        self.ph_Y         = tf.placeholder( tf.float32, shape=Y_shape, name = "Y" )
+        # dataset handle, allows to swith from/to datasets
+        self.datasetHandle = tf.placeholder( tf.string, shape=[], name="Dataset_TRN_DEV" )
+
+        # Default type
+        if ( X_type == None ) :
+            X_type = tf.float32
+
+        # Default type
+        if ( Y_type == None ) :
+            Y_type = tf.float32
+
+        # Iterator for ( X, Y )
+        dataset_Iterator = tf.data.Iterator.from_string_handle(
+            self.datasetHandle,
+            output_types  = { "X": X_type  , "Y": Y_type  },
+            output_shapes = { "X": X_shape , "Y": Y_shape }
+        )
+
+        # next X and Y
+        nextSlice = dataset_Iterator.get_next()
+        self.X = nextSlice[ "X" ]
+        self.Y = nextSlice[ "Y" ]
+
         self.ph_KEEP_PROB = tf.placeholder( tf.float32, name = "KEEP_PROB" )
         # Training mode
         self.ph_TRN_MODE  = tf.placeholder( tf.bool, name = "TRN_MODE" )
+
+        self.var_numEpoch     = tf.get_variable( "NumEpoch"    , [] , dtype=tf.int32  , trainable=False )
+        self.var_DEV_accuracy = tf.get_variable( "DEV_accuracy", [] , dtype=tf.float32, trainable=False )
 
     @abc.abstractmethod
     def initialize_parameters( self, X_shape ):
@@ -221,10 +267,10 @@ class AbstractTensorFlowMachine( AbstractMachine ):
     def runIteration(
         self,
         iteration, num_minibatches, sess,
-        X, Y, keep_prob,
+        handle, keep_prob,
     ):
 
-        feed_dict = { self.ph_X: X, self.ph_Y: Y, self.ph_KEEP_PROB: keep_prob, self.ph_TRN_MODE: True }
+        feed_dict = { self.datasetHandle: handle, self.ph_KEEP_PROB: keep_prob, self.ph_TRN_MODE: True }
 
         # No mini-batch
         if ( self.isTensorboard and ( iteration % ( 100 * num_minibatches ) == 100 * num_minibatches - 1 ) ):  # Record execution stats
@@ -241,7 +287,7 @@ class AbstractTensorFlowMachine( AbstractMachine ):
             if ( self.isTensorboard ) :
                 #run without meta data
                 summary, _ , curCost = sess.run(
-                    [ self.mergedSummaries, self.optimizer, self. cost ], feed_dict=feed_dict
+                    [ self.mergedSummaries, self.optimizer, self.cost ], feed_dict=feed_dict
                 )
                 self.trn_writer.add_summary( summary, iteration )
             else :
@@ -523,7 +569,7 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
         if ( self.beta != 0 ) :
             regularizer_l2 = tf.contrib.layers.l2_regularizer( self.beta )
 
-        curInput = self.ph_X
+        curInput = self.X
 
         # Browse structure
         for structureItem in self.structure :
@@ -632,3 +678,270 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
 
         else :
             self.cost = raw_cost
+
+#*********************************************************************************************
+# Estimation
+#*********************************************************************************************
+    def optimizeModel(
+        self, conn, idRun,
+        structure,
+        hyperParams,
+        print_cost = True, show_plot = True, extractImageErrors = True
+    ):
+
+        costs = []                                     # To keep track of the cost
+        DEV_accuracies = []                            # for DEV accuracy graph
+
+        # Get hyper parameters from dico
+        self.beta           = hyperParams[ const.KEY_BETA ]
+        self.keep_prob      = hyperParams[ const.KEY_KEEP_PROB ]
+        self.num_epochs     = hyperParams[ const.KEY_NUM_EPOCHS ]
+        self.minibatch_size = hyperParams[ const.KEY_MINIBATCH_SIZE ]
+
+        self.start_learning_rate         = hyperParams[ const.KEY_START_LEARNING_RATE ]
+        self.learning_rate_decay_nb      = hyperParams[ const.KEY_LEARNING_RATE_DECAY_NB ]
+        self.learning_rate_decay_percent = hyperParams[ const.KEY_LEARNING_RATE_DECAY_PERCENT ]
+
+        self.useBatchNormalization = hyperParams[ const.KEY_USE_BATCH_NORMALIZATION ]
+
+        ops.reset_default_graph()                         # to be able to rerun the model without overwriting tf variables
+
+        # Start the session to compute the tensorflow graph
+        with self.getSession() as sess:
+
+            # Convert ( nbLines, dims... ) to ( None, dims... )
+            self.tfDatasetTrn = tf.data.Dataset.from_tensor_slices(
+                {
+                    "X" : self.datasetTrn.X,
+                    "Y" : self.datasetTrn.Y,
+                }
+            )
+
+            # Required to use batch ti get a ( ?, ... ) shape
+            # Data set, repeat num_epochs, minibatch_size slices
+            self.tfDatasetTrn = self.tfDatasetTrn.repeat( self.num_epochs ).batch( self.minibatch_size )
+
+            X_shape = self.tfDatasetTrn.output_shapes[ "X" ]
+            Y_shape = self.tfDatasetTrn.output_shapes[ "Y" ]
+
+            X_type = self.tfDatasetTrn.output_types[ "X" ]
+            Y_type = self.tfDatasetTrn.output_types[ "Y" ]
+
+
+            self.tfDatasetDev = tf.data.Dataset.from_tensor_slices(
+                {
+                    "X" : self.datasetDev.X,
+                    "Y" : self.datasetDev.Y
+                }
+            )
+
+            # Data set, repeat num_epochs, minibatch_size slices
+            self.tfDatasetDev = self.tfDatasetDev.repeat( self.num_epochs ).batch( self.minibatch_size )
+
+            self.modelInit( structure, X_shape, X_type, Y_shape, Y_type, training=True )
+
+            seed = 3 # to keep consistent results
+
+            # Start time
+            tsStart = time.time()
+
+            # time to make sure we trace something each N minuts
+            tsTraceStart = tsStart
+
+            # initialise iterators.
+            iteratorTrn = self.tfDatasetTrn.make_initializable_iterator()
+            iteratorDev = self.tfDatasetDev.make_initializable_iterator()
+
+            sess.run( iteratorTrn.initializer )
+            sess.run( iteratorDev.initializer )
+
+            # Initialize the iterator
+            handleTrn = sess.run( iteratorTrn.string_handle() )
+            handleDev = sess.run( iteratorDev.string_handle() )
+
+            self.initVariables( sess )
+
+            # current iteration
+            iteration = 0
+
+            ## optimisation may overshoot locally
+            ## To avoid returning an overshoot, we detect it and run extra epochs if needed
+            finalizationMode = False
+            current_num_epochs = hyperParams[ const.KEY_NUM_EPOCHS ]
+            iEpoch = 0
+            minCost = 99999999999999
+            minCostFinalization = 99999999999999
+            finished = False
+
+            # intercept Ctrl-C
+            self.interrupted = False
+            import signal
+            # signal.signal( signal.SIGINT, self.signal_handler )
+
+            # Do the training loop
+            while ( not self.interrupted and not finished and ( iEpoch <= current_num_epochs ) ) :
+
+                epoch_cost = 0.                       # Defines a cost related to an epoch
+
+                if ( self.minibatch_size < 0 ) :
+
+                    # No mini-batch : do a gradient descent for whole data
+
+                    epoch_cost = self.runIteration(
+                        iEpoch, 1, sess,
+                        handleTrn, self.keep_prob,
+                    )
+
+                    iteration += 1
+
+                else:
+
+                    # Minibatch mode, non handled by data source
+                    m = self.dataInfo[ const.KEY_TRN_X_SIZE ]              # m : number of examples in the train set)
+                    num_minibatches = math.ceil( m / self.minibatch_size ) # number of minibatches of size minibatch_size in the train set
+
+                    for iterationMinibatch in range( 1, num_minibatches + 1 ) :
+
+                        minibatch_cost = self.runIteration(
+                            iteration, num_minibatches, sess,
+                            handleTrn, self.keep_prob
+                        )
+
+                        epoch_cost += minibatch_cost / num_minibatches
+
+                        if ( print_cost and iteration == 0 ) :
+                            # Display iteration 0 to allow verify cost calculation accross machines
+                            print ("Cost after epoch %i, iteration %i: %f" % ( iEpoch, iteration, epoch_cost ) )
+
+                        # time to trace?
+                        tsTraceNow = time.time()
+                        tsTraceElapsed = tsTraceNow - tsTraceStart
+
+                        # Each 60 seconds
+                        if ( tsTraceElapsed >= 60 ) :
+
+                            # Display iteration 0 to allow verify cost calculation accross machines
+                            print( "TRACE : cost after epoch %i, iteration %i, iterationMinibatch %i / %i: %f" % ( iEpoch, iteration, iterationMinibatch, num_minibatches, epoch_cost ) )
+                            # reset trace start
+                            tsTraceStart = tsTraceNow
+
+                        iteration += 1
+
+                if print_cost and iEpoch % 25 == 0:
+                    print ("Cost after epoch %i, iteration %i: %f" % ( iEpoch, iteration, epoch_cost ) )
+                    if ( iEpoch != 0 ) :
+
+                        # Performance counters
+                        curElapsedSeconds, curPerfIndex = self.getPerfCounters( tsStart, iEpoch, self.datasetTrn.X.shape )
+                        print( "  current: elapsedTime:", curElapsedSeconds, "perfIndex:", curPerfIndex )
+
+                        #  calculate DEV accuracy
+                        DEV_accuracy = self.accuracyEval( handleDev, "dev" )
+                        print( "  current: DEV accuracy: %f" % ( DEV_accuracy ) )
+                        DEV_accuracies.append( DEV_accuracy )
+
+                if print_cost == True and iEpoch % 5 == 0:
+                    costs.append( epoch_cost )
+
+                # Record min cost
+                minCost = min( minCost, epoch_cost )
+
+                # Next epoch
+                iEpoch += 1
+                self.var_numEpoch.load( iEpoch )
+
+                # Close to finish?
+                if ( not finalizationMode and ( iEpoch > current_num_epochs ) ) :
+                    # Activate finalization mode
+                    finalizationMode = True
+                    # local overshoot?
+                    if ( epoch_cost > minCost ) :
+                        # Yes, run some extra epochs
+                        print( "WARNING: local cost overshoot detected, adding maximum 100 epochs to leave local cost overshoot" )
+                        current_num_epochs += 100
+                        minCostFinalization = minCost
+
+                if ( finalizationMode ) :
+                    # Check overshoot is finished
+                    if ( epoch_cost <= minCostFinalization ) :
+                        # finished
+                        finished = True
+
+            self.modelOptimizeEnd( sess )
+
+            if ( self.interrupted ) :
+                print( "Training has been interrupted by Ctrl-C" )
+                print( "Store current epoch number '" + str( iEpoch ) + "' in run hyper parameters" )
+                # Get runs and hps
+                run = db.getRun( conn, self.idRun )
+                idRunHps = run[ "idHyperParams" ]
+                runHps = db.getHyperParams( conn, idRunHps )[ "hyperParameters" ]
+                # Modify num epochs
+                runHps[ const.KEY_NUM_EPOCHS ] = iEpoch
+                # update run
+                db.updateRun( conn, self.idRun, runHps )
+
+            # Final cost
+            print ("Parameters have been trained!")
+            print( "Final cost:", epoch_cost )
+
+            ## Elapsed (seconds)
+            elapsedSeconds, perfIndex = self.getPerfCounters( tsStart, iEpoch, self.datasetTrn.X.shape )
+            perfInfo = {}
+
+            print( "Elapsed (s):", elapsedSeconds )
+            print( "Perf index :", perfIndex )
+
+            self.persistParams( sess, idRun )
+
+            accuracyTrain = self.accuracyEval( self.datasetTrn.X, self.datasetTrn.Y, "trn" )
+            print ( "Train Accuracy:", accuracyTrain )
+
+            accuracyDev = self.accuracyEval( self.datasetDev.X, self.datasetDev.Y, "dev" )
+            print ( "Dev Accuracy:", accuracyDev )
+
+            if ( show_plot ) :
+                # plot the cost
+                plt.plot(np.squeeze(costs))
+                plt.ylabel('cost')
+                plt.xlabel('iterations (per tens)')
+                plt.title("Start learning rate =" + str( self.start_learning_rate ) )
+                plt.show()
+
+                # plot the accuracies
+                plt.plot( np.squeeze( DEV_accuracies ) )
+                plt.ylabel('DEV accuracy')
+                plt.xlabel('iterations (100)')
+                plt.title("Start learning rate =" + str( self.start_learning_rate ) )
+                plt.show()
+
+            ## Errors
+            resultInfo = {}
+
+            if ( extractImageErrors ) :
+
+                # Lists of OK for training
+                oks_train  = self.correctPredictionEval(  self.datasetTrn.X, self.datasetTrn.Y )
+                map1, map2 = self.statsExtractErrors( "train", dataset = self.datasetTrn, oks = oks_train, show_plot=show_plot )
+                # Errors nb by data tag
+                resultInfo[ const.KEY_TRN_NB_ERROR_BY_TAG ] = map1
+                resultInfo[ const.KEY_TRN_PC_ERROR_BY_TAG ] = map2
+
+                oks_dev   = self.correctPredictionEval(  self.datasetDev.X, self.datasetDev.Y )
+                map1, map2 = self.statsExtractErrors( "dev", dataset = self.datasetDev, oks = oks_dev, show_plot=show_plot )
+                # Errors nb by data tag
+                resultInfo[ const.KEY_DEV_NB_ERROR_BY_TAG ] = map1
+                resultInfo[ const.KEY_DEV_PC_ERROR_BY_TAG ] = map2
+
+            # Update DB run after execution, add extra info
+            db.updateRunAfter(
+                conn, idRun,
+                perf_info = perfInfo, result_info=resultInfo,
+                perf_index=perfIndex,
+                elapsed_second = elapsedSeconds,
+                train_accuracy=accuracyTrain.astype( float ),
+                dev_accuracy=accuracyDev.astype( float )
+            )
+
+            return accuracyDev, accuracyTrain
+

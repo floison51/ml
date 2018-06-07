@@ -19,9 +19,6 @@ import db.db as db
 # Abtract classes
 import abc
 
-#To debug run iterations
-debugRun = False
-
 # Abstract class
 class AbstractMachine():
     # Abstract class
@@ -39,7 +36,7 @@ class AbstractMachine():
         '''
 
     @abc.abstractmethod
-    def modelInit( self, X_shape, training ):
+    def modelInit( self, strStructure, X_shape, X_type, Y_type, Y_shape, training ):
         "Initializse the model"
 
     @abc.abstractmethod
@@ -47,7 +44,7 @@ class AbstractMachine():
         "Get a new calculation session"
 
     @abc.abstractmethod
-    def modelOptimizeEnd( self ):
+    def modelOptimizeEnd( self, session ):
         "End of model optimization"
 
     @abc.abstractmethod
@@ -55,7 +52,7 @@ class AbstractMachine():
         "Persist parameters"
 
     @abc.abstractmethod
-    def accuracyEval( self, X, Y ):
+    def accuracyEval( self, X, Y, what ):
         "Evaluate accurary"
 
     @abc.abstractmethod
@@ -208,6 +205,9 @@ class AbstractMachine():
         print( "Please, wait an epoch before training stops" )
         self.interrupted = True
 
+    def initializeDataset( self, session, dataset ):
+        pass
+    
     def optimizeModel(
         self, conn, idRun,
         structure,
@@ -215,9 +215,8 @@ class AbstractMachine():
         print_cost = True, show_plot = True, extractImageErrors = True
     ):
 
-        m = self.datasetTrn.X.shape[ 0 ]       # m : number of examples in the train set)
-        costs = []                             # To keep track of the cost
-        DEV_accuracies = []                    # for DEV accuracy graph
+        costs = []                                     # To keep track of the cost
+        DEV_accuracies = []                            # for DEV accuracy graph
 
         # Get hyper parameters from dico
         self.beta           = hyperParams[ const.KEY_BETA ]
@@ -233,17 +232,20 @@ class AbstractMachine():
 
         # Convert ( nbLines, dims... ) to ( None, dims... )
         X_shape = [ None ]
-        X_shape.extend( self.datasetTrn.X.shape[ 1: ] )
+        X_shape.extend( self.dataInfo[ const.KEY_TRN_X_SHAPE ][ 1: ] )
 
         Y_shape = [ None ]
-        Y_shape.extend( self.datasetTrn.Y.shape[ 1: ] )
+        Y_shape.extend( self.dataInfo[ const.KEY_TRN_Y_SHAPE ][ 1: ] )
 
-        self.modelInit( structure, X_shape, Y_shape, training=True )
+        self.modelInit( structure, X_shape, None, Y_shape, None, training=True )
 
         seed = 3 # to keep consistent results
 
         # Start time
         tsStart = time.time()
+
+        # time to make sure we trace something each N minuts
+        tsTraceStart = tsStart
 
         # Start the session to compute the tensorflow graph
 
@@ -264,8 +266,10 @@ class AbstractMachine():
             # intercept Ctrl-C
             self.interrupted = False
             import signal
-            signal.signal( signal.SIGINT, self.signal_handler )
+            # signal.signal( signal.SIGINT, self.signal_handler )
 
+            self.initializeDataset( sess, self.datasetTrn )
+            
             # Do the training loop
             while ( not self.interrupted and not finished and ( iEpoch <= current_num_epochs ) ) :
 
@@ -283,14 +287,13 @@ class AbstractMachine():
                     iteration += 1
 
                 else:
-                    # Minibatch mode
+                    
+                    # Minibatch mode, non handled by data source
+                    m = self.dataInfo[ const.KEY_TRN_X_SIZE ]      # m : number of examples in the train set)
                     num_minibatches = int( m / self.minibatch_size ) # number of minibatches of size minibatch_size in the train set
                     seed = seed + 1
 
                     minibatches = self.random_mini_batches( self.datasetTrn.X, self.datasetTrn.Y, self.minibatch_size, seed )
-
-                    # When to show debug info : 4 by minibatch
-                    debugIterationShow = num_minibatches // 4
 
                     iterationMinibatch = 0
 
@@ -303,7 +306,7 @@ class AbstractMachine():
 
                         minibatch_cost = self.runIteration(
                             iteration, num_minibatches, sess,
-                            minibatch_X, minibatch_Y, self.keep_prob
+                            ( minibatch_X, minibatch_Y ), self.keep_prob
                         )
 
                         epoch_cost += minibatch_cost / num_minibatches
@@ -312,11 +315,18 @@ class AbstractMachine():
                             # Display iteration 0 to allow verify cost calculation accross machines
                             print ("Cost after epoch %i, iteration %i: %f" % ( iEpoch, iteration, epoch_cost ) )
 
-                        if ( debugRun and ( iterationMinibatch % debugIterationShow ) == 0 ) :
+                        # time to trace?
+                        tsTraceNow = time.time()
+                        tsTraceElapsed = tsTraceNow - tsTraceStart
+                        
+                        # Each 60 seconds
+                        if ( tsTraceElapsed >= 60 ) :
 
                             # Display iteration 0 to allow verify cost calculation accross machines
-                            print ("DEBUG : cost after epoch %i, iteration %i, iterationMinibatch %i / %i: %f" % ( iEpoch, iteration, iterationMinibatch, num_minibatches, epoch_cost ) )
-
+                            print( "TRACE : cost after epoch %i, iteration %i, iterationMinibatch %i / %i: %f" % ( iEpoch, iteration, iterationMinibatch, num_minibatches, epoch_cost ) )
+                            # reset trace start
+                            tsTraceStart = tsTraceNow
+                            
                         iteration += 1
 
                 if print_cost and iEpoch % 25 == 0:
@@ -328,7 +338,7 @@ class AbstractMachine():
                         print( "  current: elapsedTime:", curElapsedSeconds, "perfIndex:", curPerfIndex )
 
                         #  calculate DEV accuracy
-                        DEV_accuracy = self.accuracyEval( self.datasetDev.X, self.datasetDev.Y )
+                        DEV_accuracy = self.accuracyEval( self.datasetDev.X, self.datasetDev.Y, "dev" )
                         print( "  current: DEV accuracy: %f" % ( DEV_accuracy ) )
                         DEV_accuracies.append( DEV_accuracy )
 
@@ -340,6 +350,7 @@ class AbstractMachine():
 
                 # Next epoch
                 iEpoch += 1
+                self.var_numEpoch.load( iEpoch )
 
                 # Close to finish?
                 if ( not finalizationMode and ( iEpoch > current_num_epochs ) ) :
@@ -358,8 +369,8 @@ class AbstractMachine():
                         # finished
                         finished = True
 
-            self.modelOptimizeEnd()
-
+            self.modelOptimizeEnd( sess )
+            
             if ( self.interrupted ) :
                 print( "Training has been interrupted by Ctrl-C" )
                 print( "Store current epoch number '" + str( iEpoch ) + "' in run hyper parameters" )
@@ -385,10 +396,10 @@ class AbstractMachine():
 
             self.persistParams( sess, idRun )
 
-            accuracyTrain = self.accuracyEval( self.datasetTrn.X, self.datasetTrn.Y )
+            accuracyTrain = self.accuracyEval( self.datasetTrn.X, self.datasetTrn.Y, "trn" )
             print ( "Train Accuracy:", accuracyTrain )
 
-            accuracyDev = self.accuracyEval( self.datasetDev.X, self.datasetDev.Y )
+            accuracyDev = self.accuracyEval( self.datasetDev.X, self.datasetDev.Y, "dev" )
             print ( "Dev Accuracy:", accuracyDev )
 
             if ( show_plot ) :
