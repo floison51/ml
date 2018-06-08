@@ -1,9 +1,5 @@
 /saved/
-/__pycache__/
-/const/__pycache__/
-/data/__pycache__/
-/view/__pycache__/
-/control/__pycache__/
+**/__pycache__
 /errors/
 /temp.py
 /temp/
