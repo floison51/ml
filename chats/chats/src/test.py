@@ -104,93 +104,7 @@ def prepareData( dataSource ):
 
     return datasetTrn, datasetDev, dataInfo
 
-def testDataSource() :
-    import tensorflow as tf
-    import numpy as np
 
-    # making fake data using numpy
-#    train_data = ( np.random.sample( (10,2) ), np.random.sample( (10,1) ))
-#    test_data = (np.random.sample((5,2)), np.random.sample((5,1)))
-
-    train_data = {
-        "X": np.array( [ [ 1.0, 2.0 ], [ 3.0, 4.0 ], [ 5.0, 6.0 ] ] ) ,
-        "Y": np.array( [ [ 1.0 ], [ 3.0 ], [ 5.0 ] ] )
-    }
-    test_data =  {
-        "X": np.array( [ [ 1.0, 2.0 ], [ 3.0, 4.0 ] ] ),
-        "Y": np.array( [ [ 1.0 ], [ 3.0 ] ] )
-    }
- 
-    catDs = cats.CatNormalizedDataSource( { "pxWidth": 64 } )
-    catDs.setImageWidth( 64 )
-    ( dataTrn, dataDev, _ ) = catDs.getDatasets( False )
- 
-    train_data = { "X": dataTrn.X, "Y": dataTrn.Y }
-    test_data  = { "X": dataDev.X, "Y": dataDev.Y }
- 
-    print( "Numpy X shape :", train_data[ "X" ].shape )
-    print( "Numpy X type  :", train_data[ "X" ].dtype )
-    print( "Numpy Y shape :", train_data[ "Y" ].shape )
-    print( "Numpy Y type  :", train_data[ "Y" ].dtype )
- 
-    datasetTrn = tf.data.Dataset.from_tensor_slices( train_data ).batch( 2 )
-    datasetDev = tf.data.Dataset.from_tensor_slices( test_data ).shuffle( 100 ).batch( 2 )
- 
-    train_iterator = datasetTrn.make_initializable_iterator()
-    test_iterator  = datasetDev.make_initializable_iterator()
- 
-    print( "train_iterator.output_shapes:", train_iterator.output_shapes )
-    print( "train_iterator.output_types:", train_iterator.output_types )
- 
- 
-    handle = tf.placeholder(tf.string, shape=[], name="Dataset_placeholder" )
-    print( "handle shape:", handle.get_shape() )
- 
-    X_shape = datasetTrn.output_shapes[ "X" ]
-    Y_shape = datasetTrn.output_shapes[ "Y" ]
-     
-    X_type = datasetTrn.output_types[ "X" ]
-    Y_type = datasetTrn.output_types[ "Y" ]
-
-    print( "dataset x shape:", X_shape )
-     
-    theIter = tf.data.Iterator.from_string_handle(
-        handle, 
-        output_types={'X': X_type, 'Y': Y_type },
-        # {'X': TensorShape([Dimension(None), Dimension(2)]), 'Y': TensorShape([Dimension(None), Dimension(1)])}
-        output_shapes={ "X": X_shape, "Y": Y_shape }
-    )
- 
-    x = theIter.get_next()[ "X" ]
-    print( "x shape:", x.shape )
- 
-    y_hat = x + 1
- 
-    with tf.Session() as sess:
- 
-        init = tf.global_variables_initializer()
-        sess.run( init )
- 
-        # initialise iterators.
-        sess.run( train_iterator.initializer )
-        sess.run( test_iterator.initializer  )
- 
-        train_handle = sess.run( train_iterator.string_handle() )
-        test_handle  = sess.run( test_iterator.string_handle() )
- 
-        print( "TRN:" )
-        for i in range( 1 ):
-            data = sess.run( x, feed_dict = {handle: train_handle } )
-            print( data.shape )
- 
-        print( "DEV:" )
-        for i in range( 1 ):
-            data = sess.run( y_hat, feed_dict = {handle: test_handle} )
-            print( data.shape )
- 
-    sys.exit()
-
-    
 if __name__ == '__main__':
 
     # Init DB
@@ -219,7 +133,7 @@ if __name__ == '__main__':
             ( idConfig, buttonClicked, runParams ) = (
                 debugIdConconfig,
                 "Train",
-                { "comment": "", "tune": False, "showPlots": False, "nbTuning": 2, "isTensorboard": True, "isTensorboardFull": True }
+                { "comment": "", "tune": False, "showPlots": False, "nbTuning": 2, "isTensorboard": False, "isTensorboardFull": False }
             )
 
         # cancel?

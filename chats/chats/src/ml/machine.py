@@ -237,11 +237,13 @@ class AbstractMachine():
         # Convert ( nbLines, dims... ) to ( None, dims... )
         X_shape = [ None ]
         X_shape.extend( self.dataInfo[ const.KEY_TRN_X_SHAPE ][ 1: ] )
-
+        X_type = self.datasetTrn.X.dtype()
+        
         Y_shape = [ None ]
         Y_shape.extend( self.dataInfo[ const.KEY_TRN_Y_SHAPE ][ 1: ] )
+        Y_type = self.datasetTrn.Y.dtype()
 
-        self.modelInit( structure, X_shape, None, Y_shape, None, training=True )
+        self.modelInit( structure, X_shape, X_type, Y_shape, Y_type, training=True )
 
         seed = 3 # to keep consistent results
 

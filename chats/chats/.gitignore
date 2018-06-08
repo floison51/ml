@@ -10,3 +10,4 @@
 /run/
 /test-dataset.py
 /test-regressor.py
+/minst.py
