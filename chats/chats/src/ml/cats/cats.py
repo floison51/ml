@@ -70,6 +70,11 @@ class CatRawDataSource( DataSource ):
         self.transpose( datasetTrn )
         self.transpose( datasetDev )
 
+        dataInfo = self.getDataInfo( datasetTrn, datasetDev )
+
+        return ( datasetTrn, datasetDev, dataInfo )
+
+    def getDataInfo( self, datasetTrn, datasetDev ) :
         # Store data info in a dico
         dataInfo = {
             const.KEY_TRN_X_SIZE    : datasetTrn.X.shape[0],
@@ -84,8 +89,8 @@ class CatRawDataSource( DataSource ):
 
             const.KEY_IS_SUPPORT_BATCH_STREAMING : False
         }
-
-        return ( datasetTrn, datasetDev, dataInfo )
+        
+        return dataInfo
 
     def getWeights( self, tags ):
 
@@ -148,11 +153,14 @@ class CatFlattenNormalizedDataSource( CatNormalizedDataSource ):
 
     def getDatasets( self, isLoadWeights ):
         # ancestor
-        ( datasetTrn, datasetDev, dataInfo ) = super().getDatasets( isLoadWeights )
+        ( datasetTrn, datasetDev, _ ) = super().getDatasets( isLoadWeights )
 
         # flatten data
         datasetTrn.X = self.flatten( datasetTrn.X )
         datasetDev.X = self.flatten( datasetDev.X )
+
+        # re-compute data info because shape changed
+        dataInfo = self.getDataInfo( datasetTrn, datasetDev )
 
         return ( datasetTrn, datasetDev, dataInfo )
 

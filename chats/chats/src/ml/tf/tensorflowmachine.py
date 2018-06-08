@@ -65,7 +65,7 @@ class AbstractTensorFlowMachine( AbstractMachine ):
         folder = TENSORBOARD_LOG_DIR + "/" + what + "/" + str( self.idRun )
         return folder
 
-    def initVariables( self, sess ):
+    def initSessionVariables( self, sess ):
 
         if ( self.isTensorboard ) :
 
@@ -92,6 +92,9 @@ class AbstractTensorFlowMachine( AbstractMachine ):
     @abc.abstractmethod
     def parseStructure( self, strStructure ):
         "Parse provided string structure into machine dependent model"
+
+    def useDataSource( self ):
+        return False
 
     def modelInit( self, strStructure, X_shape, X_type, Y_shape, Y_type, training ):
 
@@ -194,9 +197,15 @@ class AbstractTensorFlowMachine( AbstractMachine ):
         save_path = self.tfSaver.save( sess, save_dir )
         print( "Model saved in path: %s" % save_path)
 
-    def accuracyEval( self, handle, what ):
-        #Make sure KEEP_PROB = 1 and TRN_MODE = False
-        accuracy = self.accuracy.eval( { self.datasetHandle: handle, self.ph_KEEP_PROB: 1.0, self.ph_TRN_MODE: False } )
+    def accuracyEval( self, XY, what ):
+        
+        #Make sure KEEP_PROB = 1 and TRN_MODE = False        
+        if ( self.useDataSource() ) :
+            feed_dict = { self.datasetHandle: XY, self.ph_KEEP_PROB: 1.0, self.ph_TRN_MODE: False }
+        else :
+            feed_dict = { self.X: XY[ 0 ], self.Y: XY[ 1 ], self.ph_KEEP_PROB: 1.0, self.ph_TRN_MODE: False }
+
+        accuracy = self.accuracy.eval( feed_dict )
 
         if ( what == "dev" ) :
             # Update accuracy dev variable
@@ -204,9 +213,14 @@ class AbstractTensorFlowMachine( AbstractMachine ):
 
         return accuracy
 
-    def correctPredictionEval( self, handle ):
-        #Make sure KEEP_PROB = 1 and TRN_MODE = False
-        correct_prediction = self.correct_prediction.eval( { self.datasetHandle: handle, self.ph_KEEP_PROB: 1.0, self.ph_TRN_MODE: False } )
+    def correctPredictionEval( self, XY ):
+        # Make sure KEEP_PROB = 1 and TRN_MODE = False
+        if ( self.useDataSource() ) :
+            feed_dict = { self.datasetHandle: XY, self.ph_KEEP_PROB: 1.0, self.ph_TRN_MODE: False }
+        else :
+            feed_dict = { self.X: XY[ 0 ], self.Y: XY[ 1 ], self.ph_KEEP_PROB: 1.0, self.ph_TRN_MODE: False }
+            
+        correct_prediction = self.correct_prediction.eval( feed_dict )
         return correct_prediction
 
     def create_placeholders( self, X_shape, X_type, Y_shape, Y_type ):
@@ -226,8 +240,7 @@ class AbstractTensorFlowMachine( AbstractMachine ):
           In fact, the number of examples during test/train is different.
         """
 
-        # dataset handle, allows to swith from/to datasets
-        self.datasetHandle = tf.placeholder( tf.string, shape=[], name="Dataset_TRN_DEV" )
+        useDataSource = self.useDataSource()
 
         # Default type
         if ( X_type == None ) :
@@ -237,17 +250,26 @@ class AbstractTensorFlowMachine( AbstractMachine ):
         if ( Y_type == None ) :
             Y_type = tf.float32
 
-        # Iterator for ( X, Y )
-        dataset_Iterator = tf.data.Iterator.from_string_handle(
-            self.datasetHandle,
-            output_types  = { "X": X_type  , "Y": Y_type  },
-            output_shapes = { "X": X_shape , "Y": Y_shape }
-        )
+        if ( useDataSource ) :
+            # dataset handle, allows to swith from/to datasets
+            self.datasetHandle = tf.placeholder( tf.string, shape=[], name="Dataset_TRN_DEV" )
 
-        # next X and Y
-        nextSlice = dataset_Iterator.get_next()
-        self.X = nextSlice[ "X" ]
-        self.Y = nextSlice[ "Y" ]
+            # Iterator for ( X, Y )
+            dataset_Iterator = tf.data.Iterator.from_string_handle(
+                self.datasetHandle,
+                output_types  = { "X": X_type  , "Y": Y_type  },
+                output_shapes = { "X": X_shape , "Y": Y_shape }
+            )
+
+            # next X and Y
+            nextSlice = dataset_Iterator.get_next()
+            self.X = nextSlice[ "X" ]
+            self.Y = nextSlice[ "Y" ]
+
+        else :
+
+            self.X = tf.placeholder( X_type, shape=X_shape, name="X" )
+            self.Y = tf.placeholder( Y_type, shape=Y_shape, name="Y" )
 
         self.ph_KEEP_PROB = tf.placeholder( tf.float32, name = "KEEP_PROB" )
         # Training mode
@@ -267,10 +289,13 @@ class AbstractTensorFlowMachine( AbstractMachine ):
     def runIteration(
         self,
         iteration, num_minibatches, sess,
-        handle, keep_prob,
+        XY, keep_prob,
     ):
 
-        feed_dict = { self.datasetHandle: handle, self.ph_KEEP_PROB: keep_prob, self.ph_TRN_MODE: True }
+        if ( self.useDataSource() ) :
+            feed_dict = { self.datasetHandle: XY, self.ph_KEEP_PROB: keep_prob, self.ph_TRN_MODE: True }
+        else :
+            feed_dict = { self.X: XY[ 0 ], self.Y: XY[ 1 ], self.ph_KEEP_PROB: keep_prob, self.ph_TRN_MODE: True }
 
         # No mini-batch
         if ( self.isTensorboard and ( iteration % ( 100 * num_minibatches ) == 100 * num_minibatches - 1 ) ):  # Record execution stats
@@ -401,7 +426,7 @@ class TensorFlowSimpleMachine( AbstractTensorFlowMachine ):
         Z = None
         A = None
 
-        curInput = self.ph_X
+        curInput = self.X
 
         for i in range( 1, len( structure0 ) ):
             # Adding a name scope ensures logical grouping of the layers in the graph.
@@ -505,6 +530,9 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
         super( AbstractTensorFlowMachine, self ).__init__( params )
         self.isTensorboard     = False
         self.isTensorboardFull = False
+
+    def useDataSource( self ):
+        return True
 
     def parseStructure( self, strStructure ):
         ## Normalize structure
@@ -759,7 +787,7 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
             handleTrn = sess.run( iteratorTrn.string_handle() )
             handleDev = sess.run( iteratorDev.string_handle() )
 
-            self.initVariables( sess )
+            self.initSessionVariables( sess )
 
             # current iteration
             iteration = 0
@@ -811,7 +839,7 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
 
                         if ( print_cost and iteration == 0 ) :
                             # Display iteration 0 to allow verify cost calculation accross machines
-                            print ("Cost after epoch %i, iteration %i: %f" % ( iEpoch, iteration, epoch_cost ) )
+                            print ("Cost after epoch %i, iteration %i: %f, mini-batch cost: %f" % ( iEpoch, iteration, epoch_cost, minibatch_cost ) )
 
                         # time to trace?
                         tsTraceNow = time.time()
@@ -828,7 +856,7 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
                         iteration += 1
 
                 if print_cost and iEpoch % 25 == 0:
-                    print ("Cost after epoch %i, iteration %i: %f" % ( iEpoch, iteration, epoch_cost ) )
+                    print ("Cost after epoch %i, iteration %i: %f, mini-batch cost: %f" % ( iEpoch, iteration, epoch_cost, minibatch_cost ) )
                     if ( iEpoch != 0 ) :
 
                         # Performance counters

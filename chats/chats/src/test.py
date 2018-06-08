@@ -14,7 +14,7 @@ import const.constants as const
 from ml.cats import cats
 
 # For debug
-debugUseScreen = True
+debugUseScreen = False
 debugIdConconfig = 1
 
 DB_DIR = os.getcwd().replace( "\\", "/" ) + "/run/db/chats-debug"

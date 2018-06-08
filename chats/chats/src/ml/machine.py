@@ -44,6 +44,10 @@ class AbstractMachine():
         "Get a new calculation session"
 
     @abc.abstractmethod
+    def initSessionVariables( self, sess ):
+        "Initialize session variables"
+        
+    @abc.abstractmethod
     def modelOptimizeEnd( self, session ):
         "End of model optimization"
 
@@ -52,11 +56,11 @@ class AbstractMachine():
         "Persist parameters"
 
     @abc.abstractmethod
-    def accuracyEval( self, X, Y, what ):
+    def accuracyEval( self, XY, what ):
         "Evaluate accurary"
 
     @abc.abstractmethod
-    def correctPredictionEval( self, X, Y ):
+    def correctPredictionEval( self, XY ):
         "Return a 0/1 vector containing correct predictions"
 
     def addSystemInfo( self, systemInfo ):
@@ -207,7 +211,7 @@ class AbstractMachine():
 
     def initializeDataset( self, session, dataset ):
         pass
-    
+
     def optimizeModel(
         self, conn, idRun,
         structure,
@@ -251,6 +255,9 @@ class AbstractMachine():
 
         with self.getSession() as sess:
 
+            # initialize session variables
+            self.initSessionVariables( sess )
+
             # current iteration
             iteration = 0
 
@@ -269,7 +276,7 @@ class AbstractMachine():
             # signal.signal( signal.SIGINT, self.signal_handler )
 
             self.initializeDataset( sess, self.datasetTrn )
-            
+
             # Do the training loop
             while ( not self.interrupted and not finished and ( iEpoch <= current_num_epochs ) ) :
 
@@ -287,10 +294,10 @@ class AbstractMachine():
                     iteration += 1
 
                 else:
-                    
+
                     # Minibatch mode, non handled by data source
-                    m = self.dataInfo[ const.KEY_TRN_X_SIZE ]      # m : number of examples in the train set)
-                    num_minibatches = int( m / self.minibatch_size ) # number of minibatches of size minibatch_size in the train set
+                    m = self.dataInfo[ const.KEY_TRN_X_SIZE ]               # m : number of examples in the train set)
+                    num_minibatches =  math.ceil( m / self.minibatch_size ) # number of minibatches of size minibatch_size in the train set
                     seed = seed + 1
 
                     minibatches = self.random_mini_batches( self.datasetTrn.X, self.datasetTrn.Y, self.minibatch_size, seed )
@@ -313,12 +320,12 @@ class AbstractMachine():
 
                         if ( print_cost and iteration == 0 ) :
                             # Display iteration 0 to allow verify cost calculation accross machines
-                            print ("Cost after epoch %i, iteration %i: %f" % ( iEpoch, iteration, epoch_cost ) )
+                            print ("Cost after epoch %i, iteration %i: %f, mini-batch cost: %f" % ( iEpoch, iteration, epoch_cost, minibatch_cost ) )
 
                         # time to trace?
                         tsTraceNow = time.time()
                         tsTraceElapsed = tsTraceNow - tsTraceStart
-                        
+
                         # Each 60 seconds
                         if ( tsTraceElapsed >= 60 ) :
 
@@ -326,11 +333,11 @@ class AbstractMachine():
                             print( "TRACE : cost after epoch %i, iteration %i, iterationMinibatch %i / %i: %f" % ( iEpoch, iteration, iterationMinibatch, num_minibatches, epoch_cost ) )
                             # reset trace start
                             tsTraceStart = tsTraceNow
-                            
+
                         iteration += 1
 
                 if print_cost and iEpoch % 25 == 0:
-                    print ("Cost after epoch %i, iteration %i: %f" % ( iEpoch, iteration, epoch_cost ) )
+                    print ("Cost after epoch %i, iteration %i: %f, mini-batch cost: %f" % ( iEpoch, iteration, epoch_cost, minibatch_cost ) )
                     if ( iEpoch != 0 ) :
 
                         # Performance counters
@@ -338,7 +345,7 @@ class AbstractMachine():
                         print( "  current: elapsedTime:", curElapsedSeconds, "perfIndex:", curPerfIndex )
 
                         #  calculate DEV accuracy
-                        DEV_accuracy = self.accuracyEval( self.datasetDev.X, self.datasetDev.Y, "dev" )
+                        DEV_accuracy = self.accuracyEval( ( self.datasetDev.X, self.datasetDev.Y ), "dev" )
                         print( "  current: DEV accuracy: %f" % ( DEV_accuracy ) )
                         DEV_accuracies.append( DEV_accuracy )
 
@@ -370,7 +377,7 @@ class AbstractMachine():
                         finished = True
 
             self.modelOptimizeEnd( sess )
-            
+
             if ( self.interrupted ) :
                 print( "Training has been interrupted by Ctrl-C" )
                 print( "Store current epoch number '" + str( iEpoch ) + "' in run hyper parameters" )
@@ -396,10 +403,10 @@ class AbstractMachine():
 
             self.persistParams( sess, idRun )
 
-            accuracyTrain = self.accuracyEval( self.datasetTrn.X, self.datasetTrn.Y, "trn" )
+            accuracyTrain = self.accuracyEval( ( self.datasetTrn.X, self.datasetTrn.Y ), "trn" )
             print ( "Train Accuracy:", accuracyTrain )
 
-            accuracyDev = self.accuracyEval( self.datasetDev.X, self.datasetDev.Y, "dev" )
+            accuracyDev = self.accuracyEval( ( self.datasetDev.X, self.datasetDev.Y ), "dev" )
             print ( "Dev Accuracy:", accuracyDev )
 
             if ( show_plot ) :
@@ -423,13 +430,13 @@ class AbstractMachine():
             if ( extractImageErrors ) :
 
                 # Lists of OK for training
-                oks_train  = self.correctPredictionEval(  self.datasetTrn.X, self.datasetTrn.Y )
+                oks_train  = self.correctPredictionEval( ( self.datasetTrn.X, self.datasetTrn.Y ) )
                 map1, map2 = self.statsExtractErrors( "train", dataset = self.datasetTrn, oks = oks_train, show_plot=show_plot )
                 # Errors nb by data tag
                 resultInfo[ const.KEY_TRN_NB_ERROR_BY_TAG ] = map1
                 resultInfo[ const.KEY_TRN_PC_ERROR_BY_TAG ] = map2
 
-                oks_dev   = self.correctPredictionEval(  self.datasetDev.X, self.datasetDev.Y )
+                oks_dev   = self.correctPredictionEval( ( self.datasetDev.X, self.datasetDev.Y ) )
                 map1, map2 = self.statsExtractErrors( "dev", dataset = self.datasetDev, oks = oks_dev, show_plot=show_plot )
                 # Errors nb by data tag
                 resultInfo[ const.KEY_DEV_NB_ERROR_BY_TAG ] = map1
@@ -450,7 +457,7 @@ class AbstractMachine():
     def runIteration(
         self,
         iteration, num_minibatches, sess,
-        X, Y, keep_prob
+        XY, keep_prob
     ):
         # Abstract methode
         raise ValueError( "Abstract method" )
@@ -475,8 +482,8 @@ class AbstractMachine():
 
         # Step 1: Shuffle (X, Y)
         permutation = list( np.random.permutation( m ) )
-        shuffled_X = X[ permutation, : ]
-        shuffled_Y = Y[ permutation, : ].reshape( ( m, Y.shape[1] ) )
+        shuffled_X = X # [ permutation, : ]
+        shuffled_Y = Y # [ permutation, : ].reshape( ( m, Y.shape[1] ) )
 
         # Step 2: Partition (shuffled_X, shuffled_Y). Minus the end case.
         num_complete_minibatches = math.floor( m / mini_batch_size) # number of mini batches of size mini_batch_size in your partitioning
