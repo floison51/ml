@@ -202,12 +202,12 @@ class AbstractTensorFlowMachine( AbstractMachine ):
     def correctPredictionEval( self, inputData ):
 
         feed_dict = self.getAccuracyEvalFeedDict( inputData )
-        
+
         sigmaCorrectPredictionInitialized = False
         sigmaCorrectPrediction = np.array( (), dtype=np.bool )
-        
+
         if ( self.useDataSource() ) :
-            
+
             # Iterate data source
             try:
                 while ( True ) :
@@ -218,11 +218,11 @@ class AbstractTensorFlowMachine( AbstractMachine ):
 #                         sigmaCorrectPredictionInitialized = True
 #                     else :
                     sigmaCorrectPrediction = np.append( sigmaCorrectPrediction, correct_predictions )
-                    
+
             except tf.errors.OutOfRangeError:
                 # walk finished
                 pass
-            
+
         else :
             # One shot calculation
             sigmaCorrectPrediction = self.correct_prediction.eval( feed_dict )
@@ -239,7 +239,7 @@ class AbstractTensorFlowMachine( AbstractMachine ):
 
         # global accuracy
         accuracy = sigmaAccuracy / sigmaNb
-        
+
         if ( what == "dev" ) :
             # Update accuracy dev variable
             self.var_DEV_accuracy.load( accuracy )
@@ -525,6 +525,9 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
 
         super().create_placeholders( X_shape, X_type, Y_shape, Y_type )
 
+        #Num eopochs for trn dataset
+        self.phTrnNumEpoch = tf.placeholder( tf.int64, name = "phTrnNumEpoch" )
+
         # Data set handle (human identifier)
         self.dsHandle = tf.placeholder(tf.string, shape=[], name="ph_Dataset" )
 
@@ -773,7 +776,7 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
         # Cache for performance
         self.tfDatasetTrn = self.tfDatasetTrn.cache()
         # Data set, repeat num_epochs, minibatch_size slices
-        self.tfDatasetTrn = self.tfDatasetTrn.prefetch( self.minibatch_size * 2 ).batch( self.minibatch_size ).repeat( self.num_epochs )
+        self.tfDatasetTrn = self.tfDatasetTrn.prefetch( self.minibatch_size * 2 ).batch( self.minibatch_size ).repeat( self.phTrnNumEpoch )
 
         self.tfDatasetDev = tf.data.Dataset.from_tensor_slices(
             (
@@ -782,6 +785,8 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
             )
         )
 
+        # Cache for performance
+        self.tfDatasetDev = self.tfDatasetDev.cache()
         # Data set, repeat num_epochs, minibatch_size slices
         self.tfDatasetDev = self.tfDatasetDev.prefetch( self.minibatch_size * 2 ).batch( self.minibatch_size )
 
@@ -797,7 +802,7 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
 
             # initialise variables iterators.
             sess.run( tf.global_variables_initializer() )
-            sess.run( [ trnIterator.initializer, devIterator.initializer ] )
+            sess.run( [ trnIterator.initializer, devIterator.initializer ], { self.phTrnNumEpoch : self.num_epochs } )
 
             # The `Iterator.string_handle()` method returns a tensor that can be evaluated
             # and used to feed the `handle` placeholder.
@@ -942,9 +947,9 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
 
             self.persistParams( sess, idRun )
 
-            # Rewind data sets
-            sess.run( [ trnIterator.initializer, devIterator.initializer ] )
-            
+            # Rewind data sets, 1 epoch for TRN data set
+            sess.run( [ trnIterator.initializer, devIterator.initializer ], { self.phTrnNumEpoch : 1 } )
+
             accuracyTrain = self.accuracyEval( trnHandle, "trn" )
             print ( "Train Accuracy:", accuracyTrain )
 
@@ -971,9 +976,9 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
 
             if ( extractImageErrors ) :
 
-                # Rewind data sets
-                sess.run( [ trnIterator.initializer, devIterator.initializer ] )
-            
+                # Rewind data sets, 1 epoch for TRN data set
+                sess.run( [ trnIterator.initializer, devIterator.initializer ], { self.phTrnNumEpoch : 1 } )
+
                 # Lists of OK for training
                 oks_train  = self.correctPredictionEval( trnHandle )
                 map1, map2 = self.statsExtractErrors( "train", dataset = self.datasetTrn, oks = oks_train, show_plot=show_plot )
