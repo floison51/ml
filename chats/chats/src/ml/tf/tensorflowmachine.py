@@ -130,7 +130,7 @@ class AbstractTensorFlowMachine( AbstractMachine ):
         self.optimizer = tf.train.AdamOptimizer( learning_rate ).minimize( self.cost, global_step = global_step )
 
         # Accuracy and correct prediction
-        self.accuracy, self.correct_prediction = self.defineAccuracy( self.Y, Z_last )
+        self.correct_prediction = self.defineAccuracy( self.Y, Z_last )
 
         # Tensorboard summaries
         with tf.name_scope( 'LearningRate' ):
@@ -178,10 +178,7 @@ class AbstractTensorFlowMachine( AbstractMachine ):
         # To calculate the correct predictions
         prediction = tf.round( tf.sigmoid( Z_last ) )
         correct_prediction = tf.equal( prediction, Y )
-        # Calculate accuracy on the test set
-        accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
-
-        return accuracy, correct_prediction
+        return correct_prediction
 
     def persistParams( self, sess, idRun ):
 
@@ -197,25 +194,57 @@ class AbstractTensorFlowMachine( AbstractMachine ):
         save_path = self.tfSaver.save( sess, save_dir )
         print( "Model saved in path: %s" % save_path)
 
-    def accuracyEval( self, X, Y, what ):
+    def getAccuracyEvalFeedDict( self, inputData ) :
+        # Make sure KEEP_PROB = 1 and TRN_MODE = False
+        feed_dict = { self.X: inputData[ 0 ], self.Y: inputData[ 1 ], self.ph_KEEP_PROB: 1.0, self.ph_TRN_MODE: False }
+        return feed_dict
 
-        #Make sure KEEP_PROB = 1 and TRN_MODE = False
-        feed_dict = { self.ph_X: X, self.ph_Y: Y, self.ph_KEEP_PROB: 1.0, self.ph_TRN_MODE: False }
+    def correctPredictionEval( self, inputData ):
 
-        accuracy = self.accuracy.eval( feed_dict )
+        feed_dict = self.getAccuracyEvalFeedDict( inputData )
+        
+        sigmaCorrectPredictionInitialized = False
+        sigmaCorrectPrediction = np.array( (), dtype=np.bool )
+        
+        if ( self.useDataSource() ) :
+            
+            # Iterate data source
+            try:
+                while ( True ) :
+                    correct_predictions = self.correct_prediction.eval( feed_dict )
+                    # Add terms
+#                     if ( not sigmaCorrectPredictionInitialized ) :
+#                         sigmaCorrectPrediction = correct_predictions
+#                         sigmaCorrectPredictionInitialized = True
+#                     else :
+                    sigmaCorrectPrediction = np.append( sigmaCorrectPrediction, correct_predictions )
+                    
+            except tf.errors.OutOfRangeError:
+                # walk finished
+                pass
+            
+        else :
+            # One shot calculation
+            sigmaCorrectPrediction = self.correct_prediction.eval( feed_dict )
 
+        return sigmaCorrectPrediction
+
+    def accuracyEval( self, inputData, what ) :
+
+        correct_predictions = self.correctPredictionEval( inputData )
+
+        # sum terms
+        sigmaAccuracy = np.sum( correct_predictions )
+        sigmaNb = correct_predictions.shape[ 0 ]
+
+        # global accuracy
+        accuracy = sigmaAccuracy / sigmaNb
+        
         if ( what == "dev" ) :
             # Update accuracy dev variable
             self.var_DEV_accuracy.load( accuracy )
 
         return accuracy
-
-    def correctPredictionEval( self, X, Y ):
-        # Make sure KEEP_PROB = 1 and TRN_MODE = False
-        feed_dict = { self.ph_X: X, self.ph_Y: Y, self.ph_KEEP_PROB: 1.0, self.ph_TRN_MODE: False }
-
-        correct_prediction = self.correct_prediction.eval( feed_dict )
-        return correct_prediction
 
     def create_placeholders( self, X_shape, X_type, Y_shape, Y_type ):
         "Creates the placeholders for the tensorflow session."
@@ -235,13 +264,16 @@ class AbstractTensorFlowMachine( AbstractMachine ):
     def forward_propagation( self, X_shape, training ):
         "Define the forward propagation"
 
+    def getRunIterationFeedDict( self, inputData, keep_prob ):
+        feed_dict = { self.X: inputData[ 0 ], self.Y: inputData[ 1 ], self.ph_KEEP_PROB: keep_prob, self.ph_TRN_MODE: True }
+        return feed_dict
+
     def runIteration(
-        self,
-        iteration, num_minibatches, sess,
-        X, Y, keep_prob,
+        self, sess, input, keep_prob,
+        iteration, num_minibatches
     ):
 
-        feed_dict = { self.ph_X: X, self.ph_Y: Y, self.ph_KEEP_PROB: keep_prob, self.ph_TRN_MODE: True }
+        feed_dict = self.getRunIterationFeedDict( input, keep_prob )
 
         # No mini-batch
         if ( self.isTensorboard and ( iteration % ( 100 * num_minibatches ) == 100 * num_minibatches - 1 ) ):  # Record execution stats
@@ -262,7 +294,7 @@ class AbstractTensorFlowMachine( AbstractMachine ):
                 )
                 self.trn_writer.add_summary( summary, iteration )
             else :
-                _ , curCost = sess.run(
+               _ , curCost = sess.run(
                     [ self.optimizer, self.cost], feed_dict=feed_dict
                 )
 
@@ -309,8 +341,8 @@ class TensorFlowSimpleMachine( AbstractTensorFlowMachine ):
 
         super().create_placeholders( X_shape, X_type, Y_shape, Y_type )
 
-        self.ph_X = tf.placeholder( X_type, shape=X_shape, name="X" )
-        self.ph_Y = tf.placeholder( Y_type, shape=Y_shape, name="Y" )
+        self.X = tf.placeholder( X_type, shape=X_shape, name="X" )
+        self.Y = tf.placeholder( Y_type, shape=Y_shape, name="Y" )
 
     def initialize_parameters( self, shape_X ):
         """
@@ -380,7 +412,7 @@ class TensorFlowSimpleMachine( AbstractTensorFlowMachine ):
         Z = None
         A = None
 
-        curInput = self.ph_X
+        curInput = self.X
 
         for i in range( 1, len( structure0 ) ):
             # Adding a name scope ensures logical grouping of the layers in the graph.
@@ -679,41 +711,19 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
         else :
             self.cost = raw_cost
 
+    def getRunIterationFeedDict( self, inputData, keep_prob ):
+        feed_dict = { self.dsHandle: inputData, self.ph_KEEP_PROB: keep_prob, self.ph_TRN_MODE: True }
+        return feed_dict
+
+    def getAccuracyEvalFeedDict( self, inputData ) :
+        # Make sure KEEP_PROB = 1 and TRN_MODE = False
+        feed_dict = { self.dsHandle: inputData, self.ph_KEEP_PROB: 1.0, self.ph_TRN_MODE: False }
+        return feed_dict
+
+
 #*********************************************************************************************
 # Estimation
 #*********************************************************************************************
-    def runIteration(
-        self,
-        sess, input, iteration, num_minibatches, keep_prob,
-    ):
-
-        feed_dict = { self.dsHandle: input, self.ph_KEEP_PROB: keep_prob, self.ph_TRN_MODE: True }
-
-        # No mini-batch
-        if ( self.isTensorboard and ( iteration % ( 100 * num_minibatches ) == 100 * num_minibatches - 1 ) ):  # Record execution stats
-            run_options = tf.RunOptions( trace_level = tf.RunOptions.FULL_TRACE )
-            run_metadata = tf.RunMetadata()
-            summary, _ , curCost = sess.run(
-                [ self.mergedSummaries, self.optimizer, self.cost ], feed_dict=feed_dict,
-                options=run_options,run_metadata=run_metadata
-            )
-            self.trn_writer.add_run_metadata( run_metadata, 'step%03d' % iteration )
-            self.trn_writer.add_summary( summary, iteration )
-        else :
-
-            if ( self.isTensorboard ) :
-                #run without meta data
-                summary, _ , curCost = sess.run(
-                    [ self.mergedSummaries, self.optimizer, self.cost ], feed_dict=feed_dict
-                )
-                self.trn_writer.add_summary( summary, iteration )
-            else :
-                _ , curCost = sess.run(
-                    [ self.optimizer, self.cost], feed_dict=feed_dict
-                )
-
-        return curCost
-
     def optimizeModel(
         self, conn, idRun,
         structure,
@@ -760,9 +770,10 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
             )
         )
 
-        # Required to use batch ti get a ( ?, ... ) shape
+        # Cache for performance
+        self.tfDatasetTrn = self.tfDatasetTrn.cache()
         # Data set, repeat num_epochs, minibatch_size slices
-        self.tfDatasetTrn = self.tfDatasetTrn.repeat( self.num_epochs ).batch( self.minibatch_size )
+        self.tfDatasetTrn = self.tfDatasetTrn.prefetch( self.minibatch_size * 2 ).batch( self.minibatch_size ).repeat( self.num_epochs )
 
         self.tfDatasetDev = tf.data.Dataset.from_tensor_slices(
             (
@@ -772,7 +783,7 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
         )
 
         # Data set, repeat num_epochs, minibatch_size slices
-        self.tfDatasetDev = self.tfDatasetDev.batch( self.minibatch_size )
+        self.tfDatasetDev = self.tfDatasetDev.prefetch( self.minibatch_size * 2 ).batch( self.minibatch_size )
 
         trnIterator = self.tfDatasetTrn.make_initializable_iterator()
         devIterator = self.tfDatasetDev.make_initializable_iterator()
@@ -781,12 +792,6 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
         with self.getSession() as sess:
 
             seed = 3 # to keep consistent results
-
-            # Start time
-            tsStart = time.time()
-
-            # time to make sure we trace something each N minuts
-            tsTraceStart = tsStart
 
             # self.initSessionVariables( sess )
 
@@ -799,14 +804,10 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
             trnHandle = sess.run( trnIterator.string_handle() )
             devHandle = sess.run( devIterator.string_handle() )
 
-            # current iteration
-            iteration = 0
-
             ## optimisation may overshoot locally
             ## To avoid returning an overshoot, we detect it and run extra epochs if needed
             finalizationMode = False
             current_num_epochs = hyperParams[ const.KEY_NUM_EPOCHS ]
-            iEpoch = 0
             minCost = 99999999999999
             minCostFinalization = 99999999999999
             finished = False
@@ -821,75 +822,94 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
             num_minibatches = math.ceil( m / self.minibatch_size ) # number of minibatches of size minibatch_size in the train set
 
             # Do the training loop
-            
+            iEpoch = 0
+            minibatch_cost = 0
+            epoch_cost = 0.                       # Defines a cost related to an epoch
+            # current iteration
+            iteration = 0
+
+            # Start time
+            tsStart = time.time()
+
+            # time to make sure we trace something each N minuts
+            tsTraceStart = tsStart
+
             try :
                 while ( not self.interrupted and not finished ) :
 
-                    epoch_cost = 0.                       # Defines a cost related to an epoch
-
                     minibatch_cost = self.runIteration(
-                        sess, trnHandle, iteration, num_minibatches, self.keep_prob
+                        sess, trnHandle, self.keep_prob, iteration, num_minibatches
                     )
 
                     epoch_cost += minibatch_cost / num_minibatches
 
                     if ( print_cost and iteration == 0 ) :
                         # Display iteration 0 to allow verify cost calculation accross machines
-                        print ("Cost after epoch %i, iteration %i: %f, mini-batch cost: %f" % ( iEpoch, iteration, epoch_cost, minibatch_cost ) )
+                        print ( "TRACE : Current cost epoch %i; iteration %i; %f" % ( iEpoch, iteration, epoch_cost ) )
 
                     # time to trace?
                     tsTraceNow = time.time()
                     tsTraceElapsed = tsTraceNow - tsTraceStart
 
                     # Each 60 seconds
-#                     if ( tsTraceElapsed >= 60 ) :
-# 
-#                         # Display iteration 0 to allow verify cost calculation accross machines
-#                         print( "TRACE : cost after epoch %i, iteration %i, iterationMinibatch %i / %i: %f" % ( iEpoch, iteration, iterationMinibatch, num_minibatches, epoch_cost ) )
-#                         # reset trace start
-#                         tsTraceStart = tsTraceNow
+                    if ( tsTraceElapsed >= 60 ) :
+
+                        # Display iteration 0 to allow verify cost calculation accross machines
+                        print ( "TRACE : Current cost epoch %i; iteration %i; %f" % ( iEpoch, iteration, epoch_cost ) )
+                        # reset trace start
+                        tsTraceStart = tsTraceNow
+
+                    # Current epoch finished?
+                    if ( ( iteration + 1 ) % num_minibatches == 0 ) :
+
+                        # Load epoch in tensorboard
+                        self.var_numEpoch.load( iEpoch )
+
+                        #print epoch cost
+                        if print_cost and ( iteration != 0 ) and ( iEpoch % 100 ) == 0:
+                            print ("Cost after epoch %i; iteration %i; %f" % ( iEpoch, iteration, epoch_cost ) )
+                            if ( iEpoch != 0 ) :
+
+                                # Performance counters
+                                curElapsedSeconds, curPerfIndex = self.getPerfCounters( tsStart, iEpoch, self.datasetTrn.X.shape )
+                                print( "  current: elapsedTime; %i; perfIndex; %f" % ( curElapsedSeconds, curPerfIndex ) )
+
+                                #  calculate DEV accuracy
+                                # Rewind DEV iterator
+                                sess.run( [ devIterator.initializer ] )
+                                DEV_accuracy = self.accuracyEval( devHandle, "dev" )
+                                print( "  current: DEV accuracy: %f" % ( DEV_accuracy ) )
+                                DEV_accuracies.append( DEV_accuracy )
+
+                        # Store cost for graph
+                        if print_cost == True and ( iteration != 0 ) and iEpoch % 5 == 0:
+                            costs.append( epoch_cost )
+
+                        # Record min cost
+                        minCost = min( minCost, epoch_cost )
+
+                        # epoch changed
+                        iEpoch += 1
+                        epoch_cost = 0
+
+                    # Close to finish?
+#                     if ( not finalizationMode and ( iEpoch > current_num_epochs ) ) :
+#                         # Activate finalization mode
+#                         finalizationMode = True
+#                         # local overshoot?
+#                         if ( epoch_cost > minCost ) :
+#                             # Yes, run some extra epochs
+#                             print( "WARNING: local cost overshoot detected, adding maximum 100 epochs to leave local cost overshoot" )
+#                             current_num_epochs += 100
+#                             minCostFinalization = minCost
+#
+#                     if ( finalizationMode ) :
+#                         # Check overshoot is finished
+#                         if ( epoch_cost <= minCostFinalization ) :
+#                             # finished
+#                             finished = True
 
                     iteration += 1
-
-                    if print_cost and iEpoch % 25 == 0:
-                        print ("Cost after epoch %i, iteration %i: %f, mini-batch cost: %f" % ( iEpoch, iteration, epoch_cost, minibatch_cost ) )
-                        if ( iEpoch != 0 ) :
-
-                            # Performance counters
-                            curElapsedSeconds, curPerfIndex = self.getPerfCounters( tsStart, iEpoch, self.datasetTrn.X.shape )
-                            print( "  current: elapsedTime:", curElapsedSeconds, "perfIndex:", curPerfIndex )
-
-                            #  calculate DEV accuracy
-                            DEV_accuracy = self.accuracyEval( handleDev, "dev" )
-                            print( "  current: DEV accuracy: %f" % ( DEV_accuracy ) )
-                            DEV_accuracies.append( DEV_accuracy )
-
-                    if print_cost == True and iEpoch % 5 == 0:
-                        costs.append( epoch_cost )
-
-    #                 # Record min cost
-    #                 minCost = min( minCost, epoch_cost )
-    #
-    #                 # Next epoch
-    #                 iEpoch += 1
-    #                 self.var_numEpoch.load( iEpoch )
-    #
-    #                 # Close to finish?
-    #                 if ( not finalizationMode and ( iEpoch > current_num_epochs ) ) :
-    #                     # Activate finalization mode
-    #                     finalizationMode = True
-    #                     # local overshoot?
-    #                     if ( epoch_cost > minCost ) :
-    #                         # Yes, run some extra epochs
-    #                         print( "WARNING: local cost overshoot detected, adding maximum 100 epochs to leave local cost overshoot" )
-    #                         current_num_epochs += 100
-    #                         minCostFinalization = minCost
-    #
-    #                 if ( finalizationMode ) :
-    #                     # Check overshoot is finished
-    #                     if ( epoch_cost <= minCostFinalization ) :
-    #                         # finished
-    #                         finished = True
 
             except tf.errors.OutOfRangeError:
                 # walk finished
@@ -922,10 +942,13 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
 
             self.persistParams( sess, idRun )
 
-            accuracyTrain = self.accuracyEval( self.datasetTrn.X, self.datasetTrn.Y, "trn" )
+            # Rewind data sets
+            sess.run( [ trnIterator.initializer, devIterator.initializer ] )
+            
+            accuracyTrain = self.accuracyEval( trnHandle, "trn" )
             print ( "Train Accuracy:", accuracyTrain )
 
-            accuracyDev = self.accuracyEval( self.datasetDev.X, self.datasetDev.Y, "dev" )
+            accuracyDev = self.accuracyEval( devHandle, "dev" )
             print ( "Dev Accuracy:", accuracyDev )
 
             if ( show_plot ) :
@@ -948,14 +971,17 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
 
             if ( extractImageErrors ) :
 
+                # Rewind data sets
+                sess.run( [ trnIterator.initializer, devIterator.initializer ] )
+            
                 # Lists of OK for training
-                oks_train  = self.correctPredictionEval(  self.datasetTrn.X, self.datasetTrn.Y )
+                oks_train  = self.correctPredictionEval( trnHandle )
                 map1, map2 = self.statsExtractErrors( "train", dataset = self.datasetTrn, oks = oks_train, show_plot=show_plot )
                 # Errors nb by data tag
                 resultInfo[ const.KEY_TRN_NB_ERROR_BY_TAG ] = map1
                 resultInfo[ const.KEY_TRN_PC_ERROR_BY_TAG ] = map2
 
-                oks_dev   = self.correctPredictionEval(  self.datasetDev.X, self.datasetDev.Y )
+                oks_dev   = self.correctPredictionEval( trnHandle )
                 map1, map2 = self.statsExtractErrors( "dev", dataset = self.datasetDev, oks = oks_dev, show_plot=show_plot )
                 # Errors nb by data tag
                 resultInfo[ const.KEY_DEV_NB_ERROR_BY_TAG ] = map1

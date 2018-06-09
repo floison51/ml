@@ -237,21 +237,15 @@ class AbstractMachine():
         # Convert ( nbLines, dims... ) to ( None, dims... )
         X_shape = [ None ]
         X_shape.extend( self.dataInfo[ const.KEY_TRN_X_SHAPE ][ 1: ] )
-        X_type = self.datasetTrn.X.dtype()
+        X_type = self.datasetTrn.X.dtype
         
         Y_shape = [ None ]
         Y_shape.extend( self.dataInfo[ const.KEY_TRN_Y_SHAPE ][ 1: ] )
-        Y_type = self.datasetTrn.Y.dtype()
+        Y_type = self.datasetTrn.Y.dtype
 
         self.modelInit( structure, X_shape, X_type, Y_shape, Y_type, training=True )
 
         seed = 3 # to keep consistent results
-
-        # Start time
-        tsStart = time.time()
-
-        # time to make sure we trace something each N minuts
-        tsTraceStart = tsStart
 
         # Start the session to compute the tensorflow graph
 
@@ -261,7 +255,7 @@ class AbstractMachine():
             self.initSessionVariables( sess )
 
             # current iteration
-            iteration = 0
+            iteration = -1
 
             ## optimisation may overshoot locally
             ## To avoid returning an overshoot, we detect it and run extra epochs if needed
@@ -279,6 +273,12 @@ class AbstractMachine():
 
             self.initializeDataset( sess, self.datasetTrn )
 
+            # Start time
+            tsStart = time.time()
+    
+            # time to make sure we trace something each N minuts
+            tsTraceStart = tsStart
+
             # Do the training loop
             while ( not self.interrupted and not finished and ( iEpoch <= current_num_epochs ) ) :
 
@@ -288,12 +288,12 @@ class AbstractMachine():
 
                     # No mini-batch : do a gradient descent for whole data
 
+                    iteration += 1
+
                     epoch_cost = self.runIteration(
                         iEpoch, 1, sess,
                         self.datasetTrn.X, self.datasetTrn.Y, self.keep_prob,
                     )
-
-                    iteration += 1
 
                 else:
 
@@ -308,21 +308,23 @@ class AbstractMachine():
 
                     for minibatch in minibatches:
 
+                        iteration += 1
                         iterationMinibatch += 1
 
                         # Select a minibatch
                         (minibatch_X, minibatch_Y) = minibatch
 
                         minibatch_cost = self.runIteration(
-                            iteration, num_minibatches, sess,
-                            ( minibatch_X, minibatch_Y ), self.keep_prob
+                            sess, ( minibatch_X, minibatch_Y ), 
+                            iteration, num_minibatches, 
+                            self.keep_prob
                         )
 
                         epoch_cost += minibatch_cost / num_minibatches
 
                         if ( print_cost and iteration == 0 ) :
                             # Display iteration 0 to allow verify cost calculation accross machines
-                            print ("Cost after epoch %i, iteration %i: %f, mini-batch cost: %f" % ( iEpoch, iteration, epoch_cost, minibatch_cost ) )
+                            print ("TRACE : Current cost epoch %i; iteration %i; %f" % ( iEpoch, iteration, epoch_cost ) )
 
                         # time to trace?
                         tsTraceNow = time.time()
@@ -332,14 +334,12 @@ class AbstractMachine():
                         if ( tsTraceElapsed >= 60 ) :
 
                             # Display iteration 0 to allow verify cost calculation accross machines
-                            print( "TRACE : cost after epoch %i, iteration %i, iterationMinibatch %i / %i: %f" % ( iEpoch, iteration, iterationMinibatch, num_minibatches, epoch_cost ) )
+                            print ( "TRACE : Current cost epoch %i; iteration %i; %f" % ( iEpoch, iteration, epoch_cost ) )
                             # reset trace start
                             tsTraceStart = tsTraceNow
 
-                        iteration += 1
-
-                if print_cost and iEpoch % 25 == 0:
-                    print ("Cost after epoch %i, iteration %i: %f, mini-batch cost: %f" % ( iEpoch, iteration, epoch_cost, minibatch_cost ) )
+                if print_cost and iEpoch % 100 == 0:
+                    print ( "Cost after epoch %i; iteration %i; %f" % ( iEpoch, iteration, epoch_cost ) )
                     if ( iEpoch != 0 ) :
 
                         # Performance counters
@@ -551,7 +551,7 @@ class AbstractMachine():
         # Extract errors
         for i in range( 0, correct.shape[ 0 ] ):
             # Is an error?
-            if ( not( correct[ i, 0 ] ) ) :
+            if ( not( correct[ i ] ) ) :
 
                 # Add nb
                 label = str( TAG[ i, 0 ] )
