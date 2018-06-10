@@ -203,7 +203,6 @@ class AbstractTensorFlowMachine( AbstractMachine ):
 
         feed_dict = self.getAccuracyEvalFeedDict( inputData )
 
-        sigmaCorrectPredictionInitialized = False
         sigmaCorrectPrediction = np.array( (), dtype=np.bool )
 
         if ( self.useDataSource() ) :
@@ -212,11 +211,6 @@ class AbstractTensorFlowMachine( AbstractMachine ):
             try:
                 while ( True ) :
                     correct_predictions = self.correct_prediction.eval( feed_dict )
-                    # Add terms
-#                     if ( not sigmaCorrectPredictionInitialized ) :
-#                         sigmaCorrectPrediction = correct_predictions
-#                         sigmaCorrectPredictionInitialized = True
-#                     else :
                     sigmaCorrectPrediction = np.append( sigmaCorrectPrediction, correct_predictions )
 
             except tf.errors.OutOfRangeError:
@@ -773,10 +767,12 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
             )
         )
 
-        # Cache for performance
-        self.tfDatasetTrn = self.tfDatasetTrn.cache()
-        # Data set, repeat num_epochs, minibatch_size slices
-        self.tfDatasetTrn = self.tfDatasetTrn.prefetch( self.minibatch_size * 2 ).batch( self.minibatch_size ).repeat( self.phTrnNumEpoch )
+        # Shuffle data
+        self.tfDatasetTrn = self.tfDatasetTrn.shuffle( buffer_size=100000, reshuffle_each_iteration=True )
+        # Data set, minibatch_size slices
+        self.tfDatasetTrn = self.tfDatasetTrn.prefetch( self.minibatch_size * 2 ).batch( self.minibatch_size )
+        # Data set, repeat num_epochs
+        self.tfDatasetTrn = self.tfDatasetTrn.repeat( self.phTrnNumEpoch )
 
         self.tfDatasetDev = tf.data.Dataset.from_tensor_slices(
             (
@@ -785,8 +781,6 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
             )
         )
 
-        # Cache for performance
-        self.tfDatasetDev = self.tfDatasetDev.cache()
         # Data set, repeat num_epochs, minibatch_size slices
         self.tfDatasetDev = self.tfDatasetDev.prefetch( self.minibatch_size * 2 ).batch( self.minibatch_size )
 
