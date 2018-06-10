@@ -144,7 +144,7 @@ class AbstractTensorFlowMachine( AbstractMachine ):
                 tf.summary.scalar( 'Cost', self.cost )
 
                 #Don'a dd accuracy as it is re-used DEV accuracy, this mismatches graph
-                tf.summary.scalar( 'TRN Accuracy', self.accuracy )
+                #tf.summary.scalar( 'TRN Accuracy', self.accuracy )
                 tf.summary.scalar( 'DEV Accuracy', self.var_DEV_accuracy )
 
         # Merge all the summaries and write them out to /tmp/mnist_logs (by default)
@@ -798,7 +798,7 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
 
             seed = 3 # to keep consistent results
 
-            # self.initSessionVariables( sess )
+            self.initSessionVariables( sess )
 
             # initialise variables iterators.
             sess.run( tf.global_variables_initializer() )
@@ -871,7 +871,7 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
                         self.var_numEpoch.load( iEpoch )
 
                         #print epoch cost
-                        if print_cost and ( iteration != 0 ) and ( iEpoch % 100 ) == 0:
+                        if print_cost and ( iteration != 0 ) and ( iEpoch % 1 ) == 0:
                             print ("Cost after epoch %i; iteration %i; %f" % ( iEpoch, iteration, epoch_cost ) )
                             if ( iEpoch != 0 ) :
 

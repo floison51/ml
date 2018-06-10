@@ -14,10 +14,10 @@ import const.constants as const
 from ml.cats import cats
 
 # For debug
-debugUseScreen = False
+debugUseScreen = True
 debugIdConconfig = 1
 
-DB_DIR = os.getcwd().replace( "\\", "/" ) + "/run/db/chats-debug"
+DB_DIR = os.getcwd().replace( "\\", "/" ) + "/run/db/chats"
 APP_KEY = "chats"
 
 def instantiateClass( classFqName, params ) :
@@ -133,7 +133,7 @@ if __name__ == '__main__':
             ( idConfig, buttonClicked, runParams ) = (
                 debugIdConconfig,
                 "Train",
-                { "comment": "", "tune": False, "showPlots": False, "nbTuning": 2, "isTensorboard": False, "isTensorboardFull": False }
+                { "comment": "", "tune": False, "showPlots": False, "nbTuning": 2, "isTensorboard": True, "isTensorboardFull": False }
             )
 
         # cancel?
