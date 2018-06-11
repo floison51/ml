@@ -59,91 +59,88 @@ class CLIError(Exception):
         return self.msg
 
 
-def getImage( url, fileName ):
-    
-    wget.download( url, fileName ) 
+# def getImage( url, fileName ):
+#
+#     wget.download( url, fileName )
+#
+# def getGoogleImageData():
+#
+#     # get image
+#
+#     apiKey = "AIzaSyDHVMHUD5776TppEEXTdI8T5kUPFi_HG44"
+#
+#     # Google
+#     cx = '005180524979857628053:btxxhdgj_ry'
+#
+#     # Google image
+#     #cx = '005180524979857628053:qtpwfznzde8'
+#
+#     service = build( "customsearch", "v1",
+#                developerKey=apiKey )
+#
+#     iCat = 100;
+#
+#     num = 5
+#
+#     for page in range( 200 ):
+#
+#         print( "Page " + str( page ) );
+#
+#         res = service.cse().list(
+#             q= 'cat',
+#             cx= cx,
+#             searchType='image',
+#             start= page * num + 1,
+#             num= num,
+#             imgType='clipart',
+#             fileType='png',
+#             safe= 'off'
+#         ).execute()
+#
+#         if not 'items' in res:
+#             print( "No result" )
+#         else:
+#             for item in res['items']:
+#                 print('{}:\n\t{}'.format(item['title'], item['link']))
+#
+#                 # get image
+#                 url= item['link']
+#                 mime = item[ 'mime' ]
+#                 mime = mime.replace( '/', '.' )
+#                 fileName = "C:/temp/" + "cat-" + str( iCat ) + "-" + mime
+#
+#                 try:
+#                     getImage( url, fileName )
+#                 except:
+#                     print( "Can't download url '" + url + "'" )
+#
+#                 iCat += 1
 
-def getGoogleImageData():
 
-    # get image
-    
-    apiKey = "AIzaSyDHVMHUD5776TppEEXTdI8T5kUPFi_HG44"
-    
-    # Google
-    cx = '005180524979857628053:btxxhdgj_ry'
-    
-    # Google image
-    #cx = '005180524979857628053:qtpwfznzde8'
-    
-    service = build( "customsearch", "v1",
-               developerKey=apiKey )
+def transformImages( fromDir, toDir, files, iStart, iEnd,  ):
 
-    iCat = 100;
-    
-    num = 5
-    
-    for page in range( 200 ):
-        
-        print( "Page " + str( page ) );
-        
-        res = service.cse().list(
-            q= 'cat',
-            cx= cx,
-            searchType='image',
-            start= page * num + 1,
-            num= num,
-            imgType='clipart',
-            fileType='png',
-            safe= 'off'
-        ).execute()
-    
-        if not 'items' in res:
-            print( "No result" )
-        else:
-            for item in res['items']:
-                print('{}:\n\t{}'.format(item['title'], item['link']))  
-                
-                # get image
-                url= item['link']
-                mime = item[ 'mime' ]
-                mime = mime.replace( '/', '.' )
-                fileName = "C:/temp/" + "cat-" + str( iCat ) + "-" + mime
-                
-                try:
-                    getImage( url, fileName )
-                except:
-                    print( "Can't download url '" + url + "'" )
-                    
-                iCat += 1
-            
-
-def transformImages( fromDir, toDir ):
-    
-    # get files
-    files = glob.glob( fromDir + '/**/*.*', recursive=True)
-    
-    for oriImgFile in files:
+    for oriImgFile in files[ iStart : iEnd ] :
         # Copy from image
         # remove fromDir prefix
         toFilePrefix = oriImgFile[ len( fromDir ) + 1 : ]
         toFile = toDir + "/" + toFilePrefix
-        
+
         ## Make target dir
         toFileDir = os.path.dirname( toFile )
         if ( not os.path.exists( toFileDir ) ) :
             os.makedirs( toFileDir, exist_ok = True )
-            
+
         shutil.copyfile( oriImgFile, toFile )
-        
-        ## Load image 
+
+        ## Load image
         img = Image.open( oriImgFile )
         ## Flip verticaly image
         flippedImage = img.transpose( Image.FLIP_LEFT_RIGHT )
-        
+
         ## save it
         toFlippedImage = toDir + "/" + toFilePrefix + "-flipped.png"
         flippedImage.save( toFlippedImage, 'png' )
-        
+
 
 # Create dev and test sets
 
@@ -153,27 +150,27 @@ def buildDataSet( dataDir, baseDir, files, iStart, iEnd, size, outFileName ):
 # y : cat or non-cat
     y = []
 # tags of images
-    tag = []
-# path of images
-    path = []
-    
+    tags = []
+# pathes of images
+    pathes = []
+
 # From first image to dev test set percentage of full list
 #for i in range( iEndTestSet ):
     for i in range( iStart, iEnd ):
-        
+
         curImage = files[i]
         # get rid of basedir
         relCurImage = curImage[len(baseDir) + 1:]
         relCurImage = relCurImage.replace( '\\', '/' )
-        
+
         relCurImageSegments = relCurImage.split( "/" )
-        
+
         # Cat?
         isCat = relCurImageSegments[ 0 ] == "cats"
-        
-        # tag
+
+        # tags
         _tag = relCurImageSegments[ 1 ]
-        
+
         # load image
         img = Image.open(curImage)
         # Resize image
@@ -187,9 +184,9 @@ def buildDataSet( dataDir, baseDir, files, iStart, iEnd, size, outFileName ):
         else:
             imagesList.append( pix )
             y.append( isCat )                       # Image will be saved
-            tag.append( np.string_( _tag ) )    # Label of image
-            path.append( np.string_( relCurImage ) )
-    
+            tags.append( np.string_( _tag ) )       # Label of image
+            pathes.append( np.string_( relCurImage ) )
+
 # Store as binary stuff
 
     # Check dims
@@ -197,63 +194,78 @@ def buildDataSet( dataDir, baseDir, files, iStart, iEnd, size, outFileName ):
         image = imagesList[ i ]
         imageShape = image.shape
         if ( imageShape != ( size, size, 3 ) ) :
-            print( "Wrong image:", path[ i ] )
+            print( "Wrong image:", pathes[ i ] )
             sys.exit( 1 )
-        
+
     preparedDir = dataDir + "/prepared"
     os.makedirs( preparedDir, exist_ok = True )
     absOutFile = preparedDir + "/" + outFileName
+
+    # remove data dir
+    relImgDir = baseDir[ len( dataDir ) + 1 : ]
+
     with h5py.File( absOutFile, "w") as dataset:
         dataset["x"]        = imagesList
         dataset["y"]        = y
-        dataset["tag"]      = tag
-        dataset["path"]     = path
+        dataset["tags"]     = tags
+        dataset["pathes"]   = pathes
+        dataset["imgDir"]   = relImgDir.encode( 'utf-8' )
 
 def createTrainAndDevSets():
-    
+
     input( "Type enter to continue" )
-    
+
     # current dir for data
     dataDir = os.getcwd().replace( "\\", "/" )
-    
+
     # Base dir for cats and not cats images
-    baseDir = dataDir + "/images"
-    
-    ## transform images
-    transformedDir = dataDir + "/transformed"
-    transformImages( baseDir, transformedDir )
-    
-    # get files
-    files = glob.glob( transformedDir + '/**/*.*', recursive=True)
+    oriDir = dataDir + "/images"
+
+    # get original images
+    oriFiles = glob.glob( oriDir + '/**/*.*', recursive=True)
 
     # Shuffle files
-    random.shuffle( files )
-    
+    random.shuffle( oriFiles )
+
+    # for debug : only 10 images
+    # oriFiles = oriFiles[ 0:11 ]
+
+    sizes = ( 64, 92, 128 )
+
     print( "Build DEV data set" )
-    iEndTrainingSet = int( len( files ) * TRAINING_TEST_SET_PC );
-    
-    sizes = ( 64, 128, 256 )
-    
+    iEndTrainingSet = int( len( oriFiles ) * TRAINING_TEST_SET_PC );
+
+    for size in sizes :
+        ## Build DEV data set
+        buildDataSet( \
+            dataDir, oriDir, oriFiles, \
+            iEndTrainingSet, len( oriFiles ), \
+            size, "dev_chats-" + str( size) + ".h5" \
+        )
+
+    ## transform images for DEV
+    transformedDir = dataDir + "/transformed"
+
+    transformImages( oriDir, transformedDir, oriFiles, 0, iEndTrainingSet )
+
+    #Transformed files
+    transformedFiles = glob.glob( transformedDir + '/**/*.*', recursive=True)
+    # Shuffle files
+    random.shuffle( transformedFiles )
+
     for size in sizes :
         print( "Build TRAINING data set - size", size )
-        
-        ## Build TRN data set
+
+        ## Build TRN data set from transformed dir
         buildDataSet( \
-            dataDir, transformedDir, files, \
+            dataDir, transformedDir, transformedFiles, \
             0, iEndTrainingSet, \
             size, "train_chats-" + str( size) + ".h5" \
         )
-        
-        ## Build DEV data set
-        buildDataSet( \
-            dataDir, transformedDir, files, \
-            iEndTrainingSet + 1, len( files ) - 1, \
-            size, "dev_chats-" + str( size) + ".h5" \
-        )
-    
+
     print( "Finished" );
 
-    
+
 def main(argv=None): # IGNORE:C0111
     '''Command line options.'''
 
@@ -287,18 +299,18 @@ USAGE
         parser.add_argument('-V', '--version', action='version', version=program_version_message)
 
         parser.add_argument( "-command" );
-        
+
         # Process arguments
         args = parser.parse_args()
-        
+
         # check actions
         command = args.command
-        if ( "googleImage".equals( command ) ) :
-            print( "XXX" )
-            # get data
-            getGoogleImageData()
+#         if ( "googleImage".equals( command ) ) :
+#             print( "XXX" )
+#             # get data
+#             getGoogleImageData()
 
-            
+
     except KeyboardInterrupt:
         ### handle keyboard interrupt ###
         return 0
@@ -311,13 +323,12 @@ USAGE
         return 2
 
 if __name__ == "__main__":
-    
+
     # Make sure random is repeatable
     random.seed( 1 )
-    
+
     #main( sys.argv[ 1: ] )
-    
+
     #getGoogleImageData()
-    
+
     createTrainAndDevSets()
-    

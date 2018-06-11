@@ -43,28 +43,32 @@ class CatRawDataSource( DataSource ):
         dev_set_y = dev_set_y.astype( np.float32 )
 
         # Image tags
-        trn_set_tag_orig = np.array(trn_dataset["tag"][:]) # images tags
-        dev_set_tag_orig = np.array(dev_dataset["tag"][:]) # images tags
+        trn_set_tags_orig = np.array(trn_dataset["tags"][:]) # images tags
+        dev_set_tags_orig = np.array(dev_dataset["tags"][:]) # images tags
         # passer de (476,) (risque) a  (1,476)
-        trn_set_tag      = trn_set_tag_orig.reshape((1, trn_set_tag_orig.shape[0]))
-        dev_set_tag      = dev_set_tag_orig.reshape((1, dev_set_tag_orig.shape[0]))
+        trn_set_tags      = trn_set_tags_orig.reshape((1, trn_set_tags_orig.shape[0]))
+        dev_set_tags      = dev_set_tags_orig.reshape((1, dev_set_tags_orig.shape[0]))
 
         # Default weight is 1 (int)
         # If weight is loaded, it is a (1,mx)
-        trn_set_weight = 1
+        trn_set_weights = 1
 
         if isLoadWeights :
 
             ## Convert tags to weights
-            trn_set_weight   = self.getWeights( trn_set_tag )
+            trn_set_weights   = self.getWeights( trn_set_tags )
+
+        # Image base path
+        trn_imgDir = trn_dataset[ "imgDir" ].value.decode( 'utf-8' )
+        dev_imgDir = dev_dataset[ "imgDir" ].value.decode( 'utf-8' )
 
         # Image relative pathes
-        trn_imgPath = np.array( trn_dataset[ "path" ][:] )
-        dev_imgPath = np.array( dev_dataset[ "path" ][:] )
+        trn_imgPathes = np.array( trn_dataset[ "pathes" ][:] )
+        dev_imgPathes = np.array( dev_dataset[ "pathes" ][:] )
 
         # Create data sets
-        datasetTrn = DataSet( trn_set_x_orig, trn_set_x, trn_set_y, trn_imgPath, trn_set_tag, trn_set_weight )
-        datasetDev = DataSet( dev_set_x_orig, dev_set_x  , dev_set_y  , dev_imgPath  , dev_set_tag )
+        datasetTrn = DataSet( trn_set_x_orig, trn_set_x, trn_set_y, trn_imgDir, trn_imgPathes, trn_set_tags, trn_set_weights )
+        datasetDev = DataSet( dev_set_x_orig, dev_set_x, dev_set_y, dev_imgDir, dev_imgPathes, dev_set_tags )
 
         # For tensor flow, we need to transpose data
         self.transpose( datasetTrn )
@@ -89,7 +93,7 @@ class CatRawDataSource( DataSource ):
 
             const.KEY_IS_SUPPORT_BATCH_STREAMING : False
         }
-        
+
         return dataInfo
 
     def getWeights( self, tags ):
@@ -98,24 +102,24 @@ class CatRawDataSource( DataSource ):
 
         for n_tag in tags[ 0 ] :
 
-            tag = str( n_tag )
+            tag = n_tag.value.decode( 'utf-8' )
 
             weight = 1
-            if ( tag == "b'chats'" ) :
+            if ( tag == "chats" ) :
                 weight = 100
-            elif ( tag == "b'chiens'" ) :
+            elif ( tag == "chiens" ) :
                 weight = -100
-            elif ( tag == "b'loups'" ) :
+            elif ( tag == "loups" ) :
                 weight = -100
-            elif ( tag == "b'velos'" ) :
+            elif ( tag == "velos" ) :
                 weight = 1
-            elif ( tag == "b'gens'" ) :
+            elif ( tag == "gens" ) :
                 weight = 1
-            elif ( tag == "b'fleurs'" ) :
+            elif ( tag == "fleurs" ) :
                 weight = 1
-            elif ( tag == "b'villes'" ) :
+            elif ( tag == "villes" ) :
                 weight = 1
-            elif ( tag == "b'voitures'" ) :
+            elif ( tag == "voitures" ) :
                 weight = 1
             else :
                 print( "Unsupported image tag", tag )

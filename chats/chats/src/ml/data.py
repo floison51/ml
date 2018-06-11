@@ -39,27 +39,28 @@ class DataSource():
         dataset.Y = dataset.Y.T
     
         # Transpose for tensorflow
-        if ( not ( dataset.imgPath is None ) ) :
-            dataset.imgPath = dataset.imgPath.T
+        if ( not ( dataset.imgPathes is None ) ) :
+            dataset.imgPathes = dataset.imgPathes.T
     
-        if ( not ( dataset.tag is None ) ) :
-            dataset.tag = dataset.tag.T
+        if ( not ( dataset.tags is None ) ) :
+            dataset.tags = dataset.tags.T
     
-        if ( not ( dataset.weight is None ) ) :
-            if ( type( dataset.weight ) != int ) :
-                dataset.weight = dataset.weight.T
+        if ( not ( dataset.weights is None ) ) :
+            if ( type( dataset.weights ) != int ) :
+                dataset.weights = dataset.weights.T
         
         
 class DataSet() :
     "Data set"
-    def __init__( self, X_ori, X, Y, imgPath, tag = None, weight = None ):
+    def __init__( self, X_ori, X, Y, imgDir, imgPathes, tags = None, weights = None ):
         self.X_ori = X_ori
         self.X = X
         self.Y = Y
-        self.imgPath = imgPath
-        self.tag = tag;
-        self.weight = weight
-        self.isSupportBatchStreaming = False
         
-
+        self.imgDir = imgDir
+        self.imgPathes = imgPathes
+        
+        self.tags = tags;
+        self.weights = weights
+        self.isSupportBatchStreaming = False
            

@@ -18,6 +18,8 @@ import db.db as db
 
 # Abtract classes
 import abc
+from cmath import nan
+from _ast import Num
 
 # Abstract class
 class AbstractMachine():
@@ -46,7 +48,7 @@ class AbstractMachine():
     @abc.abstractmethod
     def initSessionVariables( self, sess ):
         "Initialize session variables"
-        
+
     @abc.abstractmethod
     def modelOptimizeEnd( self, session ):
         "End of model optimization"
@@ -238,7 +240,7 @@ class AbstractMachine():
         X_shape = [ None ]
         X_shape.extend( self.dataInfo[ const.KEY_TRN_X_SHAPE ][ 1: ] )
         X_type = self.datasetTrn.X.dtype
-        
+
         Y_shape = [ None ]
         Y_shape.extend( self.dataInfo[ const.KEY_TRN_Y_SHAPE ][ 1: ] )
         Y_type = self.datasetTrn.Y.dtype
@@ -275,7 +277,7 @@ class AbstractMachine():
 
             # Start time
             tsStart = time.time()
-    
+
             # time to make sure we trace something each N minuts
             tsTraceStart = tsStart
 
@@ -315,8 +317,8 @@ class AbstractMachine():
                         (minibatch_X, minibatch_Y) = minibatch
 
                         minibatch_cost = self.runIteration(
-                            sess, ( minibatch_X, minibatch_Y ), 
-                            iteration, num_minibatches, 
+                            sess, ( minibatch_X, minibatch_Y ),
+                            iteration, num_minibatches,
                             self.keep_prob
                         )
 
@@ -523,11 +525,15 @@ class AbstractMachine():
         volume = functools.reduce( operator.mul, X_real_shape, 1 )
 
         # performance index : per iEpoth - per samples
-        perfIndex = 1 / ( elapsedSeconds / iEpoch / volume ) * 1e-6
+        if ( elapsedSeconds == 0 ) :
+            #not available
+            perfIndex = nan
+        else :
+            perfIndex = 1 / ( elapsedSeconds / iEpoch / volume ) * 1e-6
 
         return elapsedSeconds, perfIndex
 
-    def dumpBadImages( self, correct, X_orig, PATH, TAG, errorsDir ):
+    def dumpBadImages( self, correct, X_orig, imgDir, PATH, TAG, errorsDir ):
 
         # Delete files in error dir
         for the_file in os.listdir( errorsDir ):
@@ -546,7 +552,7 @@ class AbstractMachine():
         # Dico of errors by label
         mapErrorNbByTag = {}
 
-        imgBase = os.getcwd().replace( "\\", "/" ) + "/data/transformed"
+        imgBase = os.getcwd().replace( "\\", "/" ) + "/data/" + imgDir
 
         # Extract errors
         for i in range( 0, correct.shape[ 0 ] ):
@@ -554,7 +560,8 @@ class AbstractMachine():
             if ( not( correct[ i ] ) ) :
 
                 # Add nb
-                label = str( TAG[ i, 0 ] )
+                numpy_label = TAG[ i, 0 ]
+                label = numpy_label.decode( 'utf-8' )
                 try:
                     nb = mapErrorNbByTag[ label ]
                 except KeyError as e:
@@ -573,11 +580,9 @@ class AbstractMachine():
 
                 # Get original image
                 # str: b'truc'
-                imgRelPath = str( PATH[ i ] )
-                # b'truc'
-                imgRelPath = imgRelPath[ 2: ]
-                # truc
-                imgRelPath = imgRelPath[ : -1 ]
+                numpy_imgRelPath = PATH[ i ]
+                # b'truc' -> 'truc'
+                imgRelPath = numpy_imgRelPath.decode( 'utf-8' )
 
                 imgPath = imgBase + "/" + imgRelPath
 
@@ -609,7 +614,7 @@ class AbstractMachine():
             sys.exit( 1 )
 
         # Dump bad images
-        mapErrorNbByTag = self.dumpBadImages( oks, dataset.X_ori, dataset.imgPath, dataset.tag, errorsDir )
+        mapErrorNbByTag = self.dumpBadImages( oks, dataset.X_ori, dataset.imgDir, dataset.imgPathes, dataset.tags, errorsDir )
 
         # Sort by value
         mapErrorNbByTagSorted = \
