@@ -58,65 +58,6 @@ class CLIError(Exception):
     def __unicode__(self):
         return self.msg
 
-
-# def getImage( url, fileName ):
-#
-#     wget.download( url, fileName )
-#
-# def getGoogleImageData():
-#
-#     # get image
-#
-#     apiKey = "AIzaSyDHVMHUD5776TppEEXTdI8T5kUPFi_HG44"
-#
-#     # Google
-#     cx = '005180524979857628053:btxxhdgj_ry'
-#
-#     # Google image
-#     #cx = '005180524979857628053:qtpwfznzde8'
-#
-#     service = build( "customsearch", "v1",
-#                developerKey=apiKey )
-#
-#     iCat = 100;
-#
-#     num = 5
-#
-#     for page in range( 200 ):
-#
-#         print( "Page " + str( page ) );
-#
-#         res = service.cse().list(
-#             q= 'cat',
-#             cx= cx,
-#             searchType='image',
-#             start= page * num + 1,
-#             num= num,
-#             imgType='clipart',
-#             fileType='png',
-#             safe= 'off'
-#         ).execute()
-#
-#         if not 'items' in res:
-#             print( "No result" )
-#         else:
-#             for item in res['items']:
-#                 print('{}:\n\t{}'.format(item['title'], item['link']))
-#
-#                 # get image
-#                 url= item['link']
-#                 mime = item[ 'mime' ]
-#                 mime = mime.replace( '/', '.' )
-#                 fileName = "C:/temp/" + "cat-" + str( iCat ) + "-" + mime
-#
-#                 try:
-#                     getImage( url, fileName )
-#                 except:
-#                     print( "Can't download url '" + url + "'" )
-#
-#                 iCat += 1
-
-
 def transformImages( fromDir, toDir, files, iStart, iEnd,  ):
 
     for oriImgFile in files[ iStart : iEnd ] :
