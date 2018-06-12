@@ -7,3 +7,4 @@
 /test-dataset.py
 /test-regressor.py
 /minst.py
+/cuda.bat

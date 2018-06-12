@@ -3,8 +3,11 @@ Created on 28 avr. 2018
 Machine Learning configuration
 @author: fran
 '''
+import os
+
 from tkinter import *
 from tkinter.ttk import Combobox
+from tkinter.filedialog import askopenfilename
 
 import const.constants as const
 
@@ -12,7 +15,7 @@ buttonsToUpdate = []
 
 class MainWindow ( Tk ):
 
-    def __init__( self, configDoer, hpDoer, runsDoer, startRunDoer ) :
+    def __init__( self, configDoer, hpDoer, runsDoer, startRunDoer, predictRunDoer ) :
 
         Tk.__init__(self)
 
@@ -20,6 +23,7 @@ class MainWindow ( Tk ):
         self.hpDoer = hpDoer
         self.runsDoer = runsDoer
         self.startRunDoer = startRunDoer
+        self.predictRunDoer = predictRunDoer
 
         # From conf radio-buttons
         self.confSelected = IntVar()
@@ -30,6 +34,7 @@ class MainWindow ( Tk ):
 
         self.buttonClicked = None
         self.runParams = None
+        self.predictParams = None
 
     def showAndSelectConf( self, configs ):
 
@@ -71,7 +76,7 @@ class MainWindow ( Tk ):
         self.mainloop()
 
         # return selected idConf
-        return ( self.confSelected.get(), self.buttonClicked, self.runParams )
+        return ( self.confSelected.get(), self.buttonClicked, self.runParams, self.predictParams )
 
 
     def buildConfigGrid( self, frameConfigs, configs ):
@@ -251,11 +256,16 @@ class MainWindow ( Tk ):
 
         # Next dialog
         if ( self.buttonClicked == "Train" ) :
-            self.startRunDoer.startRun( self, self.confSelected.get() )
+            self.startRunDoer.start( self, self.confSelected.get() )
+        elif ( self.buttonClicked == "Predict" ) :
+            self.predictRunDoer.start( self, self.confSelected.get() )
         else :
             self.destroy()
 
     def doRunTraining( self ):
+        self.destroy()
+
+    def doRunPredict( self ):
         self.destroy()
 
 class MyDialog( Toplevel ):
@@ -535,7 +545,7 @@ class StartTrainDialog( MyDialog ):
         frameTop = Frame( self, relief=GROOVE )
         frameTop.pack(side=TOP, padx=30, pady=30)
 
-        label = Label( frameTop, text="Start training form" )
+        label = Label( frameTop, text="Start run" )
         label.pack()
 
         frameForm = Frame( self, relief=GROOVE )
@@ -605,7 +615,7 @@ class StartTrainDialog( MyDialog ):
         #add machine specific fields
         for ( key, inputVar ) in self.inputMachineFields.items() :
             self.master.runParams[ key ] = inputVar.get()
-            
+
         self.destroy()
         self.master.destroy()
 
@@ -613,4 +623,120 @@ class StartTrainDialog( MyDialog ):
         # cancel
         self.master.clickButton( "Cancel" )
         self.destroy()
+
+class StartPredictDialog( MyDialog ):
+
+    def __init__( self, boss, callbackFct, **options ) :
+        MyDialog.__init__( self, boss, callbackFct, **options )
+        
+        self.imagePath = None
+
+    def run( self ) :
+
+        frameTop = Frame( self, relief=GROOVE )
+        frameTop.pack(side=TOP, padx=30, pady=30)
+
+        label = Label( frameTop, text="Predict" )
+        label.pack()
+
+        frameForm = Frame( self, relief=GROOVE )
+        frameForm.pack( padx=30, pady=30)
+
+        frameButtons = LabelFrame( self, borderwidth=0 )
+        frameButtons.pack( side=BOTTOM, padx=30, pady=30, fill='both', expand=True )
+
+        iRow = 1
+
+        self.choiceHyperParametersInputVar = getInputVarForType( "int" )
+        self.choiceDataInputVar = getInputVarForType( "int" )
+        self.photoInputVar = getInputVarForType( "string" )
+
+        Label( frameForm, text="Hyper parameters:", borderwidth=1 ).grid( row=iRow, column=1, sticky=W, padx=10 )
+        iRow += 1
+
+        values = [ 1, 2 ]
+        labels = [ "Current", "Best" ]
+
+        for i in range( 2 ) :
+            Radiobutton(
+                frameForm, variable=self.choiceHyperParametersInputVar,
+                text = labels[ i ], value=values[ i ],
+                command=self.computeEnableRun
+            ).grid( row=iRow, column=1, sticky=W, padx=10 )
+            iRow += 1
+
+        Label( frameForm, text="Data set:", borderwidth=1 ).grid( row=iRow, column=1, sticky=W, padx=10 )
+        iRow += 1
+
+        values = [ 1, 2 ]
+        labels = [ "DEV Test set", "Photo" ]
+
+        for i in range( 2 ) :
+            Radiobutton(
+                frameForm, variable=self.choiceDataInputVar,
+                text = labels[ i ], value=values[ i ],
+                command=lambda value=values[ i ] : ( self.choiceDataClicked( value ) ),
+            ).grid( row=iRow, column=1, sticky=W, padx=10 )
+            iRow += 1
+
+        # Photo selection
+        self.photo = Entry( frameForm, textvariable=self.photoInputVar, state = DISABLED )
+        self.photo.grid( row=iRow - 1, column=3, sticky=W, padx=10 )
+        iRow += 1
+
+        #Button to choose image
+        self.chooseButton = Button( frameForm, text="Choose", command=self.chooseFile, state=DISABLED )
+        self.chooseButton.grid( row=iRow - 1, column=3, sticky=W, padx=10 )
+
+        self.buttonRun    = Button( frameButtons, text="Predict" , command=self.buttonRunClicked   , state=DISABLED )
+        buttonCancel = Button( frameButtons, text="Cancel"  , command=self.buttonCancelClicked, state=NORMAL )
+
+        self.buttonRun.pack( side=LEFT, padx=40 )
+        buttonCancel.pack( side=RIGHT, padx=40 )
+
+    def chooseFile( self ):
+
+        curDir = os.getcwd().replace( "\\", "/" )
+        self.imagePath = askopenfilename(
+            initialdir=curDir,
+            filetypes = ( ( "Image File", "*.jpg"), ( "Image File", "*.jpeg"), ( "Image File", "*.png"), ("All Files","*.*") ),
+            title = "Choose an image."
+        )
+
+        basename = os.path.basename( self.imagePath )
+        self.photoInputVar.set( basename )
+
+    def choiceDataClicked( self, value ) :
+        "Activate photo if needed"
+        if ( value == 2 ) :
+            # Activate photo input
+            self.chooseButton.configure( state = NORMAL )
+        else :
+            # Disable photo input
+            self.chooseButton.configure( state = DISABLED )
+
+        #Check if run button must be enabled
+        self.computeEnableRun()
+
+    def computeEnableRun( self ) :
+        # Enable predict button?
+        if ( ( self.choiceDataInputVar.get() != 0 ) and ( self.choiceHyperParametersInputVar.get() != 0 ) ) :
+            self.buttonRun.configure( state = NORMAL )
+
+    def buttonRunClicked( self ) :
+        
+        # Give params to master
+        self.master.predictParams = {
+            
+            "choiceHyperParams" : self.choiceHyperParametersInputVar.get(),
+            "choiceData" : self.choiceDataInputVar.get(),
+            "imagePath"  : self.imagePath
+        }
+
+        self.destroy()
         self.master.destroy()
+
+    def buttonCancelClicked( self ) :
+        # cancel
+        self.master.clickButton( "Cancel" )
+        self.destroy()

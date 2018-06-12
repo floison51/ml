@@ -12,12 +12,13 @@ from tkinter import *
 
 import const.constants as const
 from ml.cats import cats
+from absl.testing.parameterized import parameters
 
 # For debug
 debugUseScreen = True
 debugIdConconfig = 1
 
-DB_DIR = os.getcwd().replace( "\\", "/" ) + "/run/db/chats"
+DB_DIR = os.getcwd().replace( "\\", "/" ) + "/run/db/chats-debug"
 APP_KEY = "chats"
 
 def instantiateClass( classFqName, params ) :
@@ -122,13 +123,14 @@ if __name__ == '__main__':
         configs = db.getConfigsWithMaxDevAccuracy( conn )
 
         if ( debugUseScreen ) :
-            configDoer   = control.ConfigDoer     ( conn )
-            hpDoer       = control.HyperParamsDoer( conn )
-            runsDoer     = control.RunsDoer       ( conn )
-            startRunDoer = control.StartRunDoer   ( conn, configMachinesForms )
+            configDoer     = control.ConfigDoer      ( conn )
+            hpDoer         = control.HyperParamsDoer ( conn )
+            runsDoer       = control.RunsDoer        ( conn )
+            startRunDoer   = control.StartRunDoer    ( conn, configMachinesForms )
+            predictRunDoer = control.StartPredictDoer( conn )
 
-            mainWindow = view.MainWindow( configDoer, hpDoer, runsDoer, startRunDoer )
-            ( idConfig, buttonClicked, runParams ) = mainWindow.showAndSelectConf( configs )
+            mainWindow = view.MainWindow( configDoer, hpDoer, runsDoer, startRunDoer, predictRunDoer )
+            ( idConfig, buttonClicked, runParams, predictParams ) = mainWindow.showAndSelectConf( configs )
         else :
             ( idConfig, buttonClicked, runParams ) = (
                 debugIdConconfig,
@@ -150,8 +152,33 @@ if __name__ == '__main__':
         print( config[ "structure" ] )
 
         # get hyper parameters
-        hyperParams = db.getHyperParams( conn, config[ "idHyperParams" ] )
+        if ( buttonClicked == "Train" ) :
+            
+            # Get config hyper parameters
+            hyperParams = db.getHyperParams( conn, config[ "idHyperParams" ] )
+            
+        elif ( buttonClicked == "Predict" ) :
+            
+            # hyper parameters depend on choice
+            choiceHp = predictParams[ "choiceHyperParams" ]
+            
+            if ( choiceHp == 1 ) :
+                
+                # Config hyper params
+                hyperParams = db.getHyperParams( conn, config[ "idHyperParams" ] )
+                
+            elif ( choiceHp == 2 ) :
+                
+                # Get best hyper parameters
+                hyperParams = db.getBestHyperParams( conn, idConfig )
+                
+            else :
+                raise ValueError( "Unknown hyper parameters choice " + choiceHp )
+        else :
+            raise ValueError( "Unknown action " + buttonClicked )
 
+        raise ValueError( "TODO check machine, size consistency with hyper parameters" )
+        
         # Get machine data source
         machineDataSourceClass = configDatasources[ machineName ]
         if ( machineDataSourceClass == None ) :

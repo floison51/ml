@@ -172,7 +172,7 @@ class StartRunDoer( Doer ):
         super().__init__( conn )
         self.confMachinesForms = configMachinesForms
 
-    def startRun( self, fenetre, idConfig ) :
+    def start( self, fenetre, idConfig ) :
         # Get form fields for machine
         config = db.getConfig( self.conn, idConfig )
 
@@ -184,3 +184,14 @@ class StartRunDoer( Doer ):
         # Launch run dialog
         startTrainingDialog = view.StartTrainDialog( fenetre, fenetre.doRunTraining, machineFields )
         startTrainingDialog.run()
+
+class StartPredictDoer( Doer ):
+
+    def __init__( self, conn ) :
+        super().__init__( conn )
+
+    def start( self, fenetre, idConfig ) :
+
+        # Launch predict dialog
+        startPredictDialog = view.StartPredictDialog( fenetre, fenetre.doRunPredict )
+        startPredictDialog.run()
