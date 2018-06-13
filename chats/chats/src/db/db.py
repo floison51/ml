@@ -66,24 +66,26 @@ def getBestHyperParams( conn, idConfig ) :
 
     # get existing, if anay
     cursor = c.execute(
-        "select r.idHyperParams, max(r.dev_accuracy) from configs c, runs r where ( c.id=? and r.idConf=c.id )",
+        "select r.idHyperParams, max(r.dev_accuracy), r.id from configs c, runs r where ( c.id=? and r.idConf=c.id )",
         ( idConfig, )
     )
 
     devAccuracy = None
     hyperParams = {}
+    idRun = None
 
     idHyperParams = None
     for row in cursor :
         idHyperParams = row[ 0 ]
         devAccuracy   = row[ 1 ]
+        idRun         = row[ 2 ]
 
     c.close();
 
     if ( idHyperParams != None ) :
         hyperParams = getHyperParams( conn, idHyperParams )
 
-    return ( hyperParams, devAccuracy )
+    return ( hyperParams, devAccuracy, idRun )
 
 def getOrCreateHyperParams( conn, hyper_params ) :
 
@@ -498,6 +500,24 @@ def getRuns( conn, idConf ) :
     c.close();
 
     return results
+
+def getRunIdLast( conn, idConf ) :
+
+    c = conn.cursor();
+
+    # Update run
+    cursor = c.execute( '''
+        select max( id ) from runs where idConf=?''',
+        (idConf,)
+    )
+
+    for row in cursor :
+
+        result = row[ 0 ]
+
+    c.close();
+
+    return result
 
 def getRun( conn, idRun ) :
 

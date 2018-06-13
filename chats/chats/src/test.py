@@ -15,8 +15,9 @@ from ml.cats import cats
 from absl.testing.parameterized import parameters
 
 # For debug
-debugUseScreen = True
-debugIdConconfig = 1
+debugUseScreen = False
+debugIdConfig  = 1
+debugCommand   = "Predict"
 
 DB_DIR = os.getcwd().replace( "\\", "/" ) + "/run/db/chats-debug"
 APP_KEY = "chats"
@@ -132,10 +133,11 @@ if __name__ == '__main__':
             mainWindow = view.MainWindow( configDoer, hpDoer, runsDoer, startRunDoer, predictRunDoer )
             ( idConfig, buttonClicked, runParams, predictParams ) = mainWindow.showAndSelectConf( configs )
         else :
-            ( idConfig, buttonClicked, runParams ) = (
-                debugIdConconfig,
-                "Train",
-                { "comment": "", "tune": False, "showPlots": False, "nbTuning": 2, "isTensorboard": True, "isTensorboardFull": False }
+            ( idConfig, buttonClicked, runParams, predictParams ) = (
+                debugIdConfig,
+                debugCommand,
+                { "comment": "", "tune": False, "showPlots": False, "nbTuning": 2, "isTensorboard": True, "isTensorboardFull": False },
+                { "choiceHyperParams" : 1, "choiceData" : 1 }
             )
 
         # cancel?
@@ -153,40 +155,69 @@ if __name__ == '__main__':
 
         # get hyper parameters
         if ( buttonClicked == "Train" ) :
-            
+
             # Get config hyper parameters
             hyperParams = db.getHyperParams( conn, config[ "idHyperParams" ] )
-            
+
         elif ( buttonClicked == "Predict" ) :
-            
+
             # hyper parameters depend on choice
             choiceHp = predictParams[ "choiceHyperParams" ]
-            
+
             if ( choiceHp == 1 ) :
-                
+
                 # Config hyper params
                 hyperParams = db.getHyperParams( conn, config[ "idHyperParams" ] )
-                
+
+                # Last idRun
+                idRun = db.getRunIdLast( conn, config[ "id" ] )
+
             elif ( choiceHp == 2 ) :
-                
+
                 # Get best hyper parameters
-                hyperParams = db.getBestHyperParams( conn, idConfig )
-                
+                ( hyperParams, _, idRun ) = db.getBestHyperParams( conn, idConfig )
+
+                # Check run structure and pixel size match with conf
+                run = db.getRun( conn, idRun )
+
+                runStructure = None
+                if ( run[ "conf_saved_info" ] != None ) :
+                    runStructure = run[ "conf_saved_info" ][ "structure" ]
+
+                if ( ( runStructure != None ) and ( config[ "structure" ] != runStructure ) ):
+                    raise ValueError( "run 'structure' != config 'structure'" )
+
+                runImageSize = None
+                if ( run[ "conf_saved_info" ] != None ) :
+                    runImageSize = run[ "conf_saved_info" ][ "imageSize" ]
+
+                if ( ( runImageSize != None ) and ( config[ "imageSize" ] != runImageSize ) ):
+                    raise ValueError( "run 'imageSize' != config 'imageSize'" )
+
             else :
                 raise ValueError( "Unknown hyper parameters choice " + choiceHp )
         else :
             raise ValueError( "Unknown action " + buttonClicked )
 
-        raise ValueError( "TODO check machine, size consistency with hyper parameters" )
-        
+        # Data source may depend on choice
+        if ( ( predictParams != None ) and ( "choiceData" in predictParams ) ) :
+            choiceData = predictParams[ "choiceData" ]
+
         # Get machine data source
         machineDataSourceClass = configDatasources[ machineName ]
         if ( machineDataSourceClass == None ) :
             raise ValueError( "Unknown machine data source class", machineName )
 
-        dataSource = instantiateClass( machineDataSourceClass, hyperParams )
-        # set image width
-        dataSource.setImageWidth( config[ "imageSize" ] )
+        # Get data
+        if ( \
+            ( buttonClicked == "Train" ) or \
+            ( ( buttonClicked == "Predict" ) and ( choiceData == 1 ) ) \
+        ) :
+            dataSource = instantiateClass( machineDataSourceClass, hyperParams )
+            # set image width
+            dataSource.setImageWidth( config[ "imageSize" ] )
+        else :
+            raise ValueError( "DataSource case not yet supported" )
 
         # Get machine class
         machineClass = iniMachines.get( "Classes", machineName )
@@ -217,14 +248,18 @@ if __name__ == '__main__':
 
         # train?
         if ( buttonClicked == "Train" ) :
-            print( "Train machine", machineName )
-
-            comment     = runParams[ "comment" ]
-            tune        = runParams[ "tune" ]
-            nbTuning    = runParams[ "nbTuning" ]
-            showPlots   = runParams[ "showPlots" ]
 
             # set run params
             ml.setRunParams( runParams )
 
+            showPlots   = runParams[ "showPlots" ]
+            tune        = runParams[ "tune" ]
+            nbTuning    = runParams[ "nbTuning" ]
+            comment     = runParams[ "comment" ]
+
+            print( "Train machine", machineName )
             ml.train( conn, config, comment, tune = tune, showPlots = showPlots )
+
+        elif ( buttonClicked == "Predict" ) :
+            print( "Predict from machine", machineName )
+            ml.predict( conn, config, idRun )

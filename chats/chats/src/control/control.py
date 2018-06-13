@@ -23,7 +23,7 @@ class HyperParamsDoer( Doer ):
         hyperParams = db.getHyperParams( self.conn, self.idHyperParams )
 
         # get best hyper params
-        ( bestHyperParams, bestDevAccuracy ) = db.getBestHyperParams( self.conn, idConf )
+        ( bestHyperParams, bestDevAccuracy, _ ) = db.getBestHyperParams( self.conn, idConf )
 
         # Launch window, it may update hps
         viewHp = view.ViewOrUpdateHyperParamsWindow( fenetre, self.doCreateOrUpdateHyperParams )

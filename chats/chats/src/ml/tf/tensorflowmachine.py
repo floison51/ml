@@ -177,13 +177,10 @@ class AbstractTensorFlowMachine( AbstractMachine ):
 
         # To calculate the correct predictions
         prediction = tf.round( tf.sigmoid( Z_last ) )
-        correct_prediction = tf.equal( prediction, Y )
+        correct_prediction = tf.equal( prediction, Y, "correct_prediction" )
         return correct_prediction
 
-    def persistParams( self, sess, idRun ):
-
-        # lets save the parameters in a variable
-        #sess.run( self.parameters )
+    def persistModel( self, sess, idRun ):
 
         # Serialize parameters
         save_dir = TENSORFLOW_SAVE_DIR + "/" + str( idRun ) + "/save"
@@ -193,6 +190,14 @@ class AbstractTensorFlowMachine( AbstractMachine ):
 
         save_path = self.tfSaver.save( sess, save_dir )
         print( "Model saved in path: %s" % save_path)
+
+    def restoreModel( self, sess, idRun ):
+
+        # Serialize parameters
+        saved_dir = TENSORFLOW_SAVE_DIR + "/" + str( idRun ) + "/save"
+
+        saved_path = self.tfSaver.restore( sess, saved_dir )
+        print( "Model restored from path: %s" % saved_path)
 
     def getAccuracyEvalFeedDict( self, inputData ) :
         # Make sure KEEP_PROB = 1 and TRN_MODE = False
@@ -307,6 +312,41 @@ class AbstractTensorFlowMachine( AbstractMachine ):
             tf.summary.scalar('min', tf.reduce_min(var))
             tf.summary.histogram('histogram', var)
 
+    def predictFromSavedModel( self, conn, config, idRun ) :
+        "Predict from saved model"
+
+        # reset graph
+        tf.reset_default_graph()
+
+        #Variable to restore
+        self.correct_prediction = tf.get_variable( "correct_prediction", shape=[ 10 ] )
+
+        # Save / restore model and vars
+        self.tfSaver = tf.train.Saver()
+
+        with tf.Session() as sess:
+
+            # Restore model from disk.
+            self.restoreModel( sess, idRun )
+            print( "Model restored." )
+
+            self.tfDatasetDev = tf.data.Dataset.from_tensor_slices(
+                (
+                    self.datasetDev.X,
+                    self.datasetDev.Y
+                )
+            )
+
+            # Data set, repeat num_epochs, minibatch_size slices
+            self.tfDatasetDev = self.tfDatasetDev.prefetch( self.minibatch_size * 2 ).batch( self.minibatch_size )
+
+            trnIterator = self.tfDatasetTrn.make_initializable_iterator()
+            devIterator = self.tfDatasetDev.make_initializable_iterator()
+
+            # calculate accuracy
+            accuracy = self.accuracyEval( inputData, "predict" )
+
+            print( "Predict accuracy : %f" % accuracy )
 
 #*****************************************************
 # Tensorflow basic machine : supports [48,24,1] fully connected hand-mad structure
@@ -520,7 +560,7 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
         super().create_placeholders( X_shape, X_type, Y_shape, Y_type )
 
         #Num eopochs for trn dataset
-        self.phTrnNumEpoch = tf.placeholder( tf.int64, name = "phTrnNumEpoch" )
+        self.phTrnNumEpochs = tf.placeholder( tf.int64, name = "phTrnNumEpochs" )
 
         # Data set handle (human identifier)
         self.dsHandle = tf.placeholder(tf.string, shape=[], name="ph_Dataset" )
@@ -772,7 +812,7 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
         # Data set, minibatch_size slices
         self.tfDatasetTrn = self.tfDatasetTrn.prefetch( self.minibatch_size * 2 ).batch( self.minibatch_size )
         # Data set, repeat num_epochs
-        self.tfDatasetTrn = self.tfDatasetTrn.repeat( self.phTrnNumEpoch )
+        self.tfDatasetTrn = self.tfDatasetTrn.repeat( self.phTrnNumEpochs )
 
         self.tfDatasetDev = tf.data.Dataset.from_tensor_slices(
             (
@@ -796,7 +836,7 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
 
             # initialise variables iterators.
             sess.run( tf.global_variables_initializer() )
-            sess.run( [ trnIterator.initializer, devIterator.initializer ], { self.phTrnNumEpoch : self.num_epochs } )
+            sess.run( [ trnIterator.initializer, devIterator.initializer ], { self.phTrnNumEpochs : self.num_epochs } )
 
             # The `Iterator.string_handle()` method returns a tensor that can be evaluated
             # and used to feed the `handle` placeholder.
@@ -939,10 +979,10 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
             print( "Elapsed (s):", elapsedSeconds )
             print( "Perf index :", perfIndex )
 
-            self.persistParams( sess, idRun )
+            self.persistModel( sess, idRun )
 
             # Rewind data sets, 1 epoch for TRN data set
-            sess.run( [ trnIterator.initializer, devIterator.initializer ], { self.phTrnNumEpoch : 1 } )
+            sess.run( [ trnIterator.initializer, devIterator.initializer ], { self.phTrnNumEpochs : 1 } )
 
             accuracyTrain = self.accuracyEval( trnHandle, "trn" )
             print ( "Train Accuracy:", accuracyTrain )
@@ -971,7 +1011,7 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
             if ( extractImageErrors ) :
 
                 # Rewind data sets, 1 epoch for TRN data set
-                sess.run( [ trnIterator.initializer, devIterator.initializer ], { self.phTrnNumEpoch : 1 } )
+                sess.run( [ trnIterator.initializer, devIterator.initializer ], { self.phTrnNumEpochs : 1 } )
 
                 # Lists of OK for training
                 oks_train  = self.correctPredictionEval( trnHandle )
@@ -980,7 +1020,7 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
                 resultInfo[ const.KEY_TRN_NB_ERROR_BY_TAG ] = map1
                 resultInfo[ const.KEY_TRN_PC_ERROR_BY_TAG ] = map2
 
-                oks_dev   = self.correctPredictionEval( trnHandle )
+                oks_dev   = self.correctPredictionEval( devHandle )
                 map1, map2 = self.statsExtractErrors( "dev", dataset = self.datasetDev, oks = oks_dev, show_plot=show_plot )
                 # Errors nb by data tag
                 resultInfo[ const.KEY_DEV_NB_ERROR_BY_TAG ] = map1

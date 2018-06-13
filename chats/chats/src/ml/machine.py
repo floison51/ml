@@ -206,6 +206,27 @@ class AbstractMachine():
 
         print( "Finished in", globalElapsedSeconds, "seconds" )
 
+    def predict( self, conn, config, idRun ):
+        "Predict accuracy from trained model"
+
+        # hyper parameters
+        confHyperParams = config.getHyperParams( conn )
+
+        runHyperParams = {}
+        runHyperParams.update( confHyperParams[ "hyperParameters" ] )
+
+        # Start time
+        tsGlobalStart = time.time()
+
+        # Predict from saved model
+        self.predictFromSavedModel( conn, config, idRun )
+
+        # Start time
+        tsGlobalEnd = time.time()
+        globalElapsedSeconds = int( round( tsGlobalEnd - tsGlobalStart ) )
+
+        print( "Finished in", globalElapsedSeconds, "seconds" )
+
     # Stuff to catch Ctrl-C
     def signal_handler( self, signal, frame ):
         print( "Please, wait an epoch before training stops" )
