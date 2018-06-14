@@ -15,7 +15,7 @@ from ml.cats import cats
 from absl.testing.parameterized import parameters
 
 # For debug
-debugUseScreen = False
+debugUseScreen = True
 debugIdConfig  = 1
 debugCommand   = "Predict"
 
