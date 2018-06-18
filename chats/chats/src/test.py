@@ -19,9 +19,6 @@ debugUseScreen = True
 debugIdConfig  = 1
 debugCommand   = "Predict"
 
-DB_DIR = os.getcwd().replace( "\\", "/" ) + "/run/db/chats-debug"
-APP_KEY = "chats"
-
 def instantiateClass( classFqName, params ) :
     module_name, class_name = classFqName.rsplit(".", 1)
     TheClass = getattr( importlib.import_module(module_name), class_name)
@@ -110,9 +107,9 @@ def prepareData( dataSource ):
 if __name__ == '__main__':
 
     # Init DB
-    print( "Db dir:", DB_DIR )
+    print( "Db dir:", const.DB_DIR )
 
-    with db.initDb( APP_KEY, DB_DIR ) as conn :
+    with db.initDb( const.APP_KEY, const.DB_DIR ) as conn :
 
         # test (debug)
         #db.test( conn )

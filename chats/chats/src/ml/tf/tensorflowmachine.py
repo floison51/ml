@@ -20,6 +20,7 @@ import time
 import os
 import shutil
 from collections import OrderedDict
+import const.constants as const
 
 import db.db as db
 
@@ -27,8 +28,8 @@ import db.db as db
 import abc
 from ml.tf.tfdatasource import TensorFlowDataSource
 
-TENSORFLOW_SAVE_DIR = os.getcwd().replace( "\\", "/" ) + "/run/tf-save/"  + AbstractMachine.APP_KEY
-TENSORBOARD_LOG_DIR = os.getcwd().replace( "\\", "/" ) + "/run/tf-board/" + AbstractMachine.APP_KEY
+TENSORFLOW_SAVE_DIR = os.getcwd().replace( "\\", "/" ) + "/run/tf-save/"  + AbstractMachine.APP_KEY_RUN
+TENSORBOARD_LOG_DIR = os.getcwd().replace( "\\", "/" ) + "/run/tf-board/" + AbstractMachine.APP_KEY_RUN
 
 class AbstractTensorFlowMachine( AbstractMachine ):
     # Abstract class
@@ -891,6 +892,9 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
             # current iteration
             iteration = 0
 
+            # Nb status epopch : if we reach it, calculate DEV efficiency
+            nbStatusEpoch = math.ceil( self.num_epochs / 20 )
+             
             # Start time
             tsStart = time.time()
 
@@ -929,7 +933,7 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
                         self.var_numEpoch.load( iEpoch )
 
                         #print epoch cost
-                        if print_cost and ( iteration != 0 ) and ( iEpoch % 1 ) == 0:
+                        if print_cost and ( iteration != 0 ) and ( iEpoch % nbStatusEpoch ) == 0:
                             print ("Cost after epoch %i; iteration %i; %f" % ( iEpoch, iteration, epoch_cost ) )
                             if ( iEpoch != 0 ) :
 
