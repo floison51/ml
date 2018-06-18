@@ -27,12 +27,24 @@ from PIL import Image
 from nst_utils import *
 import numpy as np
 import tensorflow as tf
-from optparse import OptionParser
+
+from argparse import ArgumentParser
+from argparse import RawDescriptionHelpFormatter
 
 __all__ = []
-__version__ = 0.1
+__version__ = 1.0
 __date__ = '2018-06-18'
 __updated__ = '2018-06-18'
+
+class CLIError(Exception):
+    '''Generic exception to raise and log different fatal errors.'''
+    def __init__(self, msg):
+        super(CLIError).__init__(type(self))
+        self.msg = "E: %s" % msg
+    def __str__(self):
+        return self.msg
+    def __unicode__(self):
+        return self.msg
 
 def compute_content_cost(a_C, a_G):
     """
@@ -276,70 +288,137 @@ def model_nn( sess, model, train_step, J, J_content, J_style, input_image, num_i
     
     return generated_image
 
-
-if __name__ == '__main__':
-
+def main(argv=None): # IGNORE:C0111
     '''Command line options.'''
 
-    STYLE_LAYERS = [
-        ('conv1_1', 0.2),
-        ('conv2_1', 0.2),
-        ('conv3_1', 0.2),
-        ('conv4_1', 0.2),
-        ('conv5_1', 0.2)
-    ]
+    print( "Artwork generation by Convolutional Neural Network" )
     
-    # Reset the graph
-    tf.reset_default_graph()
-    
-    # Start interactive session
-    sess = tf.InteractiveSession()
-    
-    content_image = scipy.misc.imread("images/enfants.jpg")
-    #content_image = scipy.misc.imread("images/enfants.jpg")
-    content_image = reshape_and_normalize_image(content_image)
-    
-    style_image = scipy.misc.imread("images/paysage.jpg")
-    #style_image = scipy.misc.imread("images/paysage.jpg")
-    style_image = reshape_and_normalize_image(style_image)
-    
-    generated_image = generate_noise_image(content_image)
-    imshow(generated_image[0])
-    
-    # Load model
-    model = load_vgg_model( "pretrained-model/imagenet-vgg-verydeep-19.mat" )
-    print( model )
+    if argv is None:
+        argv = sys.argv
+    else:
+        sys.argv.extend(argv)
 
-    # Assign the content image to be the input of the VGG model.  
-    sess.run(model['input'].assign(content_image))
+    program_name = os.path.basename(sys.argv[0])
+    program_version = "v%s" % __version__
+    program_build_date = str(__updated__)
+    program_version_message = '%%(prog)s %s (%s)' % (program_version, program_build_date)
+    program_shortdesc = __import__('__main__').__doc__.split("\n")[1]
+    program_license = '''%s
+
+  Created by user_name on %s.
+  Copyright 2018 organization_name. All rights reserved.
+
+  Licensed under the Apache License 2.0
+  http://www.apache.org/licenses/LICENSE-2.0
+
+  Distributed on an "AS IS" basis without warranties
+  or conditions of any kind, either express or implied.
+
+USAGE
+''' % (program_shortdesc, str(__date__))
+
+    try:
+        # Setup argument parser
+        parser = ArgumentParser(description=program_license, formatter_class=RawDescriptionHelpFormatter)
+        parser.add_argument("-c", "--content"       , dest="contentImgPath", help="Content image path (400x300)", required=True )
+        parser.add_argument("-s", "--style"         , dest="styleImgPath"  , help="Style image path (400x300)", required=True)
+
+        parser.add_argument("-cc", "--contentCoeff" , dest="contentCoeff" , help="Content coeff, default=10", required=False, default=10, type=int )
+        parser.add_argument("-sc", "--styleCoeff"   , dest="stytleCoeff"  , help="Style coeff, default=40"  , required=False, default=40, type=int )
+        
+        parser.add_argument("-n", "--numIterations" , dest="numIterations" , help="Number of iterations, typically from 120 to 2000", required=True, type=int )
+        parser.add_argument("-l", "--learningRate"  , dest="learningRate"    , help="Learning rate, from 2 to 4 (may be instable)"  , required=True, type=int )
+
+        # Process arguments
+        args = parser.parse_args()
+
+        contentImgPath = args.contentImgPath
+        styleImgPath   = args.styleImgPath
+        
+        contentCoeff = args.contentCoeff
+        stytleCoeff  = args.stytleCoeff
+        
+        numIterations  = args.numIterations
+        learningRate   = args.learningRate
+
+        print( "Content image path :", contentImgPath )
+        print( "Style image path   :", styleImgPath )
+
+        print( "contentCoeff       :", contentCoeff )
+        print( "styleCoeff         :", stytleCoeff )
+
+        print( "numIterations      :", numIterations )
+        print( "learningRate       :", learningRate )
+        
+        # Start calculation
+        STYLE_LAYERS = [
+            ('conv1_1', 0.2),
+            ('conv2_1', 0.2),
+            ('conv3_1', 0.2),
+            ('conv4_1', 0.2),
+            ('conv5_1', 0.2)
+        ]
+        
+        # Reset the graph
+        tf.reset_default_graph()
+        
+        # Start interactive session
+        sess = tf.InteractiveSession()
+        
+        content_image = scipy.misc.imread( contentImgPath )
+        #content_image = scipy.misc.imread("images/enfants.jpg")
+        content_image = reshape_and_normalize_image(content_image)
+        
+        style_image = scipy.misc.imread( styleImgPath )
+        #style_image = scipy.misc.imread("images/paysage.jpg")
+        style_image = reshape_and_normalize_image(style_image)
+        
+        generated_image = generate_noise_image(content_image)
+        
+        # Load model
+        model = load_vgg_model( "pretrained-model/imagenet-vgg-verydeep-19.mat" )
+        # print( model )
     
-    # Select the output tensor of layer conv4_2
-    out = model['conv4_2']
+        # Assign the content image to be the input of the VGG model.  
+        sess.run(model['input'].assign(content_image))
+        
+        # Select the output tensor of layer conv4_2
+        out = model['conv4_2']
+        
+        # Set a_C to be the hidden layer activation from the layer we have selected
+        a_C = sess.run(out)
+        
+        # Set a_G to be the hidden layer activation from same layer. Here, a_G references model['conv4_2'] 
+        # and isn't evaluated yet. Later in the code, we'll assign the image G as the model input, so that
+        # when we run the session, this will be the activations drawn from the appropriate layer, with G as input.
+        a_G = out
+        
+        # Compute the content cost
+        J_content = compute_content_cost(a_C, a_G)    
+        
+        # Assign the input of the model to be the "style" image 
+        sess.run(model['input'].assign(style_image))
+        
+        # Compute the style cost
+        J_style = compute_style_cost( sess, model, STYLE_LAYERS )
+        
+        J = total_cost( J_content, J_style, alpha = contentCoeff, beta = stytleCoeff )
+        
+        # define optimizer (1 line)
+        optimizer = tf.train.AdamOptimizer( learningRate )
+        
+        # define train_step (1 line)
+        train_step = optimizer.minimize(J)
+        
+        model_nn( sess, model, train_step, J, J_content, J_style, generated_image, num_iterations=numIterations )
+        
+        print( "Finished, result in output/generated_image.jpg" )
     
-    # Set a_C to be the hidden layer activation from the layer we have selected
-    a_C = sess.run(out)
-    
-    # Set a_G to be the hidden layer activation from same layer. Here, a_G references model['conv4_2'] 
-    # and isn't evaluated yet. Later in the code, we'll assign the image G as the model input, so that
-    # when we run the session, this will be the activations drawn from the appropriate layer, with G as input.
-    a_G = out
-    
-    # Compute the content cost
-    J_content = compute_content_cost(a_C, a_G)    
-    
-    # Assign the input of the model to be the "style" image 
-    sess.run(model['input'].assign(style_image))
-    
-    # Compute the style cost
-    J_style = compute_style_cost( sess, model, STYLE_LAYERS )
-    
-    J = total_cost( J_content, J_style, alpha = 10, beta = 40 )
-    
-    # define optimizer (1 line)
-    optimizer = tf.train.AdamOptimizer(2.0)
-    
-    # define train_step (1 line)
-    train_step = optimizer.minimize(J)
-    
-    model_nn( sess, model, train_step, J, J_content, J_style, generated_image)
-    
+    except KeyboardInterrupt:
+        ### handle keyboard interrupt ###
+        return 0
+
+if __name__ == '__main__':
+    sys.exit( main() )
+    '''Command line options.'''
+
