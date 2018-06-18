@@ -326,7 +326,7 @@ USAGE
         parser.add_argument("-cc", "--contentCoeff" , dest="contentCoeff" , help="Content coeff, default=10", required=False, default=10, type=int )
         parser.add_argument("-sc", "--styleCoeff"   , dest="stytleCoeff"  , help="Style coeff, default=40"  , required=False, default=40, type=int )
         
-        parser.add_argument("-n", "--numIterations" , dest="numIterations" , help="Number of iterations, typically from 120 to 2000", required=True, type=int )
+        parser.add_argument("-n", "--numIterations" , dest="numIterations" , help="Number of iterations, typically from 200 to 2000", required=True, type=int )
         parser.add_argument("-l", "--learningRate"  , dest="learningRate"    , help="Learning rate, from 2 to 4 (may be instable)"  , required=True, type=int )
 
         # Process arguments
