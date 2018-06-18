@@ -165,7 +165,7 @@ def test_compute_layer_style_cost() :
         
     # J_style_layer    9.19028
 
-def compute_style_cost(model, STYLE_LAYERS):
+def compute_style_cost( sess, model, STYLE_LAYERS):
     """
     Computes the overall style cost from several chosen layers
     
@@ -183,13 +183,13 @@ def compute_style_cost(model, STYLE_LAYERS):
     J_style = 0
     
     for layer_name, coeff in STYLE_LAYERS:
-​
+        
         # Select the output tensor of the currently selected layer
         out = model[layer_name]
-​
+        
         # Set a_S to be the hidden layer activation from the layer we have selected, by running the session on out
         a_S = sess.run(out)
-​
+        
         # Set a_G to be the hidden layer activation from same layer. Here, a_G references model[layer_name] 
         # and isn't evaluated yet. Later in the code, we'll assign the image G as the model input, so that
         # when we run the session, this will be the activations drawn from the appropriate layer, with G as input.
@@ -197,10 +197,10 @@ def compute_style_cost(model, STYLE_LAYERS):
         
         # Compute style_cost for the current layer
         J_style_layer = compute_layer_style_cost(a_S, a_G)
-​
+        
         # Add coeff * J_style_layer of this layer to overall style cost
         J_style += coeff * J_style_layer
-​
+        
     return J_style
 
 def total_cost(J_content, J_style, alpha = 10, beta = 40):
@@ -223,9 +223,10 @@ def total_cost(J_content, J_style, alpha = 10, beta = 40):
     
     return J
 
-def test_total_cost :
+def test_total_cost() :
+    
     tf.reset_default_graph()
-​
+
     with tf.Session() as test:
         np.random.seed(3)
         J_content = np.random.randn()    
@@ -235,7 +236,7 @@ def test_total_cost :
         
     # J    35.34667875478276
 
-def model_nn(sess, input_image, num_iterations = 200):
+def model_nn( sess, model, train_step, J, J_content, J_style, input_image, num_iterations = 200):
     
     # Initialize global variables (you need to run the session on the initializer)
     ### START CODE HERE ### (1 line)
@@ -258,9 +259,9 @@ def model_nn(sess, input_image, num_iterations = 200):
         ### START CODE HERE ### (1 line)
         generated_image = sess.run( model['input'] )
         ### END CODE HERE ###
-​
+        
         # Print every 20 iteration.
-        if i % 1 == 0:
+        if i % 20 == 0:
             Jt, Jc, Js = sess.run([J, J_content, J_style])
             print("Iteration " + str(i) + " :")
             print("total cost = " + str(Jt))
@@ -274,7 +275,10 @@ def model_nn(sess, input_image, num_iterations = 200):
     save_image('output/generated_image.jpg', generated_image)
     
     return generated_image
-def main( argv=None ):
+
+
+if __name__ == '__main__':
+
     '''Command line options.'''
 
     STYLE_LAYERS = [
@@ -287,15 +291,15 @@ def main( argv=None ):
     
     # Reset the graph
     tf.reset_default_graph()
-    ​
+    
     # Start interactive session
     sess = tf.InteractiveSession()
     
-    content_image = scipy.misc.imread("images/louvre_small.jpg")
+    content_image = scipy.misc.imread("images/enfants.jpg")
     #content_image = scipy.misc.imread("images/enfants.jpg")
     content_image = reshape_and_normalize_image(content_image)
     
-    style_image = scipy.misc.imread("images/monet.jpg")
+    style_image = scipy.misc.imread("images/paysage.jpg")
     #style_image = scipy.misc.imread("images/paysage.jpg")
     style_image = reshape_and_normalize_image(style_image)
     
@@ -308,34 +312,34 @@ def main( argv=None ):
 
     # Assign the content image to be the input of the VGG model.  
     sess.run(model['input'].assign(content_image))
-    ​
+    
     # Select the output tensor of layer conv4_2
     out = model['conv4_2']
-    ​
+    
     # Set a_C to be the hidden layer activation from the layer we have selected
     a_C = sess.run(out)
-    ​
+    
     # Set a_G to be the hidden layer activation from same layer. Here, a_G references model['conv4_2'] 
     # and isn't evaluated yet. Later in the code, we'll assign the image G as the model input, so that
     # when we run the session, this will be the activations drawn from the appropriate layer, with G as input.
     a_G = out
-    ​
+    
     # Compute the content cost
     J_content = compute_content_cost(a_C, a_G)    
     
     # Assign the input of the model to be the "style" image 
     sess.run(model['input'].assign(style_image))
-    ​
+    
     # Compute the style cost
-    J_style = compute_style_cost(model, STYLE_LAYERS)
+    J_style = compute_style_cost( sess, model, STYLE_LAYERS )
     
     J = total_cost( J_content, J_style, alpha = 10, beta = 40 )
     
     # define optimizer (1 line)
     optimizer = tf.train.AdamOptimizer(2.0)
-    ​
+    
     # define train_step (1 line)
     train_step = optimizer.minimize(J)
     
-    model_nn(sess, generated_image)
+    model_nn( sess, model, train_step, J, J_content, J_style, generated_image)
     
