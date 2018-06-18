@@ -26,7 +26,8 @@ class AbstractMachine():
     # Abstract class
     __metaclass__ = abc.ABCMeta
 
-    APP_KEY = "chats"
+    APP_KEY     = const.APP_KEY
+    APP_KEY_RUN = const.APP_RUN_KEY
 
     '''
     Abstract Machine Learning class
@@ -54,9 +55,13 @@ class AbstractMachine():
         "End of model optimization"
 
     @abc.abstractmethod
-    def persistParams( self ):
-        "Persist parameters"
+    def persistModel( self, sess, idRun ):
+        "Persist model"
 
+    @abc.abstractmethod
+    def restoreModel( self, idRun ):
+        "Restore model"
+        
     @abc.abstractmethod
     def accuracyEval( self, XY, what ):
         "Evaluate accurary"
@@ -426,7 +431,7 @@ class AbstractMachine():
             print( "Elapsed (s):", elapsedSeconds )
             print( "Perf index :", perfIndex )
 
-            self.persistParams( sess, idRun )
+            self.persistModel( sess, idRun )
 
             accuracyTrain = self.accuracyEval( ( self.datasetTrn.X, self.datasetTrn.Y ), "trn" )
             print ( "Train Accuracy:", accuracyTrain )

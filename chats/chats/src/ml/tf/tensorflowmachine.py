@@ -20,6 +20,7 @@ import time
 import os
 import shutil
 from collections import OrderedDict
+import const.constants as const
 
 import db.db as db
 
@@ -27,8 +28,8 @@ import db.db as db
 import abc
 from ml.tf.tfdatasource import TensorFlowDataSource
 
-TENSORFLOW_SAVE_DIR = os.getcwd().replace( "\\", "/" ) + "/run/tf-save/"  + AbstractMachine.APP_KEY
-TENSORBOARD_LOG_DIR = os.getcwd().replace( "\\", "/" ) + "/run/tf-board/" + AbstractMachine.APP_KEY
+TENSORFLOW_SAVE_DIR = os.getcwd().replace( "\\", "/" ) + "/run/tf-save/"  + AbstractMachine.APP_KEY_RUN
+TENSORBOARD_LOG_DIR = os.getcwd().replace( "\\", "/" ) + "/run/tf-board/" + AbstractMachine.APP_KEY_RUN
 
 class AbstractTensorFlowMachine( AbstractMachine ):
     # Abstract class
@@ -184,20 +185,29 @@ class AbstractTensorFlowMachine( AbstractMachine ):
 
         # Serialize parameters
         save_dir = TENSORFLOW_SAVE_DIR + "/" + str( idRun ) + "/save"
-        if tf.gfile.Exists( save_dir ):
+        if tf.gfile.Exists( save_dir ) :
             tf.gfile.DeleteRecursively( save_dir )
-        tf.gfile.MakeDirs( save_dir )
 
-        save_path = self.tfSaver.save( sess, save_dir )
-        print( "Model saved in path: %s" % save_path)
+        tf.saved_model.simple_save(
+            sess,
+            save_dir,
+            inputs={ "X": self.X, "Y": self.Y },
+            outputs={ "correct_prediction": self.correct_prediction }
+        )
 
-    def restoreModel( self, sess, idRun ):
+        print( "Model saved in path: %s" % save_dir )
+
+    def restoreModel( self, idRun ):
 
         # Serialize parameters
         saved_dir = TENSORFLOW_SAVE_DIR + "/" + str( idRun ) + "/save"
 
-        saved_path = self.tfSaver.restore( sess, saved_dir )
-        print( "Model restored from path: %s" % saved_path)
+        sess = tf.Session( graph=tf.Graph() )
+        tf.saved_model.loader.load( sess, [ "serve" ], saved_dir )
+        graph = tf.get_default_graph()
+
+        print( "Model restored from path: %s" % saved_dir )
+        return sess, graph
 
     def getAccuracyEvalFeedDict( self, inputData ) :
         # Make sure KEEP_PROB = 1 and TRN_MODE = False
@@ -318,17 +328,27 @@ class AbstractTensorFlowMachine( AbstractMachine ):
         # reset graph
         tf.reset_default_graph()
 
-        #Variable to restore
-        self.correct_prediction = tf.get_variable( "correct_prediction", shape=[ 10 ] )
+        # Restore model from disk.
+        #sess, graph = self.restoreModel( idRun )
 
-        # Save / restore model and vars
-        self.tfSaver = tf.train.Saver()
+        #with sess :
 
-        with tf.Session() as sess:
+        with tf.Session( graph=tf.Graph() ) as sess:
 
-            # Restore model from disk.
-            self.restoreModel( sess, idRun )
+            # Serialize parameters
+            saved_dir = TENSORFLOW_SAVE_DIR + "/" + str( idRun ) + "/save"
+            tf.saved_model.loader.load( sess, [ "serve" ], saved_dir )
+            graph = tf.get_default_graph()
+
             print( "Model restored." )
+
+            # Get handles
+            self.ph_dsHandle  = graph.get_tensor_by_name( "ph_Dataset:0" )
+            self.ph_KEEP_PROB = graph.get_tensor_by_name( "KEEP_PROB:0" )
+            self.ph_TRN_MODE  = graph.get_tensor_by_name( "TRN_MODE:0" )
+
+            # Result
+            self.correct_prediction = graph.get_tensor_by_name( "correct_prediction:0" )
 
             self.tfDatasetDev = tf.data.Dataset.from_tensor_slices(
                 (
@@ -338,13 +358,18 @@ class AbstractTensorFlowMachine( AbstractMachine ):
             )
 
             # Data set, repeat num_epochs, minibatch_size slices
-            self.tfDatasetDev = self.tfDatasetDev.prefetch( self.minibatch_size * 2 ).batch( self.minibatch_size )
-
-            trnIterator = self.tfDatasetTrn.make_initializable_iterator()
+            minibatch_size = 32
+            self.tfDatasetDev = self.tfDatasetDev.prefetch( minibatch_size * 2 ).batch( minibatch_size )
             devIterator = self.tfDatasetDev.make_initializable_iterator()
 
+            # Handle selecting dev dataset
+            devHandle = sess.run( devIterator.string_handle() )
+
+            # initialise variables iterators.
+            sess.run( [ devIterator.initializer ] )
+
             # calculate accuracy
-            accuracy = self.accuracyEval( inputData, "predict" )
+            accuracy = self.accuracyEval( devHandle, "predict" )
 
             print( "Predict accuracy : %f" % accuracy )
 
@@ -563,17 +588,17 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
         self.phTrnNumEpochs = tf.placeholder( tf.int64, name = "phTrnNumEpochs" )
 
         # Data set handle (human identifier)
-        self.dsHandle = tf.placeholder(tf.string, shape=[], name="ph_Dataset" )
+        self.ph_dsHandle = tf.placeholder(tf.string, shape=[], name="ph_Dataset" )
 
         # Iterator (X,Y)
         dsIterator = tf.data.Iterator.from_string_handle(
-            self.dsHandle,
+            self.ph_dsHandle,
             output_types  = ( X_type , Y_type ),
             output_shapes = ( X_shape, Y_shape )
         )
 
         # X and Y vars
-        ( self.X, self.Y ) = dsIterator.get_next()
+        ( self.X , self.Y ) = dsIterator.get_next( name = "XY" )
 
     def parseStructure( self, strStructure ):
         ## Normalize structure
@@ -749,12 +774,12 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
             self.cost = raw_cost
 
     def getRunIterationFeedDict( self, inputData, keep_prob ):
-        feed_dict = { self.dsHandle: inputData, self.ph_KEEP_PROB: keep_prob, self.ph_TRN_MODE: True }
+        feed_dict = { self.ph_dsHandle: inputData, self.ph_KEEP_PROB: keep_prob, self.ph_TRN_MODE: True }
         return feed_dict
 
     def getAccuracyEvalFeedDict( self, inputData ) :
         # Make sure KEEP_PROB = 1 and TRN_MODE = False
-        feed_dict = { self.dsHandle: inputData, self.ph_KEEP_PROB: 1.0, self.ph_TRN_MODE: False }
+        feed_dict = { self.ph_dsHandle: inputData, self.ph_KEEP_PROB: 1.0, self.ph_TRN_MODE: False }
         return feed_dict
 
 
@@ -824,8 +849,8 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
         # Data set, repeat num_epochs, minibatch_size slices
         self.tfDatasetDev = self.tfDatasetDev.prefetch( self.minibatch_size * 2 ).batch( self.minibatch_size )
 
-        trnIterator = self.tfDatasetTrn.make_initializable_iterator()
-        devIterator = self.tfDatasetDev.make_initializable_iterator()
+        trnIterator = self.tfDatasetTrn.make_initializable_iterator( shared_name="trnIterator" )
+        devIterator = self.tfDatasetDev.make_initializable_iterator( shared_name="devIterator" )
 
         # Start the session to compute the tensorflow graph
         with self.getSession() as sess:
@@ -867,6 +892,9 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
             # current iteration
             iteration = 0
 
+            # Nb status epopch : if we reach it, calculate DEV efficiency
+            nbStatusEpoch = math.ceil( self.num_epochs / 20 )
+             
             # Start time
             tsStart = time.time()
 
@@ -905,7 +933,7 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
                         self.var_numEpoch.load( iEpoch )
 
                         #print epoch cost
-                        if print_cost and ( iteration != 0 ) and ( iEpoch % 1 ) == 0:
+                        if print_cost and ( iteration != 0 ) and ( iEpoch % nbStatusEpoch ) == 0:
                             print ("Cost after epoch %i; iteration %i; %f" % ( iEpoch, iteration, epoch_cost ) )
                             if ( iEpoch != 0 ) :
 

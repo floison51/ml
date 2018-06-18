@@ -3,6 +3,13 @@ Created on 28 avr. 2018
 Machine Learning pseudo-constants
 @author: fran
 '''
+import os
+
+APP_KEY = "chats"
+APP_RUN_KEY = "chats-debug"
+
+DB_DIR = os.getcwd().replace( "\\", "/" ) + "/run/db/" + APP_RUN_KEY
+
 # Dico keys
 KEY_DICO_HYPER_PARAMS   = "hyperParameters"
 KEY_DICO_SYSTEM         = "system"
