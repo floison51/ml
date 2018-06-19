@@ -149,7 +149,7 @@ def test_sample( vocab_size, char_to_ix, ix_to_char ):
     # 'l', 'k', 'g', 'a', 'l', 'j', 'b', 'g', 'g', 'k', 'e', 'f', 'l', 'y', '\n', '\n']
     # if __name__ == "__main__":
 
-def optimize(X, Y, a_prev, parameters, learning_rate = 0.01):
+def optimize(X, Y, a_prev, parameters, vocab_size, learning_rate = 0.01):
     """
     Execute one step of the optimization to train the model.
     
@@ -179,7 +179,7 @@ def optimize(X, Y, a_prev, parameters, learning_rate = 0.01):
     ### START CODE HERE ###
     
     # Forward propagate through time (≈1 line)
-    loss, cache = rnn_forward( X, Y, a_prev, parameters )
+    loss, cache = rnn_forward( X, Y, a_prev, parameters, vocab_size=vocab_size )
     
     # Backpropagate through time (≈1 line)
     gradients, a = rnn_backward( X, Y, parameters, cache )
@@ -222,7 +222,7 @@ def test_optimize():
 #     gradients["dby"][1]    [ 0.01538192]
 #     a_last[4]    [-1.]
 
-def model(data, ix_to_char, char_to_ix, num_iterations = 35000, n_a = 50, dino_names = 7, vocab_size = 27):
+def model(dataFile, ix_to_char, char_to_ix, vocab_size, num_iterations = 35000, learning_rate = 0.01, n_a = 50, dino_names = 7 ):
     """
     Trains the model and generates dinosaur names. 
     
@@ -249,7 +249,7 @@ def model(data, ix_to_char, char_to_ix, num_iterations = 35000, n_a = 50, dino_n
     loss = get_initial_loss(vocab_size, dino_names)
     
     # Build list of all dinosaur names (training examples).
-    with open("dinos.txt") as f:
+    with open( dataFile, encoding='utf-8' ) as f:
         examples = f.readlines()
     examples = [x.lower().strip() for x in examples]
     
@@ -272,7 +272,7 @@ def model(data, ix_to_char, char_to_ix, num_iterations = 35000, n_a = 50, dino_n
         
         # Perform one optimization step: Forward-prop -> Backward-prop -> Clip -> Update parameters
         # Choose a learning rate of 0.01
-        curr_loss, gradients, a_prev = optimize( X, Y, a_prev, parameters, learning_rate = 0.01 )
+        curr_loss, gradients, a_prev = optimize( X, Y, a_prev, parameters, vocab_size=vocab_size, learning_rate = learning_rate )
         
         ### END CODE HERE ###
         
@@ -300,7 +300,28 @@ def model(data, ix_to_char, char_to_ix, num_iterations = 35000, n_a = 50, dino_n
 
 if __name__ == '__main__':
 
-    data = open('dinos.txt', 'r').read()
+    #dataFile = 'dinos.txt'
+    dataFile = 'meca.txt'
+    
+    # Normalise input file : keep first word
+#     with open( dataFile, 'r', encoding='utf-8' ) as f:
+#         lines = f.readlines()
+# 
+#     with open( "norm.txt", "w", encoding='utf-8' ) as dataOut :
+#         for line in lines :
+#             line = line.strip()
+#             iSpace = line.find( ' ' )
+#             
+#             if ( iSpace >= 0 ) :
+#                 line = line [ 0 : iSpace ]
+#             
+#             dataOut.write( line )
+#             dataOut.write( '\n' )
+#     
+#     sys.exit()
+     
+    data = open( dataFile, 'r', encoding='utf-8' ).read()
+    
     data= data.lower()
     chars = list(set(data))
     data_size, vocab_size = len(data), len(chars)
@@ -310,4 +331,4 @@ if __name__ == '__main__':
     ix_to_char = { i:ch for i,ch in enumerate(sorted(chars)) }
     print( ix_to_char )
 
-    parameters = model( data, ix_to_char, char_to_ix )
+    parameters = model( dataFile, ix_to_char, char_to_ix, vocab_size, num_iterations = 100000, learning_rate=0.005 )
