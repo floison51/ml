@@ -222,7 +222,7 @@ def test_optimize():
 #     gradients["dby"][1]    [ 0.01538192]
 #     a_last[4]    [-1.]
 
-def model(dataFile, ix_to_char, char_to_ix, vocab_size, num_iterations = 35000, learning_rate = 0.01, n_a = 50, dino_names = 7 ):
+def model( dataFile, dataEncoding, ix_to_char, char_to_ix, vocab_size, num_iterations = 35000, learning_rate = 0.01, n_a = 50, dino_names = 7 ):
     """
     Trains the model and generates dinosaur names. 
     
@@ -249,7 +249,7 @@ def model(dataFile, ix_to_char, char_to_ix, vocab_size, num_iterations = 35000, 
     loss = get_initial_loss(vocab_size, dino_names)
     
     # Build list of all dinosaur names (training examples).
-    with open( dataFile, encoding='utf-8' ) as f:
+    with open( dataFile, encoding=dataEncoding ) as f:
         examples = f.readlines()
     examples = [x.lower().strip() for x in examples]
     
@@ -301,26 +301,40 @@ def model(dataFile, ix_to_char, char_to_ix, vocab_size, num_iterations = 35000, 
 if __name__ == '__main__':
 
     #dataFile = 'dinos.txt'
-    dataFile = 'meca.txt'
+    #dataFile = 'meca.txt'
+    
+    # https://www.legrenierdelisette.com/prenoms-anciens/prenoms-anciens-pour-filles/
+    dataFile = 'prenoms.txt'
+    dataEncoding = "Cp1252"
     
     # Normalise input file : keep first word
-#     with open( dataFile, 'r', encoding='utf-8' ) as f:
+#     with open( dataFile, 'r', encoding=dataEncoding ) as f:
 #         lines = f.readlines()
-# 
-#     with open( "norm.txt", "w", encoding='utf-8' ) as dataOut :
+#   
+#     with open( "norm.txt", "w", encoding=dataEncoding ) as dataOut :
 #         for line in lines :
 #             line = line.strip()
-#             iSpace = line.find( ' ' )
+#             if ( line == "" ) :
+#                 continue
 #             
+#             mots = line.split( " " )
+#             for mot in mots :
+#                 dataOut.write( mot )
+#                 dataOut.write( '\n' )
+#             iSpace = line.find( ' ' ) 
 #             if ( iSpace >= 0 ) :
 #                 line = line [ 0 : iSpace ]
-#             
+#               
+#             iTab = line.find( '\t' ) 
+#             if ( iTab >= 0 ) :
+#                 line = line [ 0 : iTab ]
+#                  
 #             dataOut.write( line )
 #             dataOut.write( '\n' )
-#     
+#       
 #     sys.exit()
      
-    data = open( dataFile, 'r', encoding='utf-8' ).read()
+    data = open( dataFile, 'r', encoding=dataEncoding ).read()
     
     data= data.lower()
     chars = list(set(data))
@@ -331,4 +345,4 @@ if __name__ == '__main__':
     ix_to_char = { i:ch for i,ch in enumerate(sorted(chars)) }
     print( ix_to_char )
 
-    parameters = model( dataFile, ix_to_char, char_to_ix, vocab_size, num_iterations = 100000, learning_rate=0.005 )
+    parameters = model( dataFile, dataEncoding, ix_to_char, char_to_ix, vocab_size, num_iterations = 200000, learning_rate=0.001 )
