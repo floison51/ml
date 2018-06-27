@@ -301,11 +301,16 @@ def model( dataFile, dataEncoding, ix_to_char, char_to_ix, vocab_size, num_itera
 if __name__ == '__main__':
 
     #dataFile = 'dinos.txt'
-    #dataFile = 'meca.txt'
+    
+    dataFile = 'meca.txt'
+    dataEncoding = "Cp1252"
     
     # https://www.legrenierdelisette.com/prenoms-anciens/prenoms-anciens-pour-filles/
-    dataFile = 'prenoms.txt'
-    dataEncoding = "Cp1252"
+#     dataFile = 'prenoms.txt'
+#     dataEncoding = "Cp1252"
+    
+#     dataFile = 'partNames.txt'
+#     dataEncoding = "utf-8"
     
     # Normalise input file : keep first word
 #     with open( dataFile, 'r', encoding=dataEncoding ) as f:

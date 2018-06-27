@@ -61,6 +61,15 @@ class AbstractTensorFlowMachine( AbstractMachine ):
         sess = tf.Session()
         return sess
 
+    def get_var( self, all_vars, name):
+
+        searchName = name + ":"
+
+        for i in range( len( all_vars ) ):
+            if all_vars[i].name.startswith( searchName ):
+                return all_vars[ i ]
+        return None
+
     def getTensorBoardFolder( self, what ) :
         # root TFB folder + runID to get a name in TFB
         folder = TENSORBOARD_LOG_DIR + "/" + what + "/" + str( self.idRun )
@@ -85,6 +94,10 @@ class AbstractTensorFlowMachine( AbstractMachine ):
 
             self.dev_writer = tf.summary.FileWriter( devFolder, sess.graph )
 
+        # Random seed
+        seed = 3 # to keep consistent results
+        tf.set_random_seed( seed )
+
         # Run the initialization
         init = tf.global_variables_initializer()
         sess.run( init )
@@ -103,6 +116,9 @@ class AbstractTensorFlowMachine( AbstractMachine ):
 
         # parse structure
         self.structure = self.parseStructure( strStructure )
+
+        # reset graph
+        tf.reset_default_graph()
 
         # Create Placeholders of shape (n_x, n_y)
         self.create_placeholders( X_shape, X_type, Y_shape, Y_type )
@@ -278,11 +294,11 @@ class AbstractTensorFlowMachine( AbstractMachine ):
         return feed_dict
 
     def runIteration(
-        self, sess, input, keep_prob,
+        self, sess, inputData, keep_prob,
         iteration, num_minibatches
     ):
 
-        feed_dict = self.getRunIterationFeedDict( input, keep_prob )
+        feed_dict = self.getRunIterationFeedDict( inputData, keep_prob )
 
         # No mini-batch
         if ( self.isTensorboard and ( iteration % ( 100 * num_minibatches ) == 100 * num_minibatches - 1 ) ):  # Record execution stats
@@ -665,15 +681,19 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
 
         curInput = self.X
 
+        iStructure = -1
         # Browse structure
         for structureItem in self.structure :
+
+            iStructure += 1
 
             key   = structureItem[ 0 ]
             value = structureItem[ 1 ]
 
             if ( key == "tensor" ) :
-                # value is a tensorwflow tensor
-                AZ = eval( value )
+                # value is a tensor flow tensor
+                with tf.variable_scope( "tensor" + str( iStructure ) ):
+                    AZ = eval( value )
 
             elif ( key == "flatten" ) :
                 # flatten data
@@ -685,7 +705,8 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
                 for dim in curShape.dims[ 1: ] :
                     flatDim *= dim.value
 
-                AZ = tf.reshape( curInput, [-1, flatDim ] )
+                with tf.variable_scope( "flatten" + str( iStructure ) ):
+                    AZ = tf.reshape( curInput, [-1, flatDim ], scope="flatten" )
 
             elif ( key == "fullyConnected" ) :
 
@@ -698,30 +719,34 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
                     # last layer
                     lastLayer = ( iLayer == ( len( numLayers ) - 1 ) )
 
-                    # filter input by keep prob if needed
-                    if ( self.keep_prob != 1 and not lastLayer ) :
-                        curInput = tf.contrib.layers.dropout( curInput, self.ph_KEEP_PROB )
+                    with tf.variable_scope( "fc" + str( iStructure ) ):
+                        # filter input by keep prob if needed
+                        if ( self.keep_prob != 1 and not lastLayer ) :
+                            curInput = tf.contrib.layers.dropout( curInput, self.ph_KEEP_PROB, scope="keepProb" + str( iLayer ) )
 
-                    # Z function
-                    Z0 = tf.contrib.layers.fully_connected( \
-                        inputs=curInput, num_outputs=numLayer, activation_fn=None, \
-                        weights_initializer=tf.contrib.layers.xavier_initializer( seed = 1 ), \
-                        weights_regularizer= regularizer_l2
-                    )
+                        # Z function
+                        Z0 = tf.contrib.layers.fully_connected( \
+                            inputs=curInput, num_outputs=numLayer, activation_fn=None, \
+                            weights_initializer=tf.contrib.layers.xavier_initializer( seed = 1 ), \
+                            weights_regularizer= regularizer_l2,
+                            scope="Z" + str( iLayer )
+                        )
 
-                    if ( self.useBatchNormalization ) :
-                        # Add batch normalization to speed-up gradiend descent convergence
-                        # Not for training
-                        Z1 = tf.layers.batch_normalization( Z0, training=self.ph_TRN_MODE )
-                    else :
-                        Z1 = Z0
+                        self.tfDebug = Z0
 
-                    if ( lastLayer ) :
-                        # No activation function
-                        AZ = Z1
-                    else :
-                        # activation function
-                        AZ = tf.nn.relu( Z1 )
+                        if ( self.useBatchNormalization ) :
+                            # Add batch normalization to speed-up gradiend descent convergence
+                            # Not for training
+                            Z1 = tf.layers.batch_normalization( Z0, training=self.ph_TRN_MODE, scope="batchNormZ" + str( iLayer ) )
+                        else :
+                            Z1 = Z0
+
+                        if ( lastLayer ) :
+                            # No activation function
+                            AZ = Z1
+                        else :
+                            # activation function
+                            AZ = tf.nn.relu( Z1, scope="A" + str( iLayer ) )
 
                     # next input in AZ
                     curInput = AZ
@@ -854,8 +879,6 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
 
         # Start the session to compute the tensorflow graph
         with self.getSession() as sess:
-
-            seed = 3 # to keep consistent results
 
             self.initSessionVariables( sess )
 

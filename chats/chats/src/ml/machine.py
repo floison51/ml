@@ -294,6 +294,11 @@ class AbstractMachine():
             minCostFinalization = 99999999999999
             finished = False
 
+            # When to we display epochs stats
+            nbStatusEpoch = math.ceil( current_num_epochs / 20 )
+            # Debug
+            nbStatusEpoch = 1
+            
             # intercept Ctrl-C
             self.interrupted = False
             import signal
@@ -366,7 +371,7 @@ class AbstractMachine():
                             # reset trace start
                             tsTraceStart = tsTraceNow
 
-                if print_cost and iEpoch % 100 == 0:
+                if print_cost and iEpoch % nbStatusEpoch == 0:
                     print ( "Cost after epoch %i; iteration %i; %f" % ( iEpoch, iteration, epoch_cost ) )
                     if ( iEpoch != 0 ) :
 
