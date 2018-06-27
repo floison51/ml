@@ -706,7 +706,7 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
                     flatDim *= dim.value
 
                 with tf.variable_scope( "flatten" + str( iStructure ) ):
-                    AZ = tf.reshape( curInput, [-1, flatDim ], scope="flatten" )
+                    AZ = tf.reshape( curInput, [-1, flatDim ], name="flatten" )
 
             elif ( key == "fullyConnected" ) :
 

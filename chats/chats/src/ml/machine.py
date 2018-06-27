@@ -296,8 +296,6 @@ class AbstractMachine():
 
             # When to we display epochs stats
             nbStatusEpoch = math.ceil( current_num_epochs / 20 )
-            # Debug
-            nbStatusEpoch = 1
             
             # intercept Ctrl-C
             self.interrupted = False
@@ -513,12 +511,12 @@ class AbstractMachine():
 
         m = X.shape[0]                  # number of training examples
         mini_batches = []
-        np.random.seed(seed)
+        np.random.seed( seed )
 
         # Step 1: Shuffle (X, Y)
         permutation = list( np.random.permutation( m ) )
-        shuffled_X = X # [ permutation, : ]
-        shuffled_Y = Y # [ permutation, : ].reshape( ( m, Y.shape[1] ) )
+        shuffled_X = X[ permutation, : ]
+        shuffled_Y = Y[ permutation, : ].reshape( ( m, Y.shape[1] ) )
 
         # Step 2: Partition (shuffled_X, shuffled_Y). Minus the end case.
         num_complete_minibatches = math.floor( m / mini_batch_size) # number of mini batches of size mini_batch_size in your partitioning
