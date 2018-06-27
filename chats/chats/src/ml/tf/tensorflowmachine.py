@@ -338,14 +338,11 @@ class AbstractTensorFlowMachine( AbstractMachine ):
             tf.summary.scalar('min', tf.reduce_min(var))
             tf.summary.histogram('histogram', var)
 
-    def predictFromSavedModel( self, conn, config, idRun ) :
+    def predictFromSavedModel( self, conn, config, idRun, imagePathes ) :
         "Predict from saved model"
 
         # reset graph
         tf.reset_default_graph()
-
-        # Restore model from disk.
-        #sess, graph = self.restoreModel( idRun )
 
         #with sess :
 
@@ -363,13 +360,15 @@ class AbstractTensorFlowMachine( AbstractMachine ):
             self.ph_KEEP_PROB = graph.get_tensor_by_name( "KEEP_PROB:0" )
             self.ph_TRN_MODE  = graph.get_tensor_by_name( "TRN_MODE:0" )
 
+            # Create a dummy Y vector
+            dummy_Y = np.ones( shape = ( self.datasetDev.X.shape[ 0 ], 1 ), dtype=np.float32 )
             # Result
             self.correct_prediction = graph.get_tensor_by_name( "correct_prediction:0" )
 
             self.tfDatasetDev = tf.data.Dataset.from_tensor_slices(
                 (
                     self.datasetDev.X,
-                    self.datasetDev.Y
+                    dummy_Y
                 )
             )
 
@@ -384,10 +383,20 @@ class AbstractTensorFlowMachine( AbstractMachine ):
             # initialise variables iterators.
             sess.run( [ devIterator.initializer ] )
 
-            # calculate accuracy
-            accuracy = self.accuracyEval( devHandle, "predict" )
-
-            print( "Predict accuracy : %f" % accuracy )
+            if ( imagePathes != None ) :
+                
+                # calculate correct predictions
+                correct_predictions = sess.run( [ self.correct_prediction ] , self.getAccuracyEvalFeedDict( devHandle ) )
+                
+                print( "Is a cat ???" )
+                for i in range( 0, len( imagePathes ) ) :
+                    print( "  " + imagePathes[ i ] + " :", correct_predictions[ i ] )
+                    
+            else :
+                # calculate accuracy
+                accuracy = self.accuracyEval( devHandle, "predict" )
+    
+                print( "Predict accuracy : %f" % accuracy )
 
 #*****************************************************
 # Tensorflow basic machine : supports [48,24,1] fully connected hand-mad structure
@@ -917,7 +926,7 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
 
             # Nb status epopch : if we reach it, calculate DEV efficiency
             nbStatusEpoch = math.ceil( self.num_epochs / 20 )
-             
+
             # Start time
             tsStart = time.time()
 

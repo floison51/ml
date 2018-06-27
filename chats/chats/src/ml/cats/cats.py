@@ -11,6 +11,8 @@ import os
 import h5py
 import numpy as np
 import sys
+from PIL import Image
+
 
 class CatRawDataSource( DataSource ):
     "Get cats raw data set, read from files"
@@ -20,59 +22,83 @@ class CatRawDataSource( DataSource ):
 
     def getDatasets( self, isLoadWeights ):
 
-        # Base dir for cats and not cats images
-        baseDir = os.getcwd()
+        if ( self.imagePathes != None ) :
 
-        trn_dataset = h5py.File( baseDir + "/data/prepared/train_chats-" + str( self.pxWidth ) + ".h5", "r" )
-        trn_set_x_orig = np.array(trn_dataset["x"][:]) # your train set features
-        trn_set_y_orig = np.array(trn_dataset["y"][:]) # your train set labels
+            pixes = []
 
-        dev_dataset = h5py.File( baseDir + "/data/prepared/dev_chats-" + str( self.pxWidth ) + ".h5", "r")
-        dev_set_x_orig = np.array( dev_dataset["x"][:] ) # your test set features
-        dev_set_y_orig = np.array( dev_dataset["y"][:] ) # your test set labels
+            for imagePath in self.imagePathes :
+                # load image
+                img = Image.open( imagePath )
+                # Resize image
+                resizedImg = img.resize( ( self.pxWidth, self.pxWidth ) )
+                # populate lists
+                pix = np.array( resizedImg )
 
-        trn_set_x = trn_set_x_orig.astype( np.float32 )
-        dev_set_x = dev_set_x_orig.astype( np.float32 )
+                pixes.append( pix )
 
-        # passer de (476,) (risque) a  (1,476)
-        trn_set_y = trn_set_y_orig.reshape((1, trn_set_y_orig.shape[0]))
-        dev_set_y = dev_set_y_orig.reshape((1, dev_set_y_orig.shape[0]))
+            dev_X = np.array( pixes, dtype = np.float32 )
+            
+            # Create data sets
+            datasetTrn = None
+            datasetDev = DataSet( dev_X, dev_X, None, None, self.imagePathes, None )
 
-        ## replace Boolean by (1,0) float values to be consistent with X
-        trn_set_y = trn_set_y.astype( np.float32 )
-        dev_set_y = dev_set_y.astype( np.float32 )
+        else :
 
-        # Image tags
-        trn_set_tags_orig = np.array(trn_dataset["tags"][:]) # images tags
-        dev_set_tags_orig = np.array(dev_dataset["tags"][:]) # images tags
-        # passer de (476,) (risque) a  (1,476)
-        trn_set_tags      = trn_set_tags_orig.reshape((1, trn_set_tags_orig.shape[0]))
-        dev_set_tags      = dev_set_tags_orig.reshape((1, dev_set_tags_orig.shape[0]))
+            # Load from h5py data sets
 
-        # Default weight is 1 (int)
-        # If weight is loaded, it is a (1,mx)
-        trn_set_weights = 1
+            # Base dir for cats and not cats images
+            baseDir = os.getcwd()
 
-        if isLoadWeights :
+            trn_dataset = h5py.File( baseDir + "/data/prepared/train_chats-" + str( self.pxWidth ) + ".h5", "r" )
+            trn_set_x_orig = np.array(trn_dataset["x"][:]) # your train set features
+            trn_set_y_orig = np.array(trn_dataset["y"][:]) # your train set labels
 
-            ## Convert tags to weights
-            trn_set_weights   = self.getWeights( trn_set_tags )
+            dev_dataset = h5py.File( baseDir + "/data/prepared/dev_chats-" + str( self.pxWidth ) + ".h5", "r")
+            dev_set_x_orig = np.array( dev_dataset["x"][:] ) # your test set features
+            dev_set_y_orig = np.array( dev_dataset["y"][:] ) # your test set labels
 
-        # Image base path
-        trn_imgDir = trn_dataset[ "imgDir" ].value.decode( 'utf-8' )
-        dev_imgDir = dev_dataset[ "imgDir" ].value.decode( 'utf-8' )
+            trn_set_x = trn_set_x_orig.astype( np.float32 )
+            dev_set_x = dev_set_x_orig.astype( np.float32 )
 
-        # Image relative pathes
-        trn_imgPathes = np.array( trn_dataset[ "pathes" ][:] )
-        dev_imgPathes = np.array( dev_dataset[ "pathes" ][:] )
+            # passer de (476,) (risque) a  (1,476)
+            trn_set_y = trn_set_y_orig.reshape((1, trn_set_y_orig.shape[0]))
+            dev_set_y = dev_set_y_orig.reshape((1, dev_set_y_orig.shape[0]))
 
-        # Create data sets
-        datasetTrn = DataSet( trn_set_x_orig, trn_set_x, trn_set_y, trn_imgDir, trn_imgPathes, trn_set_tags, trn_set_weights )
-        datasetDev = DataSet( dev_set_x_orig, dev_set_x, dev_set_y, dev_imgDir, dev_imgPathes, dev_set_tags )
+            ## replace Boolean by (1,0) float values to be consistent with X
+            trn_set_y = trn_set_y.astype( np.float32 )
+            dev_set_y = dev_set_y.astype( np.float32 )
 
-        # For tensor flow, we need to transpose data
-        self.transpose( datasetTrn )
-        self.transpose( datasetDev )
+            # Image tags
+            trn_set_tags_orig = np.array(trn_dataset["tags"][:]) # images tags
+            dev_set_tags_orig = np.array(dev_dataset["tags"][:]) # images tags
+            # passer de (476,) (risque) a  (1,476)
+            trn_set_tags      = trn_set_tags_orig.reshape((1, trn_set_tags_orig.shape[0]))
+            dev_set_tags      = dev_set_tags_orig.reshape((1, dev_set_tags_orig.shape[0]))
+
+            # Default weight is 1 (int)
+            # If weight is loaded, it is a (1,mx)
+            trn_set_weights = 1
+
+            if isLoadWeights :
+
+                ## Convert tags to weights
+                trn_set_weights   = self.getWeights( trn_set_tags )
+
+            # Image base path
+            trn_imgDir = trn_dataset[ "imgDir" ].value.decode( 'utf-8' )
+            dev_imgDir = dev_dataset[ "imgDir" ].value.decode( 'utf-8' )
+
+            # Image relative pathes
+            trn_imgPathes = np.array( trn_dataset[ "pathes" ][:] )
+            dev_imgPathes = np.array( dev_dataset[ "pathes" ][:] )
+
+            # Create data sets
+            datasetTrn = DataSet( trn_set_x_orig, trn_set_x, trn_set_y, trn_imgDir, trn_imgPathes, trn_set_tags, trn_set_weights )
+            datasetDev = DataSet( dev_set_x_orig, dev_set_x, dev_set_y, dev_imgDir, dev_imgPathes, dev_set_tags )
+
+            # For tensor flow, we need to transpose data
+            self.transpose( datasetTrn )
+            self.transpose( datasetDev )
 
         dataInfo = self.getDataInfo( datasetTrn, datasetDev )
 
@@ -80,19 +106,33 @@ class CatRawDataSource( DataSource ):
 
     def getDataInfo( self, datasetTrn, datasetDev ) :
         # Store data info in a dico
-        dataInfo = {
-            const.KEY_TRN_X_SIZE    : datasetTrn.X.shape[0],
-            const.KEY_TRN_X_SHAPE   : datasetTrn.X.shape,
 
-            const.KEY_TRN_Y_SIZE    : datasetTrn.Y.shape[0],
-            const.KEY_TRN_Y_SHAPE   : datasetTrn.Y.shape,
-
-            const.KEY_DEV_X_SIZE    : datasetDev.X.shape[0],
-            const.KEY_DEV_X_SHAPE   : datasetDev.X.shape,
-            const.KEY_DEV_Y_SHAPE   : datasetDev.Y.shape,
-
-            const.KEY_IS_SUPPORT_BATCH_STREAMING : False
+        dataInfo = { 
+            const.KEY_IS_SUPPORT_BATCH_STREAMING : False,
+            const.KEY_TRN_X_SIZE  : None,
+            const.KEY_TRN_X_SHAPE : None,
+            const.KEY_TRN_Y_SIZE  : None,
+            const.KEY_TRN_Y_SHAPE : None,
+            const.KEY_DEV_X_SIZE  : None,
+            const.KEY_DEV_X_SHAPE : None,
+            const.KEY_DEV_Y_SIZE  : None,
+            const.KEY_DEV_Y_SHAPE : None,
         }
+
+        if ( datasetTrn != None ) :
+            dataInfo[ const.KEY_TRN_X_SIZE  ] = datasetTrn.X.shape[0]
+            dataInfo[ const.KEY_TRN_X_SHAPE ] = datasetTrn.X.shape
+            dataInfo[ const.KEY_TRN_Y_SIZE  ] = datasetTrn.Y.shape[0]
+            dataInfo[ const.KEY_TRN_Y_SHAPE ] = datasetTrn.Y.shape
+        
+        if ( datasetDev != None ) :
+            
+            dataInfo[ const.KEY_DEV_X_SIZE  ] = datasetDev.X.shape[0]
+            dataInfo[ const.KEY_DEV_X_SHAPE ] = datasetDev.X.shape
+
+            if ( datasetDev.Y != None ) :
+                dataInfo[ const.KEY_DEV_Y_SIZE  ] = datasetDev.Y.shape[0]
+                dataInfo[ const.KEY_DEV_Y_SHAPE ] = datasetDev.Y.shape
 
         return dataInfo
 
@@ -143,9 +183,13 @@ class CatNormalizedDataSource( CatRawDataSource ):
     def getDatasets( self, isLoadWeights ):
         # ancestor
         ( datasetTrn, datasetDev, dataInfo ) = super().getDatasets( isLoadWeights )
+        
         # normalizetrnDataSet X
-        datasetTrn.X = self.normalize( datasetTrn.X )
-        datasetDev.X = self.normalize( datasetDev.X )
+        if ( datasetTrn != None ) :
+            datasetTrn.X = self.normalize( datasetTrn.X )
+            
+        if ( datasetDev != None ) :
+            datasetDev.X = self.normalize( datasetDev.X )
 
         return ( datasetTrn, datasetDev, dataInfo )
 

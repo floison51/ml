@@ -84,18 +84,24 @@ def updateMachines( conn ):
 
     return iniMachines, configDatasourceResult, configMachineFormsResult
 
+def strNone( x ):
+    if ( x == None ) :
+        return "None"
+    else :
+        return str( x )
+    
 def prepareData( dataSource ):
 
     # Load data
     ( datasetTrn, datasetDev, dataInfo ) = dataSource.getDatasets( isLoadWeights = False );
 
     print()
-    print ("number of training examples = " + str( dataInfo[ const.KEY_TRN_X_SIZE ] ) )
-    print ("number of dev test examples = " + str( dataInfo[ const.KEY_DEV_X_SIZE ] ) )
-    print ("X_train shape: " + str( dataInfo[ const.KEY_TRN_X_SHAPE ] ) )
-    print ("Y_train shape: " + str( dataInfo[ const.KEY_TRN_Y_SHAPE ] ) )
-    print ("X_test shape: "  + str( dataInfo[ const.KEY_DEV_X_SHAPE ] ) )
-    print ("Y_test shape: "  + str( dataInfo[ const.KEY_DEV_Y_SHAPE ] ) )
+    print ("number of training examples = " + strNone( dataInfo[ const.KEY_TRN_X_SIZE ] ) )
+    print ("number of dev test examples = " + strNone( dataInfo[ const.KEY_DEV_X_SIZE ] ) )
+    print ("X_train shape: " + strNone( dataInfo[ const.KEY_TRN_X_SHAPE ] ) )
+    print ("Y_train shape: " + strNone( dataInfo[ const.KEY_TRN_Y_SHAPE ] ) )
+    print ("X_dev  shape: "  + strNone( dataInfo[ const.KEY_DEV_X_SHAPE ] ) )
+    print ("Y_dev  shape: "  + strNone( dataInfo[ const.KEY_DEV_Y_SHAPE ] ) )
 
 #     if ( hyperParams[ const.KEY_USE_WEIGHTS ] ) :
 #         print ( "  Weights_train shape :", WEIGHT_train.shape )
@@ -180,8 +186,12 @@ if __name__ == '__main__':
                 runStructure = None
                 if ( run[ "conf_saved_info" ] != None ) :
                     runStructure = run[ "conf_saved_info" ][ "structure" ]
+                    # trim spaces
+                    runStructure = runStructure.strip()
 
-                if ( ( runStructure != None ) and ( config[ "structure" ] != runStructure ) ):
+                configStructure = config[ "structure" ].strip()
+
+                if ( ( runStructure != None ) and ( configStructure != runStructure ) ):
                     raise ValueError( "run 'structure' != config 'structure'" )
 
                 runImageSize = None
@@ -208,13 +218,15 @@ if __name__ == '__main__':
         # Get data
         if ( \
             ( buttonClicked == "Train" ) or \
-            ( ( buttonClicked == "Predict" ) and ( choiceData == 1 ) ) \
+            ( ( buttonClicked == "Predict" ) ) \
         ) :
             dataSource = instantiateClass( machineDataSourceClass, hyperParams )
             # set image width
             dataSource.setImageWidth( config[ "imageSize" ] )
-        else :
-            raise ValueError( "DataSource case not yet supported" )
+
+        if ( choiceData == 2  ) :
+            # image chosen
+            dataSource.setImagePathes( [ predictParams[ "imagePath" ] ] )
 
         # Get machine class
         machineClass = iniMachines.get( "Classes", machineName )
@@ -259,4 +271,4 @@ if __name__ == '__main__':
 
         elif ( buttonClicked == "Predict" ) :
             print( "Predict from machine", machineName )
-            ml.predict( conn, config, idRun )
+            ml.predict( conn, config, idRun, dataSource.imagePathes )

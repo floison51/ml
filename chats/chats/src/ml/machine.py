@@ -211,7 +211,7 @@ class AbstractMachine():
 
         print( "Finished in", globalElapsedSeconds, "seconds" )
 
-    def predict( self, conn, config, idRun ):
+    def predict( self, conn, config, idRun, imagePathes ):
         "Predict accuracy from trained model"
 
         # hyper parameters
@@ -224,7 +224,7 @@ class AbstractMachine():
         tsGlobalStart = time.time()
 
         # Predict from saved model
-        self.predictFromSavedModel( conn, config, idRun )
+        self.predictFromSavedModel( conn, config, idRun, imagePathes )
 
         # Start time
         tsGlobalEnd = time.time()

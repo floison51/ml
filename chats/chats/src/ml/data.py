@@ -15,6 +15,9 @@ class DataSource():
         '''
         self.params = params
     
+    def setImagePathes( self, imagePathes ):
+        self.imagePathes = imagePathes
+        
     def setImageWidth( self, nbPixels ):
         self.pxWidth = nbPixels
         
