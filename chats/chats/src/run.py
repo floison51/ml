@@ -207,6 +207,8 @@ if __name__ == '__main__':
             raise ValueError( "Unknown action " + buttonClicked )
 
         # Data source may depend on choice
+        choiceData = None
+        
         if ( ( predictParams != None ) and ( "choiceData" in predictParams ) ) :
             choiceData = predictParams[ "choiceData" ]
 
@@ -224,7 +226,7 @@ if __name__ == '__main__':
             # set image width
             dataSource.setImageWidth( config[ "imageSize" ] )
 
-        if ( choiceData == 2  ) :
+        if ( ( choiceData != None ) and ( choiceData == 2 ) ) :
             # image chosen
             dataSource.setImagePathes( [ predictParams[ "imagePath" ] ] )
 

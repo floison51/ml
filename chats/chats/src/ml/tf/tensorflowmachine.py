@@ -755,7 +755,7 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
                             AZ = Z1
                         else :
                             # activation function
-                            AZ = tf.nn.relu( Z1, scope="A" + str( iLayer ) )
+                            AZ = tf.nn.relu( Z1, name="A" + str( iLayer ) )
 
                     # next input in AZ
                     curInput = AZ

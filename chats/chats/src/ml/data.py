@@ -14,6 +14,7 @@ class DataSource():
         Constructor
         '''
         self.params = params
+        self.imagePathes = None
     
     def setImagePathes( self, imagePathes ):
         self.imagePathes = imagePathes

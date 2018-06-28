@@ -130,7 +130,7 @@ class CatRawDataSource( DataSource ):
             dataInfo[ const.KEY_DEV_X_SIZE  ] = datasetDev.X.shape[0]
             dataInfo[ const.KEY_DEV_X_SHAPE ] = datasetDev.X.shape
 
-            if ( datasetDev.Y != None ) :
+            if ( datasetDev.Y is None ) :
                 dataInfo[ const.KEY_DEV_Y_SIZE  ] = datasetDev.Y.shape[0]
                 dataInfo[ const.KEY_DEV_Y_SHAPE ] = datasetDev.Y.shape
 
