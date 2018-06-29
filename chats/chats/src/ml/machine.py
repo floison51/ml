@@ -81,7 +81,8 @@ class AbstractMachine():
         self.systemInfo = systemInfo
         self.dataInfo = dataInfo
 
-    def setData(self, datasetTrn, datasetDev ):
+    def setData(self, idDataset, datasetTrn, datasetDev ):
+        self.idDataset = idDataset
         self.datasetTrn  = datasetTrn
         self.datasetDev  = datasetDev
 
@@ -149,7 +150,7 @@ class AbstractMachine():
 
             # Create run
 
-            self.idRun = db.createRun( conn, config[ "id" ],  runHyperParams )
+            self.idRun = db.createRun( conn, self.idDataset, config[ "id" ],  runHyperParams )
 
             # Update run before calling model
             db.updateRunBefore(

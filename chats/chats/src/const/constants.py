@@ -77,6 +77,18 @@ class HyperParamsDico:
         KEY_USE_BATCH_NORMALIZATION : [ "boolean", False, None ]
     }
 
+class DatasetDico:
+
+    KEYS = { "id" }
+    CARAC = {
+        # Type, default value
+        "id"           : [ "int"    , None, None ],
+        "name"         : [ "string" , None, None ],
+        "path"         : [ "string" , None, None ],
+    }
+    OBJECT_FIELDS  = [ "id", "name", "path" ]
+    DISPLAY_FIELDS = OBJECT_FIELDS
+
 class ConfigsDico:
 
     KEYS = { "id", "idMachine", "idHyperParams" }

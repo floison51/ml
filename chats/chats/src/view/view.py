@@ -36,7 +36,9 @@ class MainWindow ( Tk ):
         self.runParams = None
         self.predictParams = None
 
-    def showAndSelectConf( self, configs ):
+        self.varDataset = StringVar()
+
+    def showAndSelectConf( self, conn, datasets, selection ):
 
         frameTop = Frame( self, relief=GROOVE )
         frameTop.pack(side=TOP, padx=30, pady=30)
@@ -44,8 +46,12 @@ class MainWindow ( Tk ):
         label = Label( frameTop, text="Cat's Recognition Machine Learning" )
         label.pack()
 
+        frameDatasets = LabelFrame( self, text="Data sets", padx=20, pady=20)
+        self.buildDatasetFrame( frameDatasets, datasets, selection )
+        frameDatasets.pack(fill="both", expand="yes", padx=10, pady=10)
+
         frameConfigs = LabelFrame( self, text="Configurations", padx=20, pady=20)
-        self.buildConfigGrid( frameConfigs, configs )
+        self.buildConfigGrid( frameConfigs, self.varDataset.get(), selection )
         frameConfigs.pack(fill="both", expand="yes", padx=10, pady=10)
 
         frameButtons = Frame(self, borderwidth=0 )
@@ -75,11 +81,71 @@ class MainWindow ( Tk ):
 
         self.mainloop()
 
-        # return selected idConf
-        return ( self.confSelected.get(), self.buttonClicked, self.runParams, self.predictParams )
+        # save selected things
+        selection = {
+            "selectedDatasetName" : self.varDataset.get(),
+            "selectedIdConfig"    : self.confSelected.get()
+        }
+        import db.db as db
+        db.setSelection( conn, selection )
+        # commit
+        conn.commit()
 
+        # return selected things
+        return ( self.varDataset.get(), self.confSelected.get(), self.buttonClicked, self.runParams, self.predictParams )
 
-    def buildConfigGrid( self, frameConfigs, configs ):
+    def buildDatasetFrame( self, frameDatasets, datasets, selection ):
+
+        datasetNames = []
+        for dataset in datasets :
+            datasetNames.append( dataset[ "name" ] )
+
+        comboDatasets = Combobox( frameDatasets, textvariable=self.varDataset, values=datasetNames, state="readonly", height=4 )
+
+        if ( len( datasetNames ) > 0 ) :
+            # get selected dataset
+            if not "selectedDatasetName" in selection :
+                # Default selection : first
+                selection[ "selectedDatasetName" ] = datasetNames[ 0 ]
+
+            curDatasetName = selection[ "selectedDatasetName" ]
+            self.varDataset.set( curDatasetName )
+
+        # Set change listener
+        comboDatasets.bind( "<<ComboboxSelected>>", self.updateDataset )
+        comboDatasets.pack( side="left", padx=40  )
+
+    def updateDataset( self, event ) :
+
+        ## data set has changed, update config grid
+        colVarLabelsByConfigId = self.rowVarLabels;
+
+        # Get configs with best DEV accuracy
+        datasetName = self.varDataset.get()
+        configs = self.configDoer.getConfigsWithMaxDevAccuracy( datasetName )
+
+        # browse configs
+        for config in configs :
+
+            idConfig = config[ "id" ]
+
+            # Get displayed row
+            colVarLabels = colVarLabelsByConfigId[ idConfig ]
+
+            item = config[ "bestAccuracy" ]
+            # format?
+            formatString = const.ConfigsDico.CARAC[ "bestAccuracy" ][ 2 ]
+            if ( ( item != None ) and ( formatString != None ) ) :
+                item = formatString.format( item )
+
+            # Update best DEV accuracy
+            label = colVarLabels[ 4 ]
+            label.set( item )
+
+    def buildConfigGrid( self, frameConfigs, datasetName, selection ):
+
+        # Get configs
+        configs = self.configDoer.getConfigsWithMaxDevAccuracy( datasetName )
 
         #Configuration rows
         self.rows = {}
@@ -125,6 +191,13 @@ class MainWindow ( Tk ):
         buttonsToUpdate.append( buttonDeleteConfig )
 
         self.frameConfigsTable.pack( side = "top" )
+
+        # selected config
+        if ( "selectedIdConfig" in selection ) :
+            selectedIdConfig = selection[ "selectedIdConfig" ]
+
+            if ( selectedIdConfig != None ) :
+                self.confSelected.set( selectedIdConfig )
 
     def addRowConfig( self, config ):
 
@@ -291,6 +364,7 @@ class MyDialog( Toplevel ):
 
     def destroy( self ):
         "Override close to deleselct modal mode"
+
         ## enable parent window
         self.master.wm_attributes( "-disabled", False )
         super( MyDialog, self ).destroy()
@@ -628,7 +702,7 @@ class StartPredictDialog( MyDialog ):
 
     def __init__( self, boss, callbackFct, **options ) :
         MyDialog.__init__( self, boss, callbackFct, **options )
-        
+
         self.imagePath = None
 
     def run( self ) :
@@ -724,10 +798,9 @@ class StartPredictDialog( MyDialog ):
             self.buttonRun.configure( state = NORMAL )
 
     def buttonRunClicked( self ) :
-        
+
         # Give params to master
         self.master.predictParams = {
-            
             "choiceHyperParams" : self.choiceHyperParametersInputVar.get(),
             "choiceData" : self.choiceDataInputVar.get(),
             "imagePath"  : self.imagePath

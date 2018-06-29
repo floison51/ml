@@ -55,6 +55,16 @@ class ConfigDoer( Doer ):
     def __init__( self, conn ) :
         super().__init__( conn )
 
+    def getConfigsWithMaxDevAccuracy( self, datasetName ):
+
+        # Get dataset id
+        idDataset = db.getDatasetIdByName( self.conn, datasetName )
+
+        # get configs
+        configs = db.getConfigsWithMaxDevAccuracy( self.conn, idDataset )
+
+        return configs
+
     def createConfig( self, fenetre ):
         "Create new config"
         viewConfig = view.CreateOrUpdateConfigWindow( fenetre, self.doCreateConfig )
@@ -105,9 +115,12 @@ class ConfigDoer( Doer ):
         for ( key, hpCarac ) in const.HyperParamsDico.CARAC.items() :
             hyperParams[ key ] = hpCarac[ 1 ]
 
+        # normalize structure
+        structure = newConfig[ "structure" ].strip()
+        
         # Get or create new config
         idNewConfig = db.createConfig( self.conn, \
-            newConfig[ "name" ], newConfig[ "structure" ], \
+            newConfig[ "name" ], structure, \
             newConfig[ "imageSize" ], \
             newConfig[ "machine" ], hyperParams \
         )
@@ -129,6 +142,10 @@ class ConfigDoer( Doer ):
         idMachine = db.getIdMachineByName( self.conn, newConfig[ "machine" ] )
         newConfig[ "idMachine" ] = idMachine
 
+        # normalize structure
+        structure = newConfig[ "structure" ].strip()
+        newConfig[ "structure" ] = structure
+        
         #Update config
         db.updateConfig( self.conn, newConfig )
 
@@ -180,7 +197,7 @@ class StartRunDoer( Doer ):
         machineName = db.getMachineNameById( self.conn, config[ "idMachine" ] )
         # Get fields
         machineFields = self.confMachinesForms[ machineName ]
-        
+
         # Launch run dialog
         startTrainingDialog = view.StartTrainDialog( fenetre, fenetre.doRunTraining, machineFields )
         startTrainingDialog.run()

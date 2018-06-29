@@ -47,13 +47,13 @@ class CatRawDataSource( DataSource ):
             # Load from h5py data sets
 
             # Base dir for cats and not cats images
-            baseDir = os.getcwd()
+            baseDir = os.getcwd() + "/" + self.path
 
-            trn_dataset = h5py.File( baseDir + "/data/prepared/train_chats-" + str( self.pxWidth ) + ".h5", "r" )
+            trn_dataset = h5py.File( baseDir + "/train_chats-" + str( self.pxWidth ) + ".h5", "r" )
             trn_set_x_orig = np.array(trn_dataset["x"][:]) # your train set features
             trn_set_y_orig = np.array(trn_dataset["y"][:]) # your train set labels
 
-            dev_dataset = h5py.File( baseDir + "/data/prepared/dev_chats-" + str( self.pxWidth ) + ".h5", "r")
+            dev_dataset = h5py.File( baseDir + "/dev_chats-" + str( self.pxWidth ) + ".h5", "r")
             dev_set_x_orig = np.array( dev_dataset["x"][:] ) # your test set features
             dev_set_y_orig = np.array( dev_dataset["y"][:] ) # your test set labels
 

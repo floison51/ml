@@ -1,5 +1,5 @@
 import db.db as db
-import view.view as view
+from view.view import MainWindow
 import control.control as control
 import os
 from six.moves import configparser
@@ -8,14 +8,13 @@ import importlib
 import socket
 import platform
 
-from tkinter import *
-
 import const.constants as const
 from ml.cats import cats
 from absl.testing.parameterized import parameters
 
 # For debug
 debugUseScreen = True
+debugDatasetName = "Hand-made"
 debugIdConfig  = 1
 debugCommand   = "Predict"
 
@@ -26,6 +25,22 @@ def instantiateClass( classFqName, params ) :
 
     return instance
 
+def updateDatasets( conn ):
+
+    # Read init file
+    iniDatasets = configparser.ConfigParser()
+    # Leave keys unchanged
+    iniDatasets.optionxform = str
+    iniDatasets.read( "datasets.ini" )
+
+    # Read sections
+    for section in iniDatasets.sections() :
+
+        name = section
+        path = iniDatasets.get( section, "path" )
+
+        # Create dataset
+        db.getOrCreateDataset( conn, name, path )
 
 def updateMachines( conn ):
 
@@ -89,7 +104,7 @@ def strNone( x ):
         return "None"
     else :
         return str( x )
-    
+
 def prepareData( dataSource ):
 
     # Load data
@@ -120,11 +135,16 @@ if __name__ == '__main__':
         # test (debug)
         #db.test( conn )
 
+        # update datasets
+        updateDatasets( conn )
+
         # update machines
         ( iniMachines, configDatasources, configMachinesForms ) = updateMachines( conn )
 
-        # Read configurations
-        configs = db.getConfigsWithMaxDevAccuracy( conn )
+        # Read selections
+        selection = db.getSelection( conn )
+        # Read datasets
+        datasets = db.getDatasets( conn )
 
         if ( debugUseScreen ) :
             configDoer     = control.ConfigDoer      ( conn )
@@ -133,10 +153,11 @@ if __name__ == '__main__':
             startRunDoer   = control.StartRunDoer    ( conn, configMachinesForms )
             predictRunDoer = control.StartPredictDoer( conn )
 
-            mainWindow = view.MainWindow( configDoer, hpDoer, runsDoer, startRunDoer, predictRunDoer )
-            ( idConfig, buttonClicked, runParams, predictParams ) = mainWindow.showAndSelectConf( configs )
+            mainWindow = MainWindow( configDoer, hpDoer, runsDoer, startRunDoer, predictRunDoer )
+            ( datasetName, idConfig, buttonClicked, runParams, predictParams ) = mainWindow.showAndSelectConf( conn, datasets, selection )
         else :
-            ( idConfig, buttonClicked, runParams, predictParams ) = (
+            ( datasetName, idConfig, buttonClicked, runParams, predictParams ) = (
+                debugDatasetName,
                 debugIdConfig,
                 debugCommand,
                 { "comment": "", "tune": False, "showPlots": False, "nbTuning": 2, "isTensorboard": True, "isTensorboardFull": False },
@@ -147,6 +168,10 @@ if __name__ == '__main__':
         if ( buttonClicked == "Cancel" ) :
             print( "Operation cancelled by user" )
             sys.exit( 10 )
+
+        # dataset
+        dataset = db.getOrCreateDataset( conn, datasetName, expand=True )
+        print( "Using dataset", dataset )
 
         # Read config
         config = db.getConfig( conn, idConfig );
@@ -208,7 +233,7 @@ if __name__ == '__main__':
 
         # Data source may depend on choice
         choiceData = None
-        
+
         if ( ( predictParams != None ) and ( "choiceData" in predictParams ) ) :
             choiceData = predictParams[ "choiceData" ]
 
@@ -230,6 +255,9 @@ if __name__ == '__main__':
             # image chosen
             dataSource.setImagePathes( [ predictParams[ "imagePath" ] ] )
 
+        # Tell source where is data
+        dataSource.setPath( dataset[ "path" ] )
+        
         # Get machine class
         machineClass = iniMachines.get( "Classes", machineName )
         if ( machineClass == None ) :
@@ -252,7 +280,7 @@ if __name__ == '__main__':
         # get data
         ( datasetTrn, datasetDev, dataInfos ) = prepareData( dataSource )
         # Set data
-        ml.setData( datasetTrn, datasetDev )
+        ml.setData( dataset[ "id" ], datasetTrn, datasetDev )
 
         # Set all infos
         ml.setInfos( systemInfos, dataInfos )

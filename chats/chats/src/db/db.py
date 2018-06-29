@@ -14,7 +14,143 @@ from collections import OrderedDict
 import const.constants as const
 
 # Current DB version
-DB_VERSION = 2
+DB_VERSION = 3
+
+def getSelection( conn ):
+    
+    c = conn.cursor();
+
+    # get existing, if anay
+    cursor = c.execute(
+        "select jsonSelection from selections where id=1"
+    )
+
+    result = None
+    
+    for row in cursor :
+        resultJson = row[ 0 ]
+        result = json.loads( resultJson )
+    
+    cursor.close()
+    
+    return result
+
+def setSelection( conn, selection ):
+    
+    jsonSelection = json.dumps( selection )
+    c = conn.cursor();
+
+    # get existing, if anay
+    cursor = c.execute(
+        "update selections set jSonSelection=?where id=1",
+        ( jsonSelection, )
+    )
+
+    cursor.close()
+
+
+def getOrCreateDataset( conn, name, path=None, expand=False ) :
+
+    c = conn.cursor();
+
+    # get existing, if anay
+    cursor = c.execute(
+        "select id from datasets where name=?" ,
+        ( name, )
+    )
+
+    # For some reason, cursor.rowcount is NOK, use another method
+    result = -1
+    for config in cursor:
+        result = config[ 0 ]
+
+    if ( result < 0 ) :
+        # None, create
+        result = createDataset( conn, name, path )
+
+    if ( expand ) :
+        # expand data set
+        # Update run
+        cursor = c.execute(
+            "select * from datasets where id=?",
+            ( result, )
+        )
+    
+        row = cursor.fetchone()
+        result = {}
+
+        iCol = 0
+
+        for colName in const.DatasetDico.DISPLAY_FIELDS :
+            result[ colName ] = row[ iCol ]
+            iCol += 1
+
+    c.close()
+
+    return result;
+
+def getDatasetIdByName( conn, name ) :
+
+    c = conn.cursor();
+
+    # get existing, if anay
+    cursor = c.execute(
+        "select id from datasets where name=?" ,
+        ( name, )
+    )
+
+    # For some reason, cursor.rowcount is NOK, use another method
+    idResult = -1
+    for config in cursor:
+        idResult = config[ 0 ]
+
+    c.close()
+
+    return idResult;
+
+def createDataset( conn, name, path ) :
+
+    c = conn.cursor();
+
+    cursor = c.execute(
+        "INSERT INTO datasets VALUES ( null, ?, ? )",
+        ( name, path, )
+    )
+
+    idResult = cursor.lastrowid
+
+    c.close();
+
+    return idResult
+
+def getDatasets( conn ) :
+
+    c = conn.cursor();
+
+    # Update run
+    cursor = c.execute(
+        "select * from datasets"
+    )
+
+    results = []
+
+    for row in cursor :
+
+        result = {}
+
+        iCol = 0
+
+        for colName in const.DatasetDico.DISPLAY_FIELDS :
+            result[ colName ] = row[ iCol ]
+            iCol += 1
+
+        # add result
+        results.append( result )
+
+    c.close();
+
+    return results
+
 
 def createConfig( conn, name, structure, imageSize, machineName, hyper_params ) :
 
@@ -204,22 +340,22 @@ def deleteConfig( conn, idConf ) :
 
     c.close();
 
-def getConfigsWithMaxDevAccuracy( conn, idConfig = None ) :
+def getConfigsWithMaxDevAccuracy( conn, idDataSet, idConfig = None ) :
 
     from model.mlconfig import MlConfig
 
     c = conn.cursor()
-    parameters = ()
+    parameters = ( idDataSet, )
 
     statement = \
         "select c.id as id, c.name as name, " + \
         "( select m.name from machines m where m.id=c.idMachine ) as machine, " + \
         "c.imageSize as imageSize, c.structure as structure, " + \
         "( select max(r.dev_accuracy) " + \
-        "from runs r where r.idConf=c.id ) as bestAccuracy from configs c"
+        "from runs r where ( r.idConf=c.id and r.idDataSet=? ) ) as bestAccuracy from configs c"
     if ( idConfig != None ) :
         statement += " where c.id=?"
-        parameters = ( idConfig, )
+        parameters.append( idConfig )
 
     statement += " order by c.id asc"
 
@@ -344,7 +480,7 @@ def addUniqueMachineName( conn, machineName ) :
 
 
 
-def createRun( conn, idConfig, runHyperParams ) :
+def createRun( conn, idDataset, idConfig, runHyperParams ) :
 
     c = conn.cursor();
 
@@ -358,8 +494,8 @@ def createRun( conn, idConfig, runHyperParams ) :
     json_conf_saved = json.dumps( config )
 
     cursor = c.execute( '''
-        INSERT INTO runs ( idConf, json_conf_saved, idHyperParams, date ) VALUES ( ?, ?, ?, ? )''',
-        ( config[ "id" ], json_conf_saved, idRunHyperParams, datetime.datetime.now(), )
+        INSERT INTO runs ( idDataset, idConf, json_conf_saved, idHyperParams, date ) VALUES ( ?, ?, ?, ?, ? )''',
+        ( idDataset, config[ "id" ], json_conf_saved, idRunHyperParams, datetime.datetime.now(), )
     )
 
     idRun = cursor.lastrowid
@@ -458,24 +594,25 @@ def getRunFromRow(row):
     # TODO : use dico
     result = {}
     result["id"]                = row[0]
-    result["idConf"]            = row[1]
-    result["idHyperParams"]     = row[2]
-    result["dateTime"]          = row[3]
-    result["comment"]           = row[4]
-    result["perf_index"]        = row[5]
-    result["elapsed_second"]    = row[6]
-    result["train_accuracy"]    = row[7]
-    result["dev_accuracy"]      = row[8]
-    result["system_info"]       = json.loads(row[9])
-    result["data_info"]         = json.loads(row[10])
-    result["perf_info"]         = json.loads(row[11])
-    result["result_info"]       = json.loads(row[12])
-    raw_conf_saved = row[ 13 ]
+    result["idDataset"]         = row[1]
+    result["idConf"]            = row[2]
+    result["idHyperParams"]     = row[3]
+    result["dateTime"]          = row[4]
+    result["comment"]           = row[5]
+    result["perf_index"]        = row[6]
+    result["elapsed_second"]    = row[7]
+    result["train_accuracy"]    = row[8]
+    result["dev_accuracy"]      = row[9]
+    result["system_info"]       = json.loads(row[10])
+    result["data_info"]         = json.loads(row[11])
+    result["perf_info"]         = json.loads(row[12])
+    result["result_info"]       = json.loads(row[13])
+    raw_conf_saved = row[ 14 ]
     if ( raw_conf_saved == None ) :
         result["conf_saved_info"]    = {}
     else :
         result["conf_saved_info"]    = json.loads( raw_conf_saved )
-    
+
     return result
 
 def getRuns( conn, idConf ) :
@@ -549,7 +686,7 @@ def getDbVersion( c ) :
         result = row[ 0 ]
 
     return result
-    
+
 def setDbVersion( c, dbVersion ) :
 
     # Add version
@@ -572,17 +709,19 @@ def initDb( key, dbFolder ) :
         # init tables
         if ( str( e ) == "no such table: versions" ) :
             initVersionTable( c )
+            # Init tables
+            initTables( c )
             # Save (commit) the changes
             conn.commit()
-            
+
     # upgrade DB if needed
     upgradeDb( c )
-    
+
     c.close();
 
     # commit
     conn.commit();
-            
+
     return conn;
 
 def upgradeDb( c ):
@@ -597,10 +736,12 @@ def upgradeDb( c ):
             initTables( c )
         elif ( curDbVersion == 2 ) :
             modifRunAddConfInfo( c )
-            
+        elif ( curDbVersion == 3 ) :
+            modifAddDatasets( c )
+
         setDbVersion( c, curDbVersion )
 
-    
+
 def initVersionTable( c ):
     "Init version table"
 
@@ -619,17 +760,36 @@ def initVersionTable( c ):
     c.execute(
         "insert into versions values( null, ? )",
         (
-            0,   # Initial version
+            DB_VERSION,   # Initial version
         )
     )
 
 def initTables( c ) :
 
+    # Create table : current selection
+    c.execute( '''CREATE TABLE IF NOT EXISTS selections
+        (
+           id integer PRIMARY KEY AUTOINCREMENT,
+           jsonSelection text not null
+         )'''
+    )
+    # Create default value
+    c.execute( "insert into selections values( null, '{}' )" )
+    
     # Create table - machines
     c.execute( '''CREATE TABLE IF NOT EXISTS machines
         (
            id integer PRIMARY KEY AUTOINCREMENT,
            name text not null unique
+        )'''
+    )
+
+    # Create table - datasets
+    c.execute( '''CREATE TABLE IF NOT EXISTS datasets
+        (
+           id integer PRIMARY KEY AUTOINCREMENT,
+           name text not null unique,
+           path text not null
          )'''
     )
 
@@ -660,6 +820,7 @@ def initTables( c ) :
     c.execute( '''CREATE TABLE IF NOT EXISTS runs
         (
            id integer PRIMARY KEY AUTOINCREMENT,
+           idDataset integer,
            idConf integer,
            idHyperParams not null,
            date datetime DEFAULT CURRENT_TIMESTAMP,
@@ -673,6 +834,7 @@ def initTables( c ) :
            json_perf_info text,
            json_result_info text,
            json_conf_saved text,
+           FOREIGN KEY (idDataset) REFERENCES datasets( id ),
            FOREIGN KEY (idConf) REFERENCES confs( id ),
            FOREIGN KEY (idHyperParams) REFERENCES hyperparams( id )
          )'''
@@ -682,6 +844,9 @@ def initTables( c ) :
     c.execute( '''CREATE INDEX IF NOT EXISTS idx_machines_id on machines( id ) ''' )
     c.execute( '''CREATE INDEX IF NOT EXISTS idx_machines_name on machines( name ) ''' )
 
+    c.execute( '''CREATE INDEX IF NOT EXISTS idx_datasets_id on datasets( id ) ''' )
+    c.execute( '''CREATE INDEX IF NOT EXISTS idx_datasets_name on datasets( name ) ''' )
+
     c.execute( '''CREATE INDEX IF NOT EXISTS idx_configs_id on configs( id ) ''' )
     c.execute( '''CREATE INDEX IF NOT EXISTS idx_configs_structure on configs( structure ) ''' )
 
@@ -689,13 +854,38 @@ def initTables( c ) :
     c.execute( '''CREATE INDEX IF NOT EXISTS idx_hyperparams_structure on hyperparams( id ) ''' )
 
     c.execute( '''CREATE INDEX IF NOT EXISTS idx_runs_id on runs( id ) ''' )
+    c.execute( '''CREATE INDEX IF NOT EXISTS idx_runs_idDatasets on runs( idDataset ) ''' )
     c.execute( '''CREATE INDEX IF NOT EXISTS idx_runs_perf_index on runs( perf_index ) ''' )
     c.execute( '''CREATE INDEX IF NOT EXISTS idx_runs_elapsed_second on runs( elapsed_second ) ''' )
     c.execute( '''CREATE INDEX IF NOT EXISTS idx_runs_train_accuracy on runs( train_accuracy ) ''' )
     c.execute( '''CREATE INDEX IF NOT EXISTS idx_runs_dev_accuracy on runs( dev_accuracy ) ''' )
 
+def modifAddDatasets( c ) :
+
+    # Create table - datasets
+    c.execute( '''CREATE TABLE IF NOT EXISTS datasets
+        (
+           id integer PRIMARY KEY AUTOINCREMENT,
+           name text not null unique,
+           path text not null
+         )'''
+    )
+
+    # Modif run table
+    c.execute( "alter table runs add column idDataset integer REFERENCES datasets( id )" )
+
+    # Indexes
+    c.execute( '''CREATE INDEX IF NOT EXISTS idx_datasets_id on datasets( id ) ''' )
+    c.execute( '''CREATE INDEX IF NOT EXISTS idx_datasets_name on datasets( name ) ''' )
+    c.execute( '''CREATE INDEX IF NOT EXISTS idx_runs_idDatasets on runs( idDatasets ) ''' )
+
+    # dataset default data
+    c.execute( "insert into datasets values( null, 'Default', 'data/prepared" )
+    # Update runs
+    c.execute( "update runs set idDataset=1" )
+
 def modifRunAddConfInfo( c ) :
-    
+
     c.execute( "alter table runs add column json_conf_saved text" )
 
 def test( conn ):
