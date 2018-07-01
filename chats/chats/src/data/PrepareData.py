@@ -58,34 +58,71 @@ class CLIError(Exception):
     def __unicode__(self):
         return self.msg
 
-def transformImages( fromDir, toDir, files, iStart, iEnd,  ):
+def deleteDirContent( dir ) :
+    # Delete files in dir
+    for the_file in os.listdir( dir ):
+        file_path = os.path.join( dir, the_file )
+        try:
+            if os.path.isfile( file_path ):
+                os.unlink( file_path )
+            elif os.path.isdir( file_path ): 
+                shutil.rmtree( file_path )
+        except Exception as e:
+            print(e)
 
-    for oriImgFile in files[ iStart : iEnd ] :
+    # check deleted
+    if ( len( os.listdir( dir ) ) != 0 ) :
+        print( "Dir", dir, "not empty." )
+        sys.exit( 1 )
+
+def transformImages( fromDir, toDir, files, what ):
+
+    for oriImgFile in files :
         # Copy from image
         # remove fromDir prefix
         toFilePrefix = oriImgFile[ len( fromDir ) + 1 : ]
-        toFile = toDir + "/" + toFilePrefix
+        toFile = toDir + "/" + what + "/" + toFilePrefix
 
         ## Make target dir
         toFileDir = os.path.dirname( toFile )
         if ( not os.path.exists( toFileDir ) ) :
             os.makedirs( toFileDir, exist_ok = True )
 
-        shutil.copyfile( oriImgFile, toFile )
-
         ## Load image
         img = Image.open( oriImgFile )
-        ## Flip verticaly image
-        flippedImage = img.transpose( Image.FLIP_LEFT_RIGHT )
 
-        ## save it
-        toFlippedImage = toDir + "/" + toFilePrefix + "-flipped.png"
-        flippedImage.save( toFlippedImage, 'png' )
+        if ( what == "original" ) :
 
+            # Copy ori file
+            shutil.copyfile( oriImgFile, toFile )
+
+        elif ( what == "flip" ) :
+
+            ## Flip verticaly image
+            flippedImage = img.transpose( Image.FLIP_LEFT_RIGHT )
+
+            ## save it
+            toFlippedImage = toDir + "/" + what + "/" + toFilePrefix + "-flipped.png"
+            flippedImage.save( toFlippedImage, 'png' )
+
+        elif ( what == "rotate" ) :
+
+            # +15 degrees
+            rotPlusImage = img.rotate( +15, expand=True )
+            toRotPlusImage = toDir + "/" + what + "/" + toFilePrefix + "-rotP15.png"
+            rotPlusImage.save( toRotPlusImage, 'png' )
+
+            # -15 degrees
+            rotMinusImage = img.rotate( -15, expand=True )
+            toRotMinusImage = toDir + "/" + what + "/" + toFilePrefix + "-rotM15.png"
+            rotMinusImage.save( toRotMinusImage, 'png' )
+
+        else :
+            raise ValueError( "Unknown image operation '" + what + "'" )
 
 # Create dev and test sets
 
-def buildDataSet( dataDir, baseDir, files, iStart, iEnd, size, outFileName ):
+def buildDataSet( dataDir, what, baseDir, files, iStart, iEnd, size, outFileName, indexLabel = 0 ):
     # images list
     imagesList = []
 # y : cat or non-cat
@@ -101,19 +138,19 @@ def buildDataSet( dataDir, baseDir, files, iStart, iEnd, size, outFileName ):
 
         curImage = files[i]
         # get rid of basedir
-        relCurImage = curImage[len(baseDir) + 1:]
+        relCurImage = curImage[ len( baseDir ) + 1: ]
         relCurImage = relCurImage.replace( '\\', '/' )
 
         relCurImageSegments = relCurImage.split( "/" )
 
         # Cat?
-        isCat = relCurImageSegments[ 0 ] == "cats"
+        isCat = relCurImageSegments[ indexLabel ] == "cats"
 
         # tags
-        _tag = relCurImageSegments[ 1 ]
+        _tag = relCurImageSegments[ indexLabel + 1 ]
 
         # load image
-        img = Image.open(curImage)
+        img = Image.open( curImage )
         # Resize image
         resizedImg = img.resize( ( size, size ) )
         # populate lists
@@ -138,7 +175,7 @@ def buildDataSet( dataDir, baseDir, files, iStart, iEnd, size, outFileName ):
             print( "Wrong image:", pathes[ i ] )
             sys.exit( 1 )
 
-    preparedDir = dataDir + "/prepared"
+    preparedDir = dataDir + "/prepared/" + what
     os.makedirs( preparedDir, exist_ok = True )
     absOutFile = preparedDir + "/" + outFileName
 
@@ -159,6 +196,15 @@ def createTrainAndDevSets():
     # current dir for data
     dataDir = os.getcwd().replace( "\\", "/" )
 
+    # Clean target dirs
+    transformedDir = dataDir + "/transformed"
+    os.makedirs( transformedDir, exist_ok = True )
+    deleteDirContent( transformedDir )
+    
+    preparedDir = dataDir + "/prepared"
+    os.makedirs( preparedDir, exist_ok = True )
+    deleteDirContent( preparedDir )
+    
     # Base dir for cats and not cats images
     oriDir = dataDir + "/images"
 
@@ -168,8 +214,8 @@ def createTrainAndDevSets():
     # Shuffle files
     random.shuffle( oriFiles )
 
-    # for debug : only 10 images
-    # oriFiles = oriFiles[ 0:11 ]
+    # for debug : only 20 images
+    # oriFiles = oriFiles[ 0:20 ]
 
     sizes = ( 64, 92, 128 )
 
@@ -179,7 +225,7 @@ def createTrainAndDevSets():
     for size in sizes :
         ## Build DEV data set
         buildDataSet( \
-            dataDir, oriDir, oriFiles, \
+            dataDir, "dev", oriDir, oriFiles, \
             iEndTrainingSet, len( oriFiles ), \
             size, "dev_chats-" + str( size) + ".h5" \
         )
@@ -187,21 +233,43 @@ def createTrainAndDevSets():
     ## transform images for DEV
     transformedDir = dataDir + "/transformed"
 
-    transformImages( oriDir, transformedDir, oriFiles, 0, iEndTrainingSet )
+    # Original files for TRN data set
+    trnOriFiles = oriFiles[ 0 : iEndTrainingSet ]
 
-    #Transformed files
-    transformedFiles = glob.glob( transformedDir + '/**/*.*', recursive=True)
+    ## Copy files
+    transformImages( oriDir, transformedDir, trnOriFiles, "original" )
+    ## Flip
+    transformImages( oriDir, transformedDir, trnOriFiles, "flip" )
+    ## Rotate
+    transformImages( oriDir, transformedDir, trnOriFiles, "rotate" )
+
+    ## 1) Original
+    targetFiles = glob.glob( transformedDir + '/original/**/*.*', recursive=True)
+    buildTrnSet( dataDir, transformedDir, targetFiles, "original", sizes )
+
+    ## 2) Flip
+    targetFiles.extend( glob.glob( transformedDir + '/flip/**/*.*', recursive=True) )
+    buildTrnSet( dataDir, transformedDir, targetFiles, "flip", sizes )
+
+    ## 3) Flip and rotate
+    targetFiles.extend( glob.glob( transformedDir + '/rotate/**/*.*', recursive=True) )
+    buildTrnSet( dataDir, transformedDir, targetFiles, "flip-rotate", sizes )
+
+
+def buildTrnSet( dataDir, transformedDir, targetFiles, what, sizes ):
+
     # Shuffle files
-    random.shuffle( transformedFiles )
+    random.shuffle( targetFiles )
 
     for size in sizes :
-        print( "Build TRAINING data set - size", size )
+        print( "Build TRAINING data set '" + what + "' - size", size, "length:", len( targetFiles ) )
 
         ## Build TRN data set from transformed dir
         buildDataSet( \
-            dataDir, transformedDir, transformedFiles, \
-            0, iEndTrainingSet, \
-            size, "train_chats-" + str( size) + ".h5" \
+            dataDir, "trn/" + what, transformedDir, targetFiles, \
+            0, len( targetFiles ), \
+            size, "train_chats-" + str( size) + ".h5", \
+            indexLabel = 1 # rel path is original/cats/label/xxx.jpg, so label is in index 1
         )
 
     print( "Finished" );
@@ -267,9 +335,5 @@ if __name__ == "__main__":
 
     # Make sure random is repeatable
     random.seed( 1 )
-
-    #main( sys.argv[ 1: ] )
-
-    #getGoogleImageData()
 
     createTrainAndDevSets()

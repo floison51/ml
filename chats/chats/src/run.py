@@ -25,7 +25,13 @@ def instantiateClass( classFqName, params ) :
 
     return instance
 
-def updateDatasets( conn ):
+def updateDatasets( conn, selection ):
+
+    # get selected data set
+    selectedDatasetName = selection.get( "selectedDatasetName" )
+
+    # selection OK flag
+    selectionOk = False
 
     # Read init file
     iniDatasets = configparser.ConfigParser()
@@ -33,14 +39,27 @@ def updateDatasets( conn ):
     iniDatasets.optionxform = str
     iniDatasets.read( "datasets.ini" )
 
+    # Get current
     # Read sections
     for section in iniDatasets.sections() :
 
-        name = section
-        path = iniDatasets.get( section, "path" )
+        name    = section
+
+        if ( name == selectedDatasetName ) :
+            selectionOk = True
+
+        order   = int( iniDatasets.get( section, "order" ) )
+        pathTrn = iniDatasets.get( section, "pathTrn" )
+        pathDev = iniDatasets.get( section, "pathDev" )
 
         # Create dataset
-        db.getOrCreateDataset( conn, name, path )
+        db.createOrUpdateDataset( conn, name, order, pathTrn, pathDev )
+
+    # Clear selection if not existing
+    if ( not selectionOk ) :
+        selection.pop( "selectedDatasetName", None )
+        # save selection
+        db.setSelection( conn, selection )
 
 def updateMachines( conn ):
 
@@ -135,14 +154,15 @@ if __name__ == '__main__':
         # test (debug)
         #db.test( conn )
 
+        # Read selections
+        selection = db.getSelection( conn )
+
         # update datasets
-        updateDatasets( conn )
+        updateDatasets( conn, selection )
 
         # update machines
         ( iniMachines, configDatasources, configMachinesForms ) = updateMachines( conn )
 
-        # Read selections
-        selection = db.getSelection( conn )
         # Read datasets
         datasets = db.getDatasets( conn )
 
@@ -170,7 +190,8 @@ if __name__ == '__main__':
             sys.exit( 10 )
 
         # dataset
-        dataset = db.getOrCreateDataset( conn, datasetName, expand=True )
+        idDataset = db.getDatasetIdByName( conn, datasetName )
+        dataset = db.getDatasetById( conn, idDataset )
         print( "Using dataset", dataset )
 
         # Read config
@@ -185,7 +206,7 @@ if __name__ == '__main__':
         if ( buttonClicked == "Train" ) :
 
             # Get config hyper parameters
-            hyperParams = db.getHyperParams( conn, config[ "idHyperParams" ] )
+            hyperParams = db.getHyperParams( conn, idDataset, config[ "id" ] )
 
         elif ( buttonClicked == "Predict" ) :
 
@@ -256,8 +277,9 @@ if __name__ == '__main__':
             dataSource.setImagePathes( [ predictParams[ "imagePath" ] ] )
 
         # Tell source where is data
-        dataSource.setPath( dataset[ "path" ] )
-        
+        dataSource.setPathTrn( dataset[ "pathTrn" ] )
+        dataSource.setPathDev( dataset[ "pathDev" ] )
+
         # Get machine class
         machineClass = iniMachines.get( "Classes", machineName )
         if ( machineClass == None ) :
@@ -297,8 +319,8 @@ if __name__ == '__main__':
             comment     = runParams[ "comment" ]
 
             print( "Train machine", machineName )
-            ml.train( conn, config, comment, tune = tune, showPlots = showPlots )
+            ml.train( conn, dataset, config, comment, tune = tune, showPlots = showPlots )
 
         elif ( buttonClicked == "Predict" ) :
             print( "Predict from machine", machineName )
-            ml.predict( conn, config, idRun, dataSource.imagePathes )
+            ml.predict( conn, dataset, config, idRun, dataSource.imagePathes )

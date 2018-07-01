@@ -15,15 +15,18 @@ class HyperParamsDoer( Doer ):
 
     def updateHyperParams( self, fenetre, idConf ):
 
+        # get idDataset
+        nameDataset = fenetre.varDataset.get()
+        idDataset = db.getDatasetIdByName( self.conn, nameDataset )
+
         # Get config
         self.config = db.getConfig( self.conn, idConf )
-        # get hyper parameters id
-        self.idHyperParams = self.config[ "idHyperParams" ]
+
         # get hyper parameters
-        hyperParams = db.getHyperParams( self.conn, self.idHyperParams )
+        hyperParams = db.getHyperParams( self.conn, idDataset, idConf )
 
         # get best hyper params
-        ( bestHyperParams, bestDevAccuracy, _ ) = db.getBestHyperParams( self.conn, idConf )
+        ( bestHyperParams, bestDevAccuracy, _ ) = db.getBestHyperParams( self.conn, idDataset, idConf )
 
         # Launch window, it may update hps
         viewHp = view.ViewOrUpdateHyperParamsWindow( fenetre, self.doCreateOrUpdateHyperParams )
@@ -39,16 +42,15 @@ class HyperParamsDoer( Doer ):
             ## Nothing to do
             return
 
-        # Get or create new hyper parameters
-        idNewHyperParams = db.getOrCreateHyperParams( self.conn, newHyperParams )
+        # get idDataset
+        nameDataset = fenetre.master.varDataset.get()
+        idDataset = db.getDatasetIdByName( self.conn, nameDataset )
 
-        # check for change
-        if ( self.idHyperParams != idNewHyperParams ) :
-            # Update config
-            self.config[ "idHyperParams" ] = idNewHyperParams
-            db.updateConfig( self.conn, self.config )
-            #commit
-            self.conn.commit()
+        # Get or create new hyper parameters
+        db.getOrCreateHyperParams( self.conn, idDataset, self.config[ "id" ], newHyperParams )
+
+        #commit
+        self.conn.commit()
 
 class ConfigDoer( Doer ):
 
@@ -117,16 +119,21 @@ class ConfigDoer( Doer ):
 
         # normalize structure
         structure = newConfig[ "structure" ].strip()
-        
+
+        # get idDataset
+        nameDataset = fenetre.master.varDataset.get()
+        idDataset = db.getDatasetIdByName( self.conn, nameDataset )
+
         # Get or create new config
         idNewConfig = db.createConfig( self.conn, \
+            idDataset,
             newConfig[ "name" ], structure, \
             newConfig[ "imageSize" ], \
             newConfig[ "machine" ], hyperParams \
         )
 
         # Update window
-        config = db.getConfigsWithMaxDevAccuracy( self.conn, idNewConfig )[ 0 ]
+        config = db.getConfigsWithMaxDevAccuracy( self.conn, idDataset, idNewConfig )[ 0 ]
         fenetre.master.addConfigGrid( config )
 
         # commit
@@ -145,7 +152,7 @@ class ConfigDoer( Doer ):
         # normalize structure
         structure = newConfig[ "structure" ].strip()
         newConfig[ "structure" ] = structure
-        
+
         #Update config
         db.updateConfig( self.conn, newConfig )
 

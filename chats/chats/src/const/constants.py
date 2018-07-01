@@ -6,7 +6,7 @@ Machine Learning pseudo-constants
 import os
 
 APP_KEY = "chats"
-APP_RUN_KEY = "chats"
+APP_RUN_KEY = "chats-debug"
 
 DB_DIR = os.getcwd().replace( "\\", "/" ) + "/run/db/" + APP_RUN_KEY
 
@@ -16,6 +16,7 @@ KEY_DICO_SYSTEM         = "system"
 KEY_DICO_PERF           = "perf"
 KEY_DICO_DATA           = "data"
 KEY_DICO_RESULT         = "result"
+KEY_DICO_DATASET_NAME   = "datasetName"
 
 # hyper-parameters keys
 KEY_MINIBATCH_SIZE      = "minibatch_size"
@@ -84,14 +85,16 @@ class DatasetDico:
         # Type, default value
         "id"           : [ "int"    , None, None ],
         "name"         : [ "string" , None, None ],
-        "path"         : [ "string" , None, None ],
+        "displayOrder" : [ "string" , None, None ],
+        "pathTrn"      : [ "string" , None, None ],
+        "pathDev"      : [ "string" , None, None ],
     }
-    OBJECT_FIELDS  = [ "id", "name", "path" ]
+    OBJECT_FIELDS  = [ "id", "name", "displayOrder", "pathTrn", "pathDev" ]
     DISPLAY_FIELDS = OBJECT_FIELDS
 
 class ConfigsDico:
 
-    KEYS = { "id", "idMachine", "idHyperParams" }
+    KEYS = { "id", "idMachine" }
     CARAC = {
         # Type, default value
         "id"           : [ "int"    , None, None ],
@@ -101,7 +104,7 @@ class ConfigsDico:
         "structure"    : [ "string" , None, None ],
         "bestAccuracy" : [ "float" ,  None, "{:.2f}" ],
     }
-    OBJECT_FIELDS  = [ "id", "name", "structure", "imageSize", "idMachine", "idHyperParams" ]
+    OBJECT_FIELDS  = [ "id", "name", "structure", "imageSize", "idMachine" ]
     DISPLAY_FIELDS = [ "id", "name", "machine", "imageSize", "structure", "bestAccuracy" ]
 
 class MachinesDico:

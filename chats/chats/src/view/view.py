@@ -79,6 +79,12 @@ class MainWindow ( Tk ):
         )
         buttonCancel.pack( side="right", padx=40  )
 
+        # If a config is selected, eanle buttons        
+        if ( self.confSelected.get() != -1 ) :
+            # Update train, etc... buttons
+            self.confRbClicked()
+
+
         self.mainloop()
 
         # save selected things
@@ -114,7 +120,7 @@ class MainWindow ( Tk ):
         # Set change listener
         comboDatasets.bind( "<<ComboboxSelected>>", self.updateDataset )
         comboDatasets.pack( side="left", padx=40  )
-
+        
     def updateDataset( self, event ) :
 
         ## data set has changed, update config grid
@@ -408,10 +414,19 @@ class ViewOrUpdateHyperParamsWindow ( MyDialog ) :
     def run( self, dbHyperParams, dbBestHyperParams, bestDevAccuracy ) :
         "View or Update hyper parameters, show best hyper params"
 
+        #Get real hyper params
+        hyperParams     = dbHyperParams[ const.KEY_DICO_HYPER_PARAMS ]
+        bestHyperParams = dbBestHyperParams.get( const.KEY_DICO_HYPER_PARAMS, {} )
+
+        # Get data set
+        nameDataset = dbHyperParams[ const.KEY_DICO_DATASET_NAME ]
+        
         frameTop = Frame( self, relief=GROOVE )
         frameTop.pack(side=TOP, padx=30, pady=30)
 
-        label = Label( frameTop, text="Hyper parameter form" )
+        label = Label( frameTop, text="Hyper parameters" )
+        label.pack()
+        label = Label( frameTop, text="Data set: " + nameDataset )
         label.pack()
 
         frameForm = Frame( self, relief=GROOVE )
@@ -419,10 +434,6 @@ class ViewOrUpdateHyperParamsWindow ( MyDialog ) :
 
         frameButtons = LabelFrame( self, borderwidth=0 )
         frameButtons.pack( side=BOTTOM, padx=30, pady=30, fill='both', expand=True )
-
-        #Get real hyper params
-        hyperParams     = dbHyperParams[ const.KEY_DICO_HYPER_PARAMS ]
-        bestHyperParams = dbBestHyperParams.get( const.KEY_DICO_HYPER_PARAMS, {} )
 
         # Add default values
         for ( key, hpCarac ) in const.HyperParamsDico.CARAC.items() :

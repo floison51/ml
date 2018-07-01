@@ -61,7 +61,7 @@ class AbstractMachine():
     @abc.abstractmethod
     def restoreModel( self, idRun ):
         "Restore model"
-        
+
     @abc.abstractmethod
     def accuracyEval( self, XY, what ):
         "Evaluate accurary"
@@ -90,11 +90,11 @@ class AbstractMachine():
         # Nothing to do
         pass
 
-    def train( self,  conn, config, comment, tune = False, nbTuning = 20, showPlots = True ):
+    def train( self,  conn, dataset, config, comment, tune = False, nbTuning = 20, showPlots = True ):
         "Train the model"
 
         # hyper parameters
-        confHyperParams = config.getHyperParams( conn )
+        confHyperParams = config.getHyperParams( conn, dataset )
 
         runHyperParams = {}
         runHyperParams.update( confHyperParams[ "hyperParameters" ] )
@@ -185,7 +185,7 @@ class AbstractMachine():
                     maxIdRun = self.idRun
 
                     # get or create hyperparams
-                    idMaxHp = db.getOrCreateHyperParams( conn, runHyperParams )
+                    idMaxHp = db.getOrCreateHyperParams( conn, dataset[ "id" ], config[ "id" ], runHyperParams )
                     # Update config
                     config[ "idHyperParams" ] = idMaxHp
                     # save config
@@ -297,7 +297,7 @@ class AbstractMachine():
 
             # When to we display epochs stats
             nbStatusEpoch = math.ceil( current_num_epochs / 20 )
-            
+
             # intercept Ctrl-C
             self.interrupted = False
             import signal

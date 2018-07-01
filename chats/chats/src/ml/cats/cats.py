@@ -47,13 +47,14 @@ class CatRawDataSource( DataSource ):
             # Load from h5py data sets
 
             # Base dir for cats and not cats images
-            baseDir = os.getcwd() + "/" + self.path
+            baseDirTrn = os.getcwd() + "/" + self.pathTrn
+            baseDirDev = os.getcwd() + "/" + self.pathDev
 
-            trn_dataset = h5py.File( baseDir + "/train_chats-" + str( self.pxWidth ) + ".h5", "r" )
+            trn_dataset = h5py.File( baseDirTrn + "/train_chats-" + str( self.pxWidth ) + ".h5", "r" )
             trn_set_x_orig = np.array(trn_dataset["x"][:]) # your train set features
             trn_set_y_orig = np.array(trn_dataset["y"][:]) # your train set labels
 
-            dev_dataset = h5py.File( baseDir + "/dev_chats-" + str( self.pxWidth ) + ".h5", "r")
+            dev_dataset = h5py.File( baseDirDev + "/dev_chats-" + str( self.pxWidth ) + ".h5", "r")
             dev_set_x_orig = np.array( dev_dataset["x"][:] ) # your test set features
             dev_set_y_orig = np.array( dev_dataset["y"][:] ) # your test set labels
 
@@ -130,7 +131,7 @@ class CatRawDataSource( DataSource ):
             dataInfo[ const.KEY_DEV_X_SIZE  ] = datasetDev.X.shape[0]
             dataInfo[ const.KEY_DEV_X_SHAPE ] = datasetDev.X.shape
 
-            if ( datasetDev.Y is None ) :
+            if ( not ( datasetDev.Y is None ) ) :
                 dataInfo[ const.KEY_DEV_Y_SIZE  ] = datasetDev.Y.shape[0]
                 dataInfo[ const.KEY_DEV_Y_SHAPE ] = datasetDev.Y.shape
 

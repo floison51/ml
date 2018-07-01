@@ -9,12 +9,9 @@ from db.db import getHyperParams
 class MlConfig( dict ):
     "Machine Leaning configuration"
 
-    def getHyperParams( self, conn ) :
-        
-        # get hyper param id
-        idHyperParams = self[ "idHyperParams" ]
-        
+    def getHyperParams( self, conn, dataset ) :
+
         # Get hyper params values
-        hyperParams = getHyperParams( conn, idHyperParams )
-        
+        hyperParams = getHyperParams( conn, dataset[ "id" ], self["id" ] )
+
         return hyperParams

@@ -15,10 +15,14 @@ class DataSource():
         '''
         self.params = params
         self.imagePathes = None
-        self.path = None
+        self.pathTrn = None
+        self.pathDev = None
     
-    def setPath( self, path ):
-        self.path = path
+    def setPathTrn( self, path ):
+        self.pathTrn = path
+        
+    def setPathDev( self, path ):
+        self.pathDev = path
         
     def setImagePathes( self, imagePathes ):
         self.imagePathes = imagePathes
