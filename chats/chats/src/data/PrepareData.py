@@ -189,13 +189,14 @@ def buildDataSet( dataDir, what, baseDir, files, iStart, iEnd, size, outFileName
         dataset["pathes"]   = pathes
         dataset["imgDir"]   = relImgDir.encode( 'utf-8' )
 
-def createTrainAndDevSets():
+def createTrainAndDevSets( name ):
 
     input( "Type enter to continue" )
 
     # current dir for data
     dataDir = os.getcwd().replace( "\\", "/" )
-
+    dataDir += "/" + name
+    
     # Clean target dirs
     transformedDir = dataDir + "/transformed"
     os.makedirs( transformedDir, exist_ok = True )
@@ -336,4 +337,5 @@ if __name__ == "__main__":
     # Make sure random is repeatable
     random.seed( 1 )
 
-    createTrainAndDevSets()
+    createTrainAndDevSets( "hand-made" )
+    createTrainAndDevSets( "contest" )
