@@ -189,7 +189,7 @@ def buildDataSet( dataDir, what, baseDir, files, iStart, iEnd, size, outFileName
         dataset["pathes"]   = pathes
         dataset["imgDir"]   = relImgDir.encode( 'utf-8' )
 
-def createTrainAndDevSets( name ):
+def createTrainAndDevSets( name, transformations ):
 
     input( "Type enter to continue" )
 
@@ -237,25 +237,13 @@ def createTrainAndDevSets( name ):
     # Original files for TRN data set
     trnOriFiles = oriFiles[ 0 : iEndTrainingSet ]
 
-    ## Copy files
-    transformImages( oriDir, transformedDir, trnOriFiles, "original" )
-    ## Flip
-    transformImages( oriDir, transformedDir, trnOriFiles, "flip" )
-    ## Rotate
-    transformImages( oriDir, transformedDir, trnOriFiles, "rotate" )
+    # transformations
+    for transformation in transformations :
+        
+        transformImages( oriDir, transformedDir, trnOriFiles, transformation )
 
-    ## 1) Original
-    targetFiles = glob.glob( transformedDir + '/original/**/*.*', recursive=True)
-    buildTrnSet( dataDir, transformedDir, targetFiles, "original", sizes )
-
-    ## 2) Flip
-    targetFiles.extend( glob.glob( transformedDir + '/flip/**/*.*', recursive=True) )
-    buildTrnSet( dataDir, transformedDir, targetFiles, "flip", sizes )
-
-    ## 3) Flip and rotate
-    targetFiles.extend( glob.glob( transformedDir + '/rotate/**/*.*', recursive=True) )
-    buildTrnSet( dataDir, transformedDir, targetFiles, "flip-rotate", sizes )
-
+        targetFiles = glob.glob( transformedDir + '/' + transformation + '/**/*.*', recursive=True)
+        buildTrnSet( dataDir, transformedDir, targetFiles, transformation, sizes )
 
 def buildTrnSet( dataDir, transformedDir, targetFiles, what, sizes ):
 
@@ -337,5 +325,5 @@ if __name__ == "__main__":
     # Make sure random is repeatable
     random.seed( 1 )
 
-    createTrainAndDevSets( "hand-made" )
-    createTrainAndDevSets( "contest" )
+    createTrainAndDevSets( "hand-made", ( "original", "flip", "rotate", ) )
+    createTrainAndDevSets( "contest", ( "original", ) )
