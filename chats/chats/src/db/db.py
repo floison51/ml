@@ -25,9 +25,9 @@ def getSelection( conn ):
         cursor.execute(
             "select jsonSelection from selections where id=1"
         )
-    
+
         result = None
-    
+
         for row in cursor :
             resultJson = row[ 0 ]
             result = json.loads( resultJson )
@@ -53,7 +53,7 @@ def setSelection( conn, selection ):
         cursor.close()
 
 
-def createOrUpdateDataset( conn, name, order, pathTrn, pathDev ) :
+def createOrUpdateDataset( conn, name, order, pathHome, pathTrn, pathDev ) :
 
     cursor = conn.cursor();
 
@@ -63,20 +63,20 @@ def createOrUpdateDataset( conn, name, order, pathTrn, pathDev ) :
             "select id from datasets where name=?" ,
             ( name, )
         )
-    
+
         # For some reason, cursor.rowcount is NOK, use another method
         idConfig = -1
         for config in cursor:
             idConfig = config[ 0 ]
-    
+
         if ( idConfig < 0 ) :
             # None, create
-            idConfig = createDataset( conn, name, order, pathTrn, pathDev )
-    
+            idConfig = createDataset( conn, name, order, pathHome, pathTrn, pathDev )
+
         else :
             # update data set
-            updateDataset( conn, idConfig, name, order, pathTrn, pathDev )
-    
+            updateDataset( conn, idConfig, name, order, pathHome, pathTrn, pathDev )
+
     finally :
         cursor.close()
 
@@ -92,7 +92,7 @@ def getDatasetIdByName( conn, name ) :
             "select id from datasets where name=?" ,
             ( name, )
         )
-    
+
         # For some reason, cursor.rowcount is NOK, use another method
         idResult = -1
         for config in cursor:
@@ -113,12 +113,12 @@ def getDatasetById( conn, idDataset ) :
             "select * from datasets where id=?" ,
             ( idDataset, )
         )
-    
+
         result = {}
-    
+
         for row in cursor :
             iCol = 0
-    
+
             for colName in const.DatasetDico.DISPLAY_FIELDS :
                 result[ colName ] = row[ iCol ]
                 iCol += 1
@@ -128,16 +128,16 @@ def getDatasetById( conn, idDataset ) :
 
     return result;
 
-def createDataset( conn, name, order, pathTrn, pathDev ) :
+def createDataset( conn, name, order, pathHome, pathTrn, pathDev ) :
 
     cursor = conn.cursor()
 
     try :
         cursor.execute(
-            "INSERT INTO datasets VALUES ( null, ?, ?, ?, ? )",
-            ( name, order, pathTrn, pathDev, )
+            "INSERT INTO datasets VALUES ( null, ?, ?, ?, ?, ? )",
+            ( name, order, pathHome, pathTrn, pathDev, )
         )
-    
+
         idResult = cursor.lastrowid
 
     finally :
@@ -145,16 +145,16 @@ def createDataset( conn, name, order, pathTrn, pathDev ) :
 
     return idResult
 
-def updateDataset( conn, idDataset, name, order, pathTrn, pathDev ) :
+def updateDataset( conn, idDataset, name, order, pathHome, pathTrn, pathDev ) :
 
     cursor = conn.cursor()
 
     try :
         cursor.execute(
-            "UPDATE datasets set displayOrder=?, name=?, pathTrn=?, pathDev=? where id=?",
-            ( order, name, pathTrn, pathDev, idDataset, )
+            "UPDATE datasets set displayOrder=?, name=?, pathHome=?, pathTrn=?, pathDev=? where id=?",
+            ( order, name, pathHome, pathTrn, pathDev, idDataset, )
         )
-    
+
         idResult = cursor.lastrowid
 
     finally :
@@ -172,19 +172,19 @@ def getDatasets( conn ) :
         cursor.execute(
             "select * from datasets order by displayOrder asc"
         )
-    
+
         results = []
-    
+
         for row in cursor :
-    
+
             result = {}
-    
+
             iCol = 0
-    
+
             for colName in const.DatasetDico.DISPLAY_FIELDS :
                 result[ colName ] = row[ iCol ]
                 iCol += 1
-    
+
             # add result
             results.append( result )
 
@@ -207,12 +207,12 @@ def createConfig( conn, idDataset, name, structure, imageSize, machineName, hype
             "INSERT INTO configs VALUES ( null, ?, ?, ?, ? )",
             ( name, structure, imageSize, idMachine, )
         )
-    
+
         idConfig = cursor.lastrowid
-    
+
         # get hyparams
         idHyperParams = getOrCreateHyperParams( conn, idDataset, idConfig, hyper_params )
-    
+
         # create selector
         cursor.execute(
             "INSERT INTO hpSelector VALUES ( null, ?, ?, ? )",
@@ -226,14 +226,14 @@ def createConfig( conn, idDataset, name, structure, imageSize, machineName, hype
 
 def getHyperParamsFrowRow( row ) :
 
-    result = {} 
-        
+    result = {}
+
     result[ "id" ]    = row[ 0 ]
     json_hyper_params = row[ 1 ]
 
     hyper_params = json.loads( json_hyper_params )
     result[ const.KEY_DICO_HYPER_PARAMS ]  = hyper_params
-    
+
     return result
 
 def getHyperParamsById( conn, idHp ) :
@@ -246,19 +246,19 @@ def getHyperParamsById( conn, idHp ) :
             "select * from hyperparams where id=?",
             ( idHp, )
         )
-        
+
         result = None
-    
+
         for row in cursor :
             result = getHyperParamsFrowRow( row )
-    
+
     finally :
         cursor.close()
-    
+
     return result
 
 
-def getHyperParams( conn, idDataset, idConf ) :
+def getHyperParams( conn, idDataset, idConfig ) :
 
     cursor = conn.cursor()
 
@@ -266,26 +266,37 @@ def getHyperParams( conn, idDataset, idConf ) :
         # get hp selector to retrieve idHp
         cursor.execute(
             "select idHp from hpSelector where idDataset=? and idConfig=?",
-            ( idDataset, idConf, )
+            ( idDataset, idConfig, )
         )
-    
+
         # Default hp
-        idHyperParams = 1
-    
+        idHyperParams = -1
+
         for row in cursor :
             idHyperParams = row[ 0 ]
-    
-        # get existing, if anay
+
+        # Create selector if needed
+        if ( idHyperParams < 0 ) :
+
+            # Default hp
+            idHyperParams = 1
+            cursor.execute(
+                '''INSERT INTO hpSelector ( idDataset, idConfig, idHp ) VALUES ( ?, ?, ? )''',
+                ( idDataset, idConfig, idHyperParams, )
+            )
+
+
+        # get existing, if any
         cursor.execute(
             "select * from hyperparams where id=?",
             ( idHyperParams, )
         )
-    
+
         result = {}
-    
+
         for row in cursor :
             result = getHyperParamsFrowRow( row )
-            
+
         # resolve datat set name
         dataset = getDatasetById( conn, idDataset )
         result[ const.KEY_DICO_DATASET_NAME ]  = dataset[ "name" ]
@@ -305,11 +316,11 @@ def getBestHyperParams( conn, idDataSet, idConfig ) :
             "select r.idHyperParams, max(r.dev_accuracy), r.id from configs c, runs r where ( c.id=? and r.idConf=c.id and r.idDataset=? )",
             ( idConfig, idDataSet, )
         )
-    
+
         devAccuracy = None
         hyperParams = {}
         idRun = None
-    
+
         idHyperParams = None
         for row in cursor :
             idHyperParams = row[ 0 ]
@@ -318,7 +329,7 @@ def getBestHyperParams( conn, idDataSet, idConfig ) :
 
     finally :
         cursor.close()
-    
+
     if ( idHyperParams != None ) :
         hyperParams = getHyperParamsById( conn, idHyperParams )
 
@@ -342,10 +353,10 @@ def getSelectedIdHyperparam( conn, idDataset, idConf ):
             idHyperparam = hp[ 0 ]
 
         return idHyperparam
-    
+
     finally :
         cursor.close()
-        
+
 def getOrCreateHyperParams( conn, idDataset, idConfig, hyper_params ) :
 
     cursor = conn.cursor();
@@ -355,27 +366,27 @@ def getOrCreateHyperParams( conn, idDataset, idConfig, hyper_params ) :
         sorted_hyper_params = OrderedDict( sorted( hyper_params.items(), key=lambda t: t[0] ) )
         # JSon conversion
         json_hyper_params   = json.dumps( sorted_hyper_params )
-    
+
         # get existing, if any
         cursor.execute(
             "select id from hyperparams where json_hyper_params=?",
             ( json_hyper_params, )
         )
-    
+
         # For some reason, cursor.rowcount is NOK, use another method
         idHpResult = -1
         for ( hp ) in cursor:
             idHpResult = hp[ 0 ]
-    
+
         if ( idHpResult < 0 ) :
             # None, create
             cursor.execute(
                 "INSERT INTO hyperparams VALUES ( null, ? )",
                 ( json_hyper_params, )
             )
-    
+
             idHpResult = cursor.lastrowid
-    
+
         # update hp selector to assign new hps to (idDataset,idConf) tuple
         cursor.execute(
             "UPDATE hpSelector set idHp=? where idDataset=? and idConfig=?",
@@ -398,13 +409,13 @@ def getConfig( conn, idConfig ) :
             "select c.* from configs c where c.id=? ",
             ( idConfig, )
         )
-    
+
         result = MlConfig()
-    
+
         for row in cursor :
-    
+
             iCol = 0;
-    
+
             for colName in const.ConfigsDico.OBJECT_FIELDS :
                 result[ colName ] = row[ iCol ]
                 iCol += 1
@@ -424,12 +435,12 @@ def getOrCreateConfig( conn, name, structure, hyperParams ) :
             "select id from configs where name=? and structure=?" ,
             ( name, structure, )
         )
-    
+
         # For some reason, cursor.rowcount is NOK, use another method
         idResult = -1
         for config in cursor:
             idResult = config[ 0 ]
-    
+
         if ( idResult < 0 ) :
             # None, create
             idResult = createConfig( conn, name, structure, hyperParams )
@@ -452,7 +463,7 @@ def updateConfig( conn, config ) :
                  "imageSize=?, " + \
                  "idMachine=? " + \
                  "where id=?"
-    
+
         cursor.execute(
             updateStatement,
             (
@@ -483,11 +494,11 @@ def getConfigsWithMaxDevAccuracy( conn, idDataSet, idConfig = None ) :
     from model.mlconfig import MlConfig
 
     cursor = conn.cursor()
-    
+
     try :
 
         parameters = ( idDataSet, )
-    
+
         statement = \
             "select c.id as id, c.name as name, " + \
             "( select m.name from machines m where m.id=c.idMachine ) as machine, " + \
@@ -498,27 +509,27 @@ def getConfigsWithMaxDevAccuracy( conn, idDataSet, idConfig = None ) :
             statement += " where c.id=?"
             # Add paremetr
             parameters = parameters + ( idConfig, )
-    
+
         statement += " order by c.id asc"
-    
+
         # Update run
         cursor.execute(
             statement,
             parameters
         )
-    
+
         results = []
-    
+
         for row in cursor :
-    
+
             result = MlConfig()
-    
+
             iCol = 0
-    
+
             for colName in const.ConfigsDico.DISPLAY_FIELDS :
                 result[ colName ] = row[ iCol ]
                 iCol += 1
-    
+
             # add result
             results.append( result )
 
@@ -537,9 +548,9 @@ def getMachineNames( conn ) :
         cursor.execute(
             "select name from machines"
         )
-    
+
         result = []
-    
+
         for row in cursor :
             result.append( row[ 0 ] )
 
@@ -558,13 +569,13 @@ def getIdMachineByName( conn, machineName ):
             "select id from machines where name=?",
             ( machineName, )
         )
-    
+
         result = None
-    
+
         for row in cursor :
             result = row[ 0 ]
 
-    finally : 
+    finally :
         cursor.close();
 
     return result
@@ -580,9 +591,9 @@ def getMachineNameById( conn, idMachine ):
             "select name from machines where id=?",
             ( idMachine, )
         )
-    
+
         result = None
-    
+
         for row in cursor :
             result = row[ 0 ]
 
@@ -601,9 +612,9 @@ def getMachineIdByName( conn, machineName ):
             "select id from machines where name=?",
             ( machineName, )
         )
-    
+
         result = None
-    
+
         for row in cursor :
             result = row[ 0 ]
 
@@ -619,13 +630,13 @@ def addUniqueMachineName( conn, machineName ) :
     try :
         # exists?
         idMachine = getMachineIdByName( conn, machineName )
-    
+
         if ( idMachine == None ) :
             cursor.execute( '''
                 INSERT INTO machines ( name ) VALUES ( ? )''',
                 ( machineName, )
             )
-    
+
             idMachine = cursor.lastrowid
 
     finally :
@@ -642,18 +653,18 @@ def createRun( conn, idDataset, idConfig, runHyperParams ) :
     try :
         # get config
         config = getConfig( conn, idConfig )
-    
+
         # Get hyperparams
         idRunHyperParams = getOrCreateHyperParams( conn, idDataset, idConfig, runHyperParams )
-    
+
         # Save conf
         json_conf_saved = json.dumps( config )
-    
+
         cursor.execute( '''
             INSERT INTO runs ( idDataset, idConf, json_conf_saved, idHyperParams, date ) VALUES ( ?, ?, ?, ?, ? )''',
             ( idDataset, config[ "id" ], json_conf_saved, idRunHyperParams, datetime.datetime.now(), )
         )
-    
+
         idRun = cursor.lastrowid
 
     finally :
@@ -665,15 +676,15 @@ def updateRun( conn, idRun, runHyperParams ) :
 
     cursor = conn.cursor()
 
-    try : 
+    try :
         # Get hyperparams
         idRunHyperParams = getOrCreateHyperParams( conn, runHyperParams );
-    
+
         cursor.execute( \
             "update runs set idHyperParams=? where id=?", \
             ( idRunHyperParams, idRun, )
         )
-    
+
         idRun = cursor.lastrowid
 
     finally :
@@ -695,7 +706,7 @@ def updateRunBefore(
         json_data_info      = json.dumps( data_info )
         json_perf_info      = json.dumps( {} )
         json_result_info    = json.dumps( {} )
-    
+
         # Update run
         updateStatement = \
             "update runs set " + \
@@ -703,7 +714,7 @@ def updateRunBefore(
                  "json_system_info=?, json_data_info=?, json_perf_info=?, json_result_info=?, " + \
                  "perf_index=?, train_accuracy=?, dev_accuracy=? " + \
                  "where id=?"
-    
+
         cursor.execute(
             updateStatement,
             (
@@ -729,14 +740,14 @@ def updateRunAfter(
         # JSon conversion
         json_perf_info      = json.dumps( perf_info )
         json_result_info    = json.dumps( result_info )
-    
+
         # Update run
         updateStatement = \
             "update runs set " + \
                 "json_perf_info=?, json_result_info=?," + \
                  "perf_index=?, elapsed_second=?, train_accuracy=?, dev_accuracy=? " + \
                  "where id=?"
-    
+
         cursor.execute(
             updateStatement,
             (
@@ -788,14 +799,14 @@ def getRuns( conn, idConf ) :
             select * from runs where idConf=?''',
             (idConf,)
         )
-    
+
         results = []
-    
+
         # TODO use dico
         for row in cursor :
-    
+
             result = getRunFromRow( row )
-    
+
             results.append( result )
 
     finally :
@@ -813,9 +824,9 @@ def getRunIdLast( conn, idConf ) :
             select max( id ) from runs where idConf=?''',
             (idConf,)
         )
-    
+
         for row in cursor :
-    
+
             result = row[ 0 ]
 
     finally :
@@ -833,9 +844,9 @@ def getRun( conn, idRun ) :
             select * from runs where id=?''',
             (idRun,)
         )
-    
+
         result = None
-    
+
         for row in cursor :
             result = getRunFromRow( row )
 
@@ -875,7 +886,7 @@ def initDb( key, dbFolder ) :
     try :
 
         cursor.execute( "select * from versions" )
-        
+
         # upgrade DB if needed
         upgradeDb( cursor )
 
@@ -964,6 +975,7 @@ def initTables( cursor ) :
            id integer PRIMARY KEY AUTOINCREMENT,
            name text not null unique,
            displayOrder integer not null,
+           pathHome text not null,
            pathTrn text not null,
            pathDev text not null
          )'''

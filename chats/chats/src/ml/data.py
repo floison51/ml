@@ -15,9 +15,13 @@ class DataSource():
         '''
         self.params = params
         self.imagePathes = None
+        self.pathHome = None
         self.pathTrn = None
         self.pathDev = None
     
+    def setPathHome( self, path ):
+        self.pathHome = path
+        
     def setPathTrn( self, path ):
         self.pathTrn = path
         
@@ -64,11 +68,12 @@ class DataSource():
         
 class DataSet() :
     "Data set"
-    def __init__( self, X_ori, X, Y, imgDir, imgPathes, tags = None, weights = None ):
+    def __init__( self, X_ori, X, Y, dataHome, imgDir, imgPathes, tags = None, weights = None ):
         self.X_ori = X_ori
         self.X = X
         self.Y = Y
         
+        self.dataHome = dataHome
         self.imgDir = imgDir
         self.imgPathes = imgPathes
         

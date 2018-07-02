@@ -48,12 +48,13 @@ def updateDatasets( conn, selection ):
         if ( name == selectedDatasetName ) :
             selectionOk = True
 
-        order   = int( iniDatasets.get( section, "order" ) )
-        pathTrn = iniDatasets.get( section, "pathTrn" )
-        pathDev = iniDatasets.get( section, "pathDev" )
+        order    = int( iniDatasets.get( section, "order" ) )
+        pathHome = iniDatasets.get( section, "pathHome" )
+        pathTrn  = iniDatasets.get( section, "pathTrn" )
+        pathDev  = iniDatasets.get( section, "pathDev" )
 
         # Create dataset
-        db.createOrUpdateDataset( conn, name, order, pathTrn, pathDev )
+        db.createOrUpdateDataset( conn, name, order, pathHome, pathTrn, pathDev )
 
     # Clear selection if not existing
     if ( not selectionOk ) :
@@ -277,8 +278,9 @@ if __name__ == '__main__':
             dataSource.setImagePathes( [ predictParams[ "imagePath" ] ] )
 
         # Tell source where is data
-        dataSource.setPathTrn( dataset[ "pathTrn" ] )
-        dataSource.setPathDev( dataset[ "pathDev" ] )
+        dataSource.setPathHome( dataset[ "pathHome" ] )
+        dataSource.setPathTrn(  dataset[ "pathTrn" ] )
+        dataSource.setPathDev(  dataset[ "pathDev" ] )
 
         # Get machine class
         machineClass = iniMachines.get( "Classes", machineName )

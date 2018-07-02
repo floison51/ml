@@ -563,8 +563,10 @@ class AbstractMachine():
 
         return elapsedSeconds, perfIndex
 
-    def dumpBadImages( self, correct, X_orig, imgDir, PATH, TAG, errorsDir ):
+    def dumpBadImages( self, correct, X_orig, dataHome, imgDir, PATH, TAG, errorsDir ):
 
+        nbBadImages = 0
+        
         # Delete files in error dir
         for the_file in os.listdir( errorsDir ):
             file_path = os.path.join( errorsDir, the_file )
@@ -582,13 +584,20 @@ class AbstractMachine():
         # Dico of errors by label
         mapErrorNbByTag = {}
 
-        imgBase = os.getcwd().replace( "\\", "/" ) + "/data/" + imgDir
+        imgBase = dataHome.replace( "\\", "/" )
 
         # Extract errors
         for i in range( 0, correct.shape[ 0 ] ):
+            
             # Is an error?
             if ( not( correct[ i ] ) ) :
 
+                nbBadImages += 1
+                
+                # finished?
+                if ( nbBadImages > 100 ) :
+                    break;
+                
                 # Add nb
                 numpy_label = TAG[ i, 0 ]
                 label = numpy_label.decode( 'utf-8' )
@@ -644,7 +653,7 @@ class AbstractMachine():
             sys.exit( 1 )
 
         # Dump bad images
-        mapErrorNbByTag = self.dumpBadImages( oks, dataset.X_ori, dataset.imgDir, dataset.imgPathes, dataset.tags, errorsDir )
+        mapErrorNbByTag = self.dumpBadImages( oks, dataset.X_ori, dataset.dataHome, dataset.imgDir, dataset.imgPathes, dataset.tags, errorsDir )
 
         # Sort by value
         mapErrorNbByTagSorted = \

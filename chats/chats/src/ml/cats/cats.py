@@ -47,8 +47,9 @@ class CatRawDataSource( DataSource ):
             # Load from h5py data sets
 
             # Base dir for cats and not cats images
-            baseDirTrn = os.getcwd() + "/" + self.pathTrn
-            baseDirDev = os.getcwd() + "/" + self.pathDev
+            baseDirHome = os.getcwd() + "/" + self.pathHome
+            baseDirTrn  = os.getcwd() + "/" + self.pathTrn
+            baseDirDev  = os.getcwd() + "/" + self.pathDev
 
             trn_dataset = h5py.File( baseDirTrn + "/train_chats-" + str( self.pxWidth ) + ".h5", "r" )
             trn_set_x_orig = np.array(trn_dataset["x"][:]) # your train set features
@@ -94,8 +95,8 @@ class CatRawDataSource( DataSource ):
             dev_imgPathes = np.array( dev_dataset[ "pathes" ][:] )
 
             # Create data sets
-            datasetTrn = DataSet( trn_set_x_orig, trn_set_x, trn_set_y, trn_imgDir, trn_imgPathes, trn_set_tags, trn_set_weights )
-            datasetDev = DataSet( dev_set_x_orig, dev_set_x, dev_set_y, dev_imgDir, dev_imgPathes, dev_set_tags )
+            datasetTrn = DataSet( trn_set_x_orig, trn_set_x, trn_set_y, baseDirHome, trn_imgDir, trn_imgPathes, trn_set_tags, trn_set_weights )
+            datasetDev = DataSet( dev_set_x_orig, dev_set_x, dev_set_y, baseDirHome, dev_imgDir, dev_imgPathes, dev_set_tags )
 
             # For tensor flow, we need to transpose data
             self.transpose( datasetTrn )

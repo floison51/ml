@@ -65,7 +65,7 @@ def deleteDirContent( dir ) :
         try:
             if os.path.isfile( file_path ):
                 os.unlink( file_path )
-            elif os.path.isdir( file_path ): 
+            elif os.path.isdir( file_path ):
                 shutil.rmtree( file_path )
         except Exception as e:
             print(e)
@@ -163,7 +163,11 @@ def buildDataSet( dataDir, what, baseDir, files, iStart, iEnd, size, outFileName
             imagesList.append( pix )
             y.append( isCat )                       # Image will be saved
             tags.append( np.string_( _tag ) )       # Label of image
-            pathes.append( np.string_( relCurImage ) )
+
+            # Image rel path from home
+            relHomeCurImage = curImage[ len( dataDir ) + 1: ]
+            relHomeCurImage = relHomeCurImage.replace( '\\', '/' )
+            pathes.append( np.string_( relHomeCurImage ) )
 
 # Store as binary stuff
 
@@ -189,23 +193,21 @@ def buildDataSet( dataDir, what, baseDir, files, iStart, iEnd, size, outFileName
         dataset["pathes"]   = pathes
         dataset["imgDir"]   = relImgDir.encode( 'utf-8' )
 
-def createTrainAndDevSets( name, transformations ):
-
-    input( "Type enter to continue" )
+def createTrainAndDevSets( name, transformations, pc ):
 
     # current dir for data
     dataDir = os.getcwd().replace( "\\", "/" )
     dataDir += "/" + name
-    
+
     # Clean target dirs
     transformedDir = dataDir + "/transformed"
     os.makedirs( transformedDir, exist_ok = True )
     deleteDirContent( transformedDir )
-    
+
     preparedDir = dataDir + "/prepared"
     os.makedirs( preparedDir, exist_ok = True )
     deleteDirContent( preparedDir )
-    
+
     # Base dir for cats and not cats images
     oriDir = dataDir + "/images"
 
@@ -221,7 +223,7 @@ def createTrainAndDevSets( name, transformations ):
     sizes = ( 64, 92, 128 )
 
     print( "Build DEV data set" )
-    iEndTrainingSet = int( len( oriFiles ) * TRAINING_TEST_SET_PC );
+    iEndTrainingSet = int( len( oriFiles ) * pc );
 
     for size in sizes :
         ## Build DEV data set
@@ -239,7 +241,7 @@ def createTrainAndDevSets( name, transformations ):
 
     # transformations
     for transformation in transformations :
-        
+
         transformImages( oriDir, transformedDir, trnOriFiles, transformation )
 
         targetFiles = glob.glob( transformedDir + '/' + transformation + '/**/*.*', recursive=True)
@@ -325,5 +327,7 @@ if __name__ == "__main__":
     # Make sure random is repeatable
     random.seed( 1 )
 
-    createTrainAndDevSets( "hand-made", ( "original", "flip", "rotate", ) )
-    createTrainAndDevSets( "contest", ( "original", ) )
+    input( "Type enter to continue" )
+
+    createTrainAndDevSets( "hand-made", ( "original", "flip", "rotate", ), TRAINING_TEST_SET_PC )
+    createTrainAndDevSets( "contest", ( "original", ), 100 )
