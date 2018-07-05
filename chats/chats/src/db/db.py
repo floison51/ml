@@ -489,7 +489,7 @@ def deleteConfig( conn, idConf ) :
     finally :
         cursor.close();
 
-def getConfigsWithMaxDevAccuracy( conn, idDataSet, idConfig = None ) :
+def getConfigsWithMaxDevAccuracy( conn, idDataset, idConfig = None ) :
 
     from model.mlconfig import MlConfig
 
@@ -497,14 +497,14 @@ def getConfigsWithMaxDevAccuracy( conn, idDataSet, idConfig = None ) :
 
     try :
 
-        parameters = ( idDataSet, )
+        parameters = ()
 
         statement = \
             "select c.id as id, c.name as name, " + \
             "( select m.name from machines m where m.id=c.idMachine ) as machine, " + \
-            "c.imageSize as imageSize, c.structure as structure, " + \
-            "( select max(r.dev_accuracy) " + \
-            "from runs r where ( r.idConf=c.id and r.idDataSet=? ) ) as bestAccuracy from configs c"
+            "c.imageSize as imageSize, c.structure as structure " + \
+            "from configs c "
+
         if ( idConfig != None ) :
             statement += " where c.id=?"
             # Add paremetr
@@ -527,9 +527,51 @@ def getConfigsWithMaxDevAccuracy( conn, idDataSet, idConfig = None ) :
             iCol = 0
 
             for colName in const.ConfigsDico.DISPLAY_FIELDS :
-                result[ colName ] = row[ iCol ]
+                
+                if ( ( colName != "bestDevAccuracy" ) and ( colName != "assoTrnAccuracy" ) ) :
+                    result[ colName ] = row[ iCol ]
+                    
                 iCol += 1
 
+            # Append best DEV accuracy and TRN Accuracy
+            statementRun = \
+                "select r.id from runs r where ( r.idDataset=? and r.idConf=? and r.dev_accuracy=" \
+                    "(select max( r2.dev_accuracy) from runs r2 where r2.idDataset=? and r2.idConf=? ) ) order by id desc;"
+
+            # dataset id, config id
+            parameters = ( idDataset, result[ "id" ], idDataset, result[ "id" ], )
+
+            cursorRun = conn.cursor()
+        
+            try :
+
+                cursorRun.execute(
+                    statementRun,
+                    parameters
+                )
+    
+                bestDevAccuracy = None
+                assoTrnAccuracy = None
+    
+                # Get selected run
+                for row in cursorRun :
+    
+                    idRun = row[ 0 ]
+                    run = getRun( conn, idRun )
+    
+                    bestDevAccuracy = run[ "dev_accuracy" ]
+                    assoTrnAccuracy = run[ "train_accuracy" ]
+                    
+                    # Read only first row
+                    break
+    
+                # Add accuracies
+                result[ "bestDevAccuracy" ] = bestDevAccuracy
+                result[ "assoTrnAccuracy" ] = assoTrnAccuracy
+            
+            finally :
+                cursorRun.close()
+                
             # add result
             results.append( result )
 
@@ -789,15 +831,15 @@ def getRunFromRow(row):
 
     return result
 
-def getRuns( conn, idConf ) :
+def getRuns( conn, idDataset, idConf ) :
 
     cursor = conn.cursor()
 
     try :
         # Update run
         cursor.execute( '''
-            select * from runs where idConf=?''',
-            (idConf,)
+            select * from runs where idDataset=? and idConf=?''',
+            ( idDataset, idConf, )
         )
 
         results = []

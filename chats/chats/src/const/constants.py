@@ -98,15 +98,16 @@ class ConfigsDico:
     KEYS = { "id", "idMachine" }
     CARAC = {
         # Type, default value
-        "id"           : [ "int"    , None, None ],
-        "name"         : [ "string" , None, None ],
-        "machine"      : [ "string" , None, None ],
-        "imageSize"    : [ "int"    , 64  , None ],
-        "structure"    : [ "string" , None, None ],
-        "bestAccuracy" : [ "float" ,  None, "{:.2f}" ],
+        "id"              : [ "int"    , None, None ],
+        "name"            : [ "string" , None, None ],
+        "machine"         : [ "string" , None, None ],
+        "imageSize"       : [ "int"    , 64  , None ],
+        "structure"       : [ "string" , None, None ],
+        "bestDevAccuracy" : [ "float" ,  None, "{:.2f}" ],
+        "assoTrnAccuracy" : [ "float" ,  None, "{:.2f}" ],
     }
     OBJECT_FIELDS  = [ "id", "name", "structure", "imageSize", "idMachine" ]
-    DISPLAY_FIELDS = [ "id", "name", "machine", "imageSize", "structure", "bestAccuracy" ]
+    DISPLAY_FIELDS = [ "id", "name", "machine", "imageSize", "structure", "bestDevAccuracy", "assoTrnAccuracy" ]
 
 class MachinesDico:
 
@@ -119,10 +120,13 @@ class MachinesDico:
 
 class RunsDico:
 
-    KEYS = { "id", "idConf", "idHyperParams" }
+    KEYS = { "id", "idDataset", "idConf", "idHyperParams" }
     CARAC = {
         # Type, default value
         "id"                    : [ "int"      , None, None     ],
+        "idDataset"             : [ "int"      , None, None     ],
+        "idConf"                : [ "int"      , None, None     ],
+        "idHyperParams"         : [ "int"      , None, None     ],
         "dateTime"              : [ "datetime" , None, None     ],
         "comment"               : [ "string"   , None, None     ],
         "perf_index"            : [ "float"    , None, "{:.1f}" ],
@@ -137,5 +141,5 @@ class RunsDico:
         
     }
     OBJECT_FIELDS  = [ "id", "dateTime", "comment", "perf_index", "elapsed_second", "train_accuracy", "dev_accuracy", "json_conf_saved_info", "json_system_info", "json_data_info", "json_perf_info", "json_result_info" ]
-    DISPLAY_FIELDS = [ "comment", "train_accuracy", "dev_accuracy", "perf_index", "elapsed_second", "dateTime", "conf_saved_info", "system_info", "data_info", "perf_info", "result_info" ]
+    DISPLAY_FIELDS = [ "comment", "idDataset", "idConf", "idHyperParams", "train_accuracy", "dev_accuracy", "perf_index", "elapsed_second", "dateTime", "conf_saved_info", "system_info", "data_info", "perf_info", "result_info" ]
 

@@ -212,11 +212,11 @@ class AbstractMachine():
 
         print( "Finished in", globalElapsedSeconds, "seconds" )
 
-    def predict( self, conn, config, idRun, imagePathes ):
+    def predict( self, conn, dataset, config, idRun, imagePathes ):
         "Predict accuracy from trained model"
 
         # hyper parameters
-        confHyperParams = config.getHyperParams( conn )
+        confHyperParams = config.getHyperParams( conn, dataset )
 
         runHyperParams = {}
         runHyperParams.update( confHyperParams[ "hyperParameters" ] )

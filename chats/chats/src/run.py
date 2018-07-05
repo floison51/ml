@@ -216,16 +216,17 @@ if __name__ == '__main__':
 
             if ( choiceHp == 1 ) :
 
-                # Config hyper params
-                hyperParams = db.getHyperParams( conn, config[ "idHyperParams" ] )
-
                 # Last idRun
                 idRun = db.getRunIdLast( conn, config[ "id" ] )
 
+                # Config hyper params
+                run = db.getRun( conn, idRun )
+                hyperParams = db.getHyperParamsById( conn, run[ "idHyperParams" ] )
+                
             elif ( choiceHp == 2 ) :
 
                 # Get best hyper parameters
-                ( hyperParams, _, idRun ) = db.getBestHyperParams( conn, idConfig )
+                ( hyperParams, _, idRun ) = db.getBestHyperParams( conn, idDataset, idConfig )
 
                 # Check run structure and pixel size match with conf
                 run = db.getRun( conn, idRun )
@@ -251,7 +252,7 @@ if __name__ == '__main__':
             else :
                 raise ValueError( "Unknown hyper parameters choice " + choiceHp )
         else :
-            raise ValueError( "Unknown action " + buttonClicked )
+            raise ValueError( "Unknown action " + str( buttonClicked ) )
 
         # Data source may depend on choice
         choiceData = None

@@ -15,17 +15,18 @@ class ViewRunsWindow ( view.MyDialog ) :
     def __init__( self, boss, callbackFct, **options ) :
         view.MyDialog.__init__( self, boss, callbackFct, **options )
 
-    def run( self, idConfig, runs ) :
+    def run( self, idDataset, idConfig, datasetName, runs ) :
         "View or Update hyper parameters, show best hyper params"
 
         # record idConf and runs
+        self.idDataset = idDataset
         self.idConfig = idConfig
         self.runs = runs
 
         frameTop = Frame( self, relief=GROOVE )
         frameTop.pack(side=TOP, padx=30, pady=30)
 
-        label = Label( frameTop, text="Runs for config " + str( idConfig ) );
+        label = Label( frameTop, text="Runs for dataset '" + datasetName + "', config '" + str( idConfig ) + "'" );
         label.pack()
 
         frameForm = Frame( self, relief=GROOVE )
@@ -42,8 +43,6 @@ class ViewRunsWindow ( view.MyDialog ) :
                 continue
 
             self.tree.heading( colName, text=colName )
-            #minwidth = self.tree.column( colName, stretch=YES, option="minwidth" )
-            #self.tree.column( colName, stretch=YES, width=minwidth )
             self.tree.column( colName, stretch=YES )
 
         self.tree.grid( row=len( const.RunsDico.DISPLAY_FIELDS ), sticky='nsew' )

@@ -384,18 +384,18 @@ class AbstractTensorFlowMachine( AbstractMachine ):
             sess.run( [ devIterator.initializer ] )
 
             if ( imagePathes != None ) :
-                
+
                 # calculate correct predictions
                 correct_predictions = sess.run( [ self.correct_prediction ] , self.getAccuracyEvalFeedDict( devHandle ) )
-                
+
                 print( "Is a cat ???" )
                 for i in range( 0, len( imagePathes ) ) :
                     print( "  " + imagePathes[ i ] + " :", correct_predictions[ i ] )
-                    
+
             else :
                 # calculate accuracy
                 accuracy = self.accuracyEval( devHandle, "predict" )
-    
+
                 print( "Predict accuracy : %f" % accuracy )
 
 #*****************************************************
@@ -869,7 +869,10 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
         # Shuffle data
         self.tfDatasetTrn = self.tfDatasetTrn.shuffle( buffer_size=100000, reshuffle_each_iteration=True )
         # Data set, minibatch_size slices
-        self.tfDatasetTrn = self.tfDatasetTrn.prefetch( self.minibatch_size * 2 ).batch( self.minibatch_size )
+        #debug
+        #self.tfDatasetTrn = self.tfDatasetTrn.prefetch( self.minibatch_size * 2 ).batch( self.minibatch_size )
+        self.tfDatasetTrn = self.tfDatasetTrn.batch( self.minibatch_size )
+
         # Data set, repeat num_epochs
         self.tfDatasetTrn = self.tfDatasetTrn.repeat( self.phTrnNumEpochs )
 
@@ -924,14 +927,19 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
             # current iteration
             iteration = 0
 
-            # Nb status epopch : if we reach it, calculate DEV efficiency
+            # Nb status epoch : if we reach it, calculate DEV efficiency
             nbStatusEpoch = math.ceil( self.num_epochs / 20 )
 
             # Start time
             tsStart = time.time()
 
-            # time to make sure we trace something each N minuts
+            # time to make sure we write epoch status each N seconds
+            tsStatusEpochStart = tsStart
+            secStatusEpoch = 120           # Status epoch each 120 seconds
+
+            # time to make sure we trace something each N seconds
             tsTraceStart = tsStart
+            secTrace = 60           #trace each 60 seconds
 
             try :
                 while ( not self.interrupted and not finished ) :
@@ -951,7 +959,7 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
                     tsTraceElapsed = tsTraceNow - tsTraceStart
 
                     # Each 60 seconds
-                    if ( tsTraceElapsed >= 60 ) :
+                    if ( tsTraceElapsed >= secTrace ) :
 
                         # Display iteration 0 to allow verify cost calculation accross machines
                         print ( "TRACE : Current cost epoch %i; iteration %i; %f" % ( iEpoch, iteration, epoch_cost ) )
@@ -964,9 +972,15 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
                         # Load epoch in tensorboard
                         self.var_numEpoch.load( iEpoch )
 
+                        # time to status epoch?
+                        tsEpochStatusNow = time.time()
+                        tsEpochStatusElapsed = tsEpochStatusNow - tsStatusEpochStart
+
                         #print epoch cost
-                        if print_cost and ( iteration != 0 ) and ( iEpoch % nbStatusEpoch ) == 0:
+                        if print_cost and ( iteration != 0 ) and ( ( iEpoch % nbStatusEpoch ) == 0 or ( tsEpochStatusElapsed >= secStatusEpoch ) ) :
+
                             print ("Cost after epoch %i; iteration %i; %f" % ( iEpoch, iteration, epoch_cost ) )
+
                             if ( iEpoch != 0 ) :
 
                                 # Performance counters
@@ -979,6 +993,9 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
                                 DEV_accuracy = self.accuracyEval( devHandle, "dev" )
                                 print( "  current: DEV accuracy: %f" % ( DEV_accuracy ) )
                                 DEV_accuracies.append( DEV_accuracy )
+                            
+                            # Reset status epoch timer
+                            tsStatusEpochStart = tsEpochStatusNow
 
                         # Store cost for graph
                         if print_cost == True and ( iteration != 0 ) and iEpoch % 5 == 0:

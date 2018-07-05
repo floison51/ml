@@ -59,7 +59,7 @@ class ConfigDoer( Doer ):
 
     def getConfigsWithMaxDevAccuracy( self, datasetName ):
 
-        # Get dataset id
+        # Get idDataset from its name
         idDataset = db.getDatasetIdByName( self.conn, datasetName )
 
         # get configs
@@ -176,7 +176,7 @@ class RunsDoer( Doer ):
     def __init__( self, conn ) :
         super().__init__( conn )
 
-    def showRuns( self, fenetre, idConf ):
+    def showRuns( self, fenetre, datasetName, idConf ):
 
         if ( idConf == None ) :
             ## Nothing to do
@@ -186,9 +186,10 @@ class RunsDoer( Doer ):
         viewRuns = ViewRunsWindow( fenetre, None )
 
         # get runs
-        runs = db.getRuns( self.conn, idConf )
+        idDataset = db.getDatasetIdByName( self.conn, datasetName )
+        runs = db.getRuns( self.conn, idDataset, idConf )
         # launch view
-        viewRuns.run( idConf, runs )
+        viewRuns.run( idDataset, idConf, datasetName, runs )
 
 class StartRunDoer( Doer ):
 

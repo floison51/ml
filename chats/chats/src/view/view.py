@@ -51,7 +51,7 @@ class MainWindow ( Tk ):
         frameDatasets.pack(fill="both", expand="yes", padx=10, pady=10)
 
         frameConfigs = LabelFrame( self, text="Configurations", padx=20, pady=20)
-        self.buildConfigGrid( frameConfigs, self.varDataset.get(), selection )
+        self.buildConfigGrid( conn, frameConfigs, selection )
         frameConfigs.pack(fill="both", expand="yes", padx=10, pady=10)
 
         frameButtons = Frame(self, borderwidth=0 )
@@ -79,7 +79,7 @@ class MainWindow ( Tk ):
         )
         buttonCancel.pack( side="right", padx=40  )
 
-        # If a config is selected, eanle buttons        
+        # If a config is selected, eanle buttons
         if ( self.confSelected.get() != -1 ) :
             # Update train, etc... buttons
             self.confRbClicked()
@@ -120,7 +120,7 @@ class MainWindow ( Tk ):
         # Set change listener
         comboDatasets.bind( "<<ComboboxSelected>>", self.updateDataset )
         comboDatasets.pack( side="left", padx=40  )
-        
+
     def updateDataset( self, event ) :
 
         ## data set has changed, update config grid
@@ -138,9 +138,10 @@ class MainWindow ( Tk ):
             # Get displayed row
             colVarLabels = colVarLabelsByConfigId[ idConfig ]
 
-            item = config[ "bestAccuracy" ]
+            # Best DEV accuracy
+            item = config[ "bestDevAccuracy" ]
             # format?
-            formatString = const.ConfigsDico.CARAC[ "bestAccuracy" ][ 2 ]
+            formatString = const.ConfigsDico.CARAC[ "bestDevAccuracy" ][ 2 ]
             if ( ( item != None ) and ( formatString != None ) ) :
                 item = formatString.format( item )
 
@@ -148,7 +149,21 @@ class MainWindow ( Tk ):
             label = colVarLabels[ 4 ]
             label.set( item )
 
-    def buildConfigGrid( self, frameConfigs, datasetName, selection ):
+            # Associated TRN accuracy
+            item = config[ "assoTrnAccuracy" ]
+            # format?
+            formatString = const.ConfigsDico.CARAC[ "assoTrnAccuracy" ][ 2 ]
+            if ( ( item != None ) and ( formatString != None ) ) :
+                item = formatString.format( item )
+
+            # Update best DEV accuracy
+            label = colVarLabels[ 5 ]
+            label.set( item )
+
+    def buildConfigGrid( self, conn, frameConfigs, selection ):
+
+        # get dataset
+        datasetName = selection[ "selectedDatasetName" ]
 
         # Get configs
         configs = self.configDoer.getConfigsWithMaxDevAccuracy( datasetName )
@@ -160,7 +175,7 @@ class MainWindow ( Tk ):
         self.frameConfigsTable = LabelFrame( frameConfigs, padx=10, pady=10)
 
         # show window
-        labels = { 1: "", 2: "Id", 3: "Name", 4: "Machine", 5: "Image Size", 6 : "Structure", 7 : "Best DEV\nAccuracy", 8: "Hyper Params", 9: "Runs" }
+        labels = { 1: "", 2: "Id", 3: "Name", 4: "Machine", 5: "Image Size", 6 : "Structure", 7 : "Best DEV\nAccuracy", 8: "TRN\nAccuracy", 9: "Hyper Params", 10: "Runs" }
 
         for iCol in range( 1, len( labels ) + 1 ) :
             label = Label( self.frameConfigsTable, text=labels[ iCol ], borderwidth=1 ).grid( row=0, column=iCol, sticky=W, padx=10 )
@@ -270,7 +285,7 @@ class MainWindow ( Tk ):
         # Button to show runs
         buttonShowRuns = Button( \
             self.frameConfigsTable, text="Show", \
-            command= lambda idConf=idConf : self.runsDoer.showRuns( self, idConf )
+            command= lambda idConf=idConf : self.runsDoer.showRuns( self, self.varDataset.get(), idConf )
         )
         cols.append( buttonShowRuns )
         buttonShowRuns.grid( row=iRow, column=iCol )
@@ -420,7 +435,7 @@ class ViewOrUpdateHyperParamsWindow ( MyDialog ) :
 
         # Get data set
         nameDataset = dbHyperParams[ const.KEY_DICO_DATASET_NAME ]
-        
+
         frameTop = Frame( self, relief=GROOVE )
         frameTop.pack(side=TOP, padx=30, pady=30)
 
@@ -445,7 +460,7 @@ class ViewOrUpdateHyperParamsWindow ( MyDialog ) :
         iRow = 1
 
         # Format accuracy
-        strFormat = const.ConfigsDico.CARAC[ "bestAccuracy" ][ 2 ]
+        strFormat = const.ConfigsDico.CARAC[ "bestDevAccuracy" ][ 2 ]
         formattedBestDevAccuracy = None
         if ( bestDevAccuracy != None ) :
             formattedBestDevAccuracy = strFormat.format( bestDevAccuracy )

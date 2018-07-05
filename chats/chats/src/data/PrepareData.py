@@ -329,5 +329,5 @@ if __name__ == "__main__":
 
     input( "Type enter to continue" )
 
-    createTrainAndDevSets( "hand-made", ( "original", "flip", "rotate", ), TRAINING_TEST_SET_PC )
-    createTrainAndDevSets( "contest", ( "original", ), 100 )
+    #createTrainAndDevSets( "hand-made", ( "original", "flip", "rotate", ), TRAINING_TEST_SET_PC )
+    createTrainAndDevSets( "contest", ( "original", ), 1 - 0.02 )
