@@ -221,6 +221,9 @@ class AbstractMachine():
         runHyperParams = {}
         runHyperParams.update( confHyperParams[ "hyperParameters" ] )
 
+        print( "Hyper params from run ID:", idRun )
+        print( "Hyper params:", runHyperParams )
+        
         # Start time
         tsGlobalStart = time.time()
 
