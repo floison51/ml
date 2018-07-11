@@ -26,7 +26,8 @@ from PIL import Image
 import h5py
 import numpy as np
 
-#import wget
+import tensorflow as tf
+
 import shutil
 
 #from apiclient.discovery import build
@@ -122,11 +123,14 @@ def transformImages( fromDir, toDir, files, what ):
 
 # Create dev and test sets
 
-def buildDataSet( dataDir, what, baseDir, files, iStart, iEnd, size, outFileName, indexLabel = 0 ):
+def buildDataSet( dataDir, what, baseDir, files, iStart, iEnd, size, outFileNameNoExt, indexLabel = 0 ):
     # images list
+    imagesNumpyList = []
     imagesList = []
+
 # y : cat or non-cat
-    y = []
+    yList = []
+    yNumpyList = []
 # tags of images
     tags = []
 # pathes of images
@@ -154,14 +158,18 @@ def buildDataSet( dataDir, what, baseDir, files, iStart, iEnd, size, outFileName
         # Resize image
         resizedImg = img.resize( ( size, size ) )
         # populate lists
-        pix = np.array(resizedImg)
+        resizedPix = np.array( resizedImg )
         # pix.spahe = (64, 64, 3 ) pour éviter les images monochromes
-        if (pix.shape != ( size, size, 3 ) ):
+        if ( resizedPix.shape != ( size, size, 3 ) ):
             print("Skipping image", curImage)
             print("It's not a (NxNx3) image.")
         else:
-            imagesList.append( pix )
-            y.append( isCat )                       # Image will be saved
+            imagesNumpyList.append( resizedPix )
+            imagesList.append( resizedImg )
+
+            yList.append( isCat )
+            yNumpyList.append( isCat )              # Image will be saved
+
             tags.append( np.string_( _tag ) )       # Label of image
 
             # Image rel path from home
@@ -173,25 +181,103 @@ def buildDataSet( dataDir, what, baseDir, files, iStart, iEnd, size, outFileName
 
     # Check dims
     for i in range( len( imagesList ) ) :
-        image = imagesList[ i ]
-        imageShape = image.shape
+        imageNumpy = imagesNumpyList[ i ]
+        imageShape = imageNumpy.shape
         if ( imageShape != ( size, size, 3 ) ) :
             print( "Wrong image:", pathes[ i ] )
             sys.exit( 1 )
 
     preparedDir = dataDir + "/prepared/" + what
     os.makedirs( preparedDir, exist_ok = True )
-    absOutFile = preparedDir + "/" + outFileName
+    absOutFileNoExt = preparedDir + "/" + outFileNameNoExt
 
     # remove data dir
     relImgDir = baseDir[ len( dataDir ) + 1 : ]
 
+    # Python h5 dataset
+    createH5PYdataset( absOutFileNoExt, ( size, size, 3 ), ( 1, ), imagesNumpyList, yNumpyList, tags, pathes, relImgDir )
+
+    # Tensorflow TFRecord format
+    createTFRdataset( absOutFileNoExt, ( size, size, 3 ), ( 1, ), imagesList, yList, tags, pathes, relImgDir )
+
+def createMetadata( absOutFileNoExt, tags, pathes, nbSamples, shape_X, shape_Y, relImgDir, dico ) :
+
+    absOutFile = absOutFileNoExt + ".h5"
+
     with h5py.File( absOutFile, "w") as dataset:
-        dataset["x"]        = imagesList
-        dataset["y"]        = y
+        
         dataset["tags"]     = tags
         dataset["pathes"]   = pathes
-        dataset["imgDir"]   = relImgDir.encode( 'utf-8' )
+        
+        # Add attributes
+        dataset.attrs["imgDir"]   = relImgDir.encode( 'utf-8' )
+        dataset.attrs[ "nbSamples" ] = nbSamples
+        dataset.attrs[ "shape_X"  ] = shape_X
+        dataset.attrs[ "shape_Y"  ] = shape_Y
+        
+        # Add provided dico entries
+        for key in dico :
+            dataset[ key ] = dico[ key ]
+
+def createH5PYdataset( absOutFileNoExt, shape_X, shape_Y, imagesNumpyList, yNumpyList, tags, pathes, relImgDir ) :
+
+    nbSamples = len( imagesNumpyList )
+    # assert same number of samples in X and Y
+    assert( nbSamples == len( yNumpyList ) )
+
+    createMetadata(
+        absOutFileNoExt, tags, pathes,
+        # Shapes
+        nbSamples, shape_X, shape_Y,
+        relImgDir,
+        # Specific data
+        { "X": imagesNumpyList, "Y": yNumpyList }
+    )
+
+def _int64_feature( value ):
+    return tf.train.Feature(int64_list=tf.train.Int64List(value=[value]))
+
+def _bytes_feature( value ):
+    return tf.train.Feature( bytes_list = tf.train.BytesList( value=[ value ] ) )
+
+def createTFRdataset( absOutFileNoExt, shape_X, shape_Y, xList, yList, tags, pathes, relImgDir ) :
+
+    # Meta-data
+    absOutFileMetadata = absOutFileNoExt + "-tfrecord-metadata"
+    absOutFile         = absOutFileNoExt + ".tfrecord"
+
+    nbSamples = len( xList )
+    # assert same number of samples in X and Y
+    assert( nbSamples == len( yList ) )
+
+    createMetadata(
+        absOutFileMetadata, tags, pathes,
+        # Shapes
+        nbSamples, shape_X, shape_Y,
+        relImgDir,
+        {
+            "XY_tfrecordPath": os.path.basename( absOutFile ).encode( 'utf-8' )
+        }
+    )
+
+    # Create TFRecords file
+
+    with tf.python_io.TFRecordWriter( absOutFile ) as tfRecordWriter:
+        for i in range( len( xList ) ) :
+
+            # Build TF train record for current image
+            tfr = tf.train.Example(
+                features=tf.train.Features(
+                    feature={
+                        'X': _bytes_feature( xList[ i ].tobytes() ),
+                        'Y': _int64_feature( int( yList[ i ] ) )
+                    }
+                )
+            )
+
+            # write record
+            tfRecordWriter.write( tfr.SerializeToString() )
+
 
 def createTrainAndDevSets( name, transformations, pc ):
 
@@ -218,7 +304,7 @@ def createTrainAndDevSets( name, transformations, pc ):
     random.shuffle( oriFiles )
 
     # for debug : only 20 images
-    # oriFiles = oriFiles[ 0:20 ]
+    oriFiles = oriFiles[ 0:20 ]
 
     sizes = ( 64, 92, 128 )
 
@@ -230,7 +316,7 @@ def createTrainAndDevSets( name, transformations, pc ):
         buildDataSet( \
             dataDir, "dev", oriDir, oriFiles, \
             iEndTrainingSet, len( oriFiles ), \
-            size, "dev_chats-" + str( size) + ".h5" \
+            size, "dev_chats-" + str( size) \
         )
 
     ## transform images for DEV
@@ -259,7 +345,7 @@ def buildTrnSet( dataDir, transformedDir, targetFiles, what, sizes ):
         buildDataSet( \
             dataDir, "trn/" + what, transformedDir, targetFiles, \
             0, len( targetFiles ), \
-            size, "train_chats-" + str( size) + ".h5", \
+            size, "train_chats-" + str( size), \
             indexLabel = 1 # rel path is original/cats/label/xxx.jpg, so label is in index 1
         )
 
@@ -329,5 +415,8 @@ if __name__ == "__main__":
 
     input( "Type enter to continue" )
 
+    # Transformation have to be debugged: 25% of data, not 100%
     #createTrainAndDevSets( "hand-made", ( "original", "flip", "rotate", ), TRAINING_TEST_SET_PC )
-    createTrainAndDevSets( "contest", ( "original", ), 1 - 0.02 )
+    createTrainAndDevSets( "hand-made", ( "original", ), TRAINING_TEST_SET_PC )
+
+    # createTrainAndDevSets( "contest", ( "original", ), 1 - 0.02 )

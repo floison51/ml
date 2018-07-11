@@ -68,10 +68,16 @@ class DataSource():
         
 class DataSet() :
     "Data set"
-    def __init__( self, X_ori, X, Y, dataHome, imgDir, imgPathes, tags = None, weights = None ):
+    def __init__( self, nbSamples, shape_X, shape_Y, X_ori, X, Y, XY, dataHome, imgDir, imgPathes, tags = None, weights = None ):
+        
+        self.nbSamples = nbSamples
+        self.shape_X = shape_X
+        self.shape_Y = shape_Y
+        
         self.X_ori = X_ori
         self.X = X
         self.Y = Y
+        self.XY = XY
         
         self.dataHome = dataHome
         self.imgDir = imgDir

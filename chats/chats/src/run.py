@@ -13,10 +13,10 @@ from ml.cats import cats
 from absl.testing.parameterized import parameters
 
 # For debug
-debugUseScreen = True
-debugDatasetName = "Hand-made"
+debugUseScreen = False
+debugDatasetName = "Hand-made original"
 debugIdConfig  = 1
-debugCommand   = "Predict"
+debugCommand   = "Train"
 
 def instantiateClass( classFqName, params ) :
     module_name, class_name = classFqName.rsplit(".", 1)
@@ -120,7 +120,7 @@ def updateMachines( conn ):
     return iniMachines, configDatasourceResult, configMachineFormsResult
 
 def strNone( x ):
-    if ( x == None ) :
+    if ( x is None ) :
         return "None"
     else :
         return str( x )

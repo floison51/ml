@@ -20,6 +20,59 @@ class CatRawDataSource( DataSource ):
     def __init__( self, params = None ):
         super().__init__( params )
 
+    def getDataset( self, dataset_metadata, isLoadWeights ) :
+
+        # Base dir for cats and not cats images
+        baseDirHome = os.getcwd() + "/" + self.pathHome
+
+        # Image base path
+        imgDir = dataset_metadata.attrs[ "imgDir" ].decode( 'utf-8' )
+        
+        # Nb samples
+        nbSamples = int( dataset_metadata.attrs[ "nbSamples" ] )
+        # Shapes
+        shape_X   = dataset_metadata.attrs[ "shape_X" ].tolist()
+        shape_Y   = dataset_metadata.attrs[ "shape_Y" ].tolist()
+
+        x_orig = dataset_metadata.get( "X" )
+        x = None
+
+        if ( x_orig is not None ) :
+            x = x_orig.astype( np.float32 )
+
+        y = dataset_metadata.get( "Y" )
+        if ( y is not None ) :
+
+            y = np.array( dataset_metadata[ "Y" ][:]) # your train set labels
+            y = y.astype( np.float32 )
+
+            # passer de (476,) (risque) a  (1,476)
+            y = y.reshape( ( 1, y.shape[ 0 ] ) )
+            ## replace Boolean by (1,0) float values to be consistent with X
+            y = y.astype( np.float32 )
+
+        # Image tags
+        tags_orig = np.array( dataset_metadata[ "tags" ][:] ) # images tags
+        # passer de (476,) (risque) a  (1,476)
+        tags      = tags_orig.reshape( ( 1, tags_orig.shape[0] ) )
+
+        # Default weight is 1 (int)
+        # If weight is loaded, it is a (1,mx)
+        weights = 1
+
+        if isLoadWeights :
+
+            ## Convert tags to weights
+            weights   = self.getWeights( tags )
+
+        # Image relative pathes
+        imgPathes = np.array( dataset_metadata[ "pathes" ][:] )
+
+        # Create data sets
+        dataset = DataSet( nbSamples, shape_X, shape_Y, x_orig, x, y, baseDirHome, imgDir, imgPathes, tags, weights )
+
+        return dataset
+
     def getDatasets( self, isLoadWeights ):
 
         if ( self.imagePathes != None ) :
@@ -37,7 +90,7 @@ class CatRawDataSource( DataSource ):
                 pixes.append( pix )
 
             dev_X = np.array( pixes, dtype = np.float32 )
-            
+
             # Create data sets
             datasetTrn = None
             datasetDev = DataSet( dev_X, dev_X, None, None, self.imagePathes, None )
@@ -47,56 +100,15 @@ class CatRawDataSource( DataSource ):
             # Load from h5py data sets
 
             # Base dir for cats and not cats images
-            baseDirHome = os.getcwd() + "/" + self.pathHome
             baseDirTrn  = os.getcwd() + "/" + self.pathTrn
             baseDirDev  = os.getcwd() + "/" + self.pathDev
 
-            trn_dataset = h5py.File( baseDirTrn + "/train_chats-" + str( self.pxWidth ) + ".h5", "r" )
-            trn_set_x_orig = np.array(trn_dataset["x"][:]) # your train set features
-            trn_set_y_orig = np.array(trn_dataset["y"][:]) # your train set labels
+            with h5py.File( baseDirTrn + "/train_chats-" + str( self.pxWidth ) + ".h5", "r" ) as trn_dataset_metadata :
+                datasetTrn = self.super().getDataset( trn_dataset_metadata )
 
-            dev_dataset = h5py.File( baseDirDev + "/dev_chats-" + str( self.pxWidth ) + ".h5", "r")
-            dev_set_x_orig = np.array( dev_dataset["x"][:] ) # your test set features
-            dev_set_y_orig = np.array( dev_dataset["y"][:] ) # your test set labels
 
-            trn_set_x = trn_set_x_orig.astype( np.float32 )
-            dev_set_x = dev_set_x_orig.astype( np.float32 )
-
-            # passer de (476,) (risque) a  (1,476)
-            trn_set_y = trn_set_y_orig.reshape((1, trn_set_y_orig.shape[0]))
-            dev_set_y = dev_set_y_orig.reshape((1, dev_set_y_orig.shape[0]))
-
-            ## replace Boolean by (1,0) float values to be consistent with X
-            trn_set_y = trn_set_y.astype( np.float32 )
-            dev_set_y = dev_set_y.astype( np.float32 )
-
-            # Image tags
-            trn_set_tags_orig = np.array(trn_dataset["tags"][:]) # images tags
-            dev_set_tags_orig = np.array(dev_dataset["tags"][:]) # images tags
-            # passer de (476,) (risque) a  (1,476)
-            trn_set_tags      = trn_set_tags_orig.reshape((1, trn_set_tags_orig.shape[0]))
-            dev_set_tags      = dev_set_tags_orig.reshape((1, dev_set_tags_orig.shape[0]))
-
-            # Default weight is 1 (int)
-            # If weight is loaded, it is a (1,mx)
-            trn_set_weights = 1
-
-            if isLoadWeights :
-
-                ## Convert tags to weights
-                trn_set_weights   = self.getWeights( trn_set_tags )
-
-            # Image base path
-            trn_imgDir = trn_dataset[ "imgDir" ].value.decode( 'utf-8' )
-            dev_imgDir = dev_dataset[ "imgDir" ].value.decode( 'utf-8' )
-
-            # Image relative pathes
-            trn_imgPathes = np.array( trn_dataset[ "pathes" ][:] )
-            dev_imgPathes = np.array( dev_dataset[ "pathes" ][:] )
-
-            # Create data sets
-            datasetTrn = DataSet( trn_set_x_orig, trn_set_x, trn_set_y, baseDirHome, trn_imgDir, trn_imgPathes, trn_set_tags, trn_set_weights )
-            datasetDev = DataSet( dev_set_x_orig, dev_set_x, dev_set_y, baseDirHome, dev_imgDir, dev_imgPathes, dev_set_tags )
+            with h5py.File( baseDirDev + "/dev_chats-" + str( self.pxWidth ) + ".h5", "r") as dev_dataset_metadata :
+                datasetDev = self.super().getDataset( dev_dataset_metadata )
 
             # For tensor flow, we need to transpose data
             self.transpose( datasetTrn )
@@ -109,7 +121,7 @@ class CatRawDataSource( DataSource ):
     def getDataInfo( self, datasetTrn, datasetDev ) :
         # Store data info in a dico
 
-        dataInfo = { 
+        dataInfo = {
             const.KEY_IS_SUPPORT_BATCH_STREAMING : False,
             const.KEY_TRN_X_SIZE  : None,
             const.KEY_TRN_X_SHAPE : None,
@@ -122,19 +134,19 @@ class CatRawDataSource( DataSource ):
         }
 
         if ( datasetTrn != None ) :
-            dataInfo[ const.KEY_TRN_X_SIZE  ] = datasetTrn.X.shape[0]
-            dataInfo[ const.KEY_TRN_X_SHAPE ] = datasetTrn.X.shape
-            dataInfo[ const.KEY_TRN_Y_SIZE  ] = datasetTrn.Y.shape[0]
-            dataInfo[ const.KEY_TRN_Y_SHAPE ] = datasetTrn.Y.shape
-        
+            dataInfo[ const.KEY_TRN_X_SIZE  ] = datasetTrn.nbSamples
+            dataInfo[ const.KEY_TRN_X_SHAPE ] = datasetTrn.shape_X
+            dataInfo[ const.KEY_TRN_Y_SIZE  ] = datasetTrn.nbSamples
+            dataInfo[ const.KEY_TRN_Y_SHAPE ] = datasetTrn.shape_Y
+
         if ( datasetDev != None ) :
-            
-            dataInfo[ const.KEY_DEV_X_SIZE  ] = datasetDev.X.shape[0]
-            dataInfo[ const.KEY_DEV_X_SHAPE ] = datasetDev.X.shape
+
+            dataInfo[ const.KEY_DEV_X_SIZE  ] = datasetDev.nbSamples
+            dataInfo[ const.KEY_DEV_X_SHAPE ] = datasetDev.shape_X
 
             if ( not ( datasetDev.Y is None ) ) :
-                dataInfo[ const.KEY_DEV_Y_SIZE  ] = datasetDev.Y.shape[0]
-                dataInfo[ const.KEY_DEV_Y_SHAPE ] = datasetDev.Y.shape
+                dataInfo[ const.KEY_DEV_Y_SIZE  ] = datasetDev.nbSamples
+                dataInfo[ const.KEY_DEV_Y_SHAPE ] = datasetDev.shape_Y
 
         return dataInfo
 
@@ -185,11 +197,11 @@ class CatNormalizedDataSource( CatRawDataSource ):
     def getDatasets( self, isLoadWeights ):
         # ancestor
         ( datasetTrn, datasetDev, dataInfo ) = super().getDatasets( isLoadWeights )
-        
+
         # normalizetrnDataSet X
         if ( datasetTrn != None ) :
             datasetTrn.X = self.normalize( datasetTrn.X )
-            
+
         if ( datasetDev != None ) :
             datasetDev.X = self.normalize( datasetDev.X )
 
