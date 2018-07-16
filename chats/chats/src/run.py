@@ -13,7 +13,7 @@ from ml.cats import cats
 from absl.testing.parameterized import parameters
 
 # For debug
-debugUseScreen = True
+debugUseScreen = False
 debugDatasetName = "Hand-made original"
 debugIdConfig  = 1
 debugCommand   = "Train"

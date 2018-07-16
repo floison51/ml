@@ -164,7 +164,9 @@ def buildDataSet( dataDir, what, baseDir, files, iStart, iEnd, size, outFileName
             print("It's not a (NxNx3) image.")
         else:
 
-            imagesNumpyList.append( resizedPix )
+            # normalize image
+            normalizedPix = resizedPix / 255
+            imagesNumpyList.append( normalizedPix )
 
             yNumpyList.append( isCat )              # Image will be saved
 
@@ -282,7 +284,7 @@ def createTFRdataset( absOutFileNoExt, shape_X, shape_Y, xNpList, yNpList, tags,
             tfr = tf.train.Example(
                 features=tf.train.Features(
                     feature={
-                        'X': _bytes_feature( xNpList[ i ].reshape( -1 ).tobytes() ),
+                        'X': _floats_feature( xNpList[ i ].reshape( -1 ).tolist() ),
                         'Y': _int64_feature(  int( yNpList[ i ] ) )
                     }
                 )
@@ -432,4 +434,4 @@ if __name__ == "__main__":
     #createTrainAndDevSets( "hand-made", ( "original", "flip", "rotate", ), TRAINING_TEST_SET_PC )
     createTrainAndDevSets( "hand-made", ( "original", ), TRAINING_TEST_SET_PC )
 
-    createTrainAndDevSets( "contest", ( "original", ), 1 - 0.02 )
+    #createTrainAndDevSets( "contest", ( "original", ), 1 - 0.02 )

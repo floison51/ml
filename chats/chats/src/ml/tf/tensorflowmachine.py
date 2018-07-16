@@ -627,25 +627,24 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
         # X and Y raw vars
         raw_XY = dsIterator.get_next()
 
+        from functools import reduce
+        X_shape_surface = reduce( lambda x, y: x*y, X_shape[ 1: ] )
+        Y_shape_surface = reduce( lambda x, y: x*y, Y_shape[ 1: ] )
+        
         read_features = {
-            'X': tf.FixedLenFeature( [], dtype=tf.string ),
-            'Y': tf.FixedLenFeature( [], dtype=tf.int64 ),
+            'X': tf.FixedLenFeature( [ X_shape_surface], dtype=tf.float32 ),
+            'Y': tf.FixedLenFeature( [ Y_shape_surface ], dtype=tf.int64 ),
         }
 
         # Parse binary record
         parsed_XY = tf.parse_example( serialized=raw_XY, features=read_features )
 
-        # Convert raw_X (String) to unint8
-        image_X = tf.decode_raw( parsed_XY[ "X" ], tf.uint8 )
         # Reshape image
         # Use ( -1, xx, xx 3 ) instead of ( None, xx, xx )
         special_X_Shape = [ -1 ] + X_shape[ 1: ]
-        image_X = tf.reshape( image_X, special_X_Shape )
+        image_X = tf.reshape( parsed_XY[ "X" ], special_X_Shape )
         # Convert to needed type
         image_X = tf.cast( image_X, X_type )
-
-        # normalize X
-        image_X = image_X / 255
 
         # Reshape label
         # Use ( -1, 1 ) instead of ( None, 1 )
