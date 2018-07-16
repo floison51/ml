@@ -20,7 +20,6 @@ class TensorFlowDataSource( CatNormalizedDataSource ):
     classdocs
     '''
 
-
     def __init__( self, params ):
         super().__init__( params )
 
@@ -44,28 +43,24 @@ class TensorFlowDataSource( CatNormalizedDataSource ):
             with h5py.File( baseDirTrn + "/train_chats-" + str( self.pxWidth ) + "-tfrecord-metadata.h5", "r" ) as trn_dataset_metadata :
                 datasetTrn = self.getDataset( trn_dataset_metadata, isLoadWeights )
                 # Path to TFRecord files
-                datasetTrn.XY = baseDirTrn + "/" + trn_dataset_metadata[ "XY_tfrecordPath" ].value.decode( 'utf-8' )
-                
+                datasetTrn.XY = [ baseDirTrn + "/" + trn_dataset_metadata[ "XY_tfrecordPath" ].value.decode( 'utf-8' ) ]
+
             with h5py.File( baseDirDev + "/dev_chats-"   + str( self.pxWidth ) + "-tfrecord-metadata.h5", "r" ) as dev_dataset_metadata :
                 datasetDev = self.getDataset( dev_dataset_metadata, isLoadWeights )
                 # Path to TFRecord files
-                datasetDev.XY = baseDirDev + "/" + dev_dataset_metadata[ "XY_tfrecordPath" ].value.decode( 'utf-8' )
+                datasetDev.XY = [ baseDirDev + "/" + dev_dataset_metadata[ "XY_tfrecordPath" ].value.decode( 'utf-8' ) ]
 
         dataInfo = self.getDataInfo( datasetTrn, datasetDev )
 
         # get batch size
         self.batchSize = self.params[ "hyperParameters" ][ const.constants.KEY_MINIBATCH_SIZE ]
 
-        # tensor flow sliced data source line = [ data ]
-        trnFilenamesXY = [ datasetTrn.XY ]
-        trnDataSet = tf.data.TFRecordDataset( trnFilenamesXY )
-        trnDataSet = trnDataSet.batch( self.batchSize )
-
-        devFilenamesXY = [ datasetDev.XY ]
-        devDataSet = tf.data.TFRecordDataset( devFilenamesXY )
-        devDataSet = devDataSet.batch( self.batchSize )
-
         dataInfo[ const.constants.KEY_IS_SUPPORT_BATCH_STREAMING ] = True
 
-        return ( trnDataSet, devDataSet, dataInfo )
+        return ( datasetDev, datasetTrn, dataInfo )
+
+    read_features = {
+        'X': tf.FixedLenFeature( [], dtype=tf.string ),
+        'Y': tf.FixedLenFeature( [], dtype=tf.int64 ),
+    }
 

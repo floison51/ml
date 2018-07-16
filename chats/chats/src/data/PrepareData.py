@@ -191,11 +191,20 @@ def buildDataSet( dataDir, what, baseDir, files, iStart, iEnd, size, outFileName
     os.makedirs( preparedDir, exist_ok = True )
     absOutFileNoExt = preparedDir + "/" + outFileNameNoExt
 
+    # Convert to numpy array
+    tags_np   = np.array( tags ).T
+    # passer de (476,) (risque) a  (476,1)
+    tags_np    = tags_np.reshape( tags_np.shape[0], 1 )
+
+    pathes_np = np.array( pathes ).T
+    # passer de (476,) (risque) a  (476,1)
+    pathes_np    = pathes_np.reshape( pathes_np.shape[0], 1 )
+    
     # remove data dir
     relImgDir = baseDir[ len( dataDir ) + 1 : ]
 
     # Python h5 dataset
-    createH5PYdataset( absOutFileNoExt, ( size, size, 3 ), ( 1, ), imagesNumpyList, yNumpyList, tags, pathes, relImgDir )
+    createH5PYdataset( absOutFileNoExt, ( size, size, 3 ), ( 1, ), imagesNumpyList, yNumpyList, tags_np, pathes_np, relImgDir )
 
     # Tensorflow TFRecord format
     createTFRdataset( absOutFileNoExt, ( size, size, 3 ), ( 1, ), imagesList, yList, tags, pathes, relImgDir )
@@ -206,14 +215,14 @@ def createMetadata( absOutFileNoExt, tags, pathes, nbSamples, shape_X, shape_Y, 
 
     with h5py.File( absOutFile, "w") as dataset:
         
-        dataset["tags"]     = tags
-        dataset["pathes"]   = pathes
+        dataset[ "tags" ]     = tags
+        dataset[ "pathes" ]   = pathes
         
         # Add attributes
-        dataset.attrs["imgDir"]   = relImgDir.encode( 'utf-8' )
+        dataset.attrs[ "imgDir"]     = relImgDir.encode( 'utf-8' )
         dataset.attrs[ "nbSamples" ] = nbSamples
-        dataset.attrs[ "shape_X"  ] = shape_X
-        dataset.attrs[ "shape_Y"  ] = shape_Y
+        dataset.attrs[ "shape_X"  ]  = shape_X
+        dataset.attrs[ "shape_Y"  ]  = shape_Y
         
         # Add provided dico entries
         for key in dico :
@@ -235,7 +244,10 @@ def createH5PYdataset( absOutFileNoExt, shape_X, shape_Y, imagesNumpyList, yNump
     )
 
 def _int64_feature( value ):
-    return tf.train.Feature(int64_list=tf.train.Int64List(value=[value]))
+    return tf.train.Feature(int64_list=tf.train.Int64List( value=[ value ] ))
+
+def _ints64_feature( values ):
+    return tf.train.Feature(int64_list=tf.train.Int64List( value=values ) )
 
 def _bytes_feature( value ):
     return tf.train.Feature( bytes_list = tf.train.BytesList( value=[ value ] ) )
@@ -269,7 +281,7 @@ def createTFRdataset( absOutFileNoExt, shape_X, shape_Y, xList, yList, tags, pat
             tfr = tf.train.Example(
                 features=tf.train.Features(
                     feature={
-                        'X': _bytes_feature( xList[ i ].tobytes() ),
+                        'X': _bytes_feature( tf.compat.as_bytes( xList[ i ].tobytes() ) ),
                         'Y': _int64_feature( int( yList[ i ] ) )
                     }
                 )

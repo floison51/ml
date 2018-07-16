@@ -566,7 +566,7 @@ class AbstractMachine():
 
         return elapsedSeconds, perfIndex
 
-    def dumpBadImages( self, correct, X_orig, dataHome, imgDir, PATH, TAG, errorsDir ):
+    def dumpBadImages( self, correct, dataHome, imgDir, PATH, TAG, errorsDir ):
 
         nbBadImages = 0
         
@@ -622,7 +622,7 @@ class AbstractMachine():
 
                 # Get original image
                 # str: b'truc'
-                numpy_imgRelPath = PATH[ i ]
+                numpy_imgRelPath = PATH[ i, 0 ]
                 # b'truc' -> 'truc'
                 imgRelPath = numpy_imgRelPath.decode( 'utf-8' )
 
@@ -656,7 +656,7 @@ class AbstractMachine():
             sys.exit( 1 )
 
         # Dump bad images
-        mapErrorNbByTag = self.dumpBadImages( oks, dataset.X_ori, dataset.dataHome, dataset.imgDir, dataset.imgPathes, dataset.tags, errorsDir )
+        mapErrorNbByTag = self.dumpBadImages( oks, dataset.dataHome, dataset.imgDir, dataset.imgPathes, dataset.tags, errorsDir )
 
         # Sort by value
         mapErrorNbByTagSorted = \

@@ -52,9 +52,9 @@ class CatRawDataSource( DataSource ):
             y = y.astype( np.float32 )
 
         # Image tags
-        tags_orig = np.array( dataset_metadata[ "tags" ][:] ) # images tags
-        # passer de (476,) (risque) a  (1,476)
-        tags      = tags_orig.reshape( ( 1, tags_orig.shape[0] ) )
+        tags = np.array( dataset_metadata[ "tags" ] ) # images tags
+        # passer de (476,) (risque) a  (476,1)
+        tags = tags.reshape( tags.shape[0], 1 )
 
         # Default weight is 1 (int)
         # If weight is loaded, it is a (1,mx)
@@ -66,10 +66,12 @@ class CatRawDataSource( DataSource ):
             weights   = self.getWeights( tags )
 
         # Image relative pathes
-        imgPathes = np.array( dataset_metadata[ "pathes" ][:] )
+        imgPathes = np.array( dataset_metadata[ "pathes" ] )
+        # passer de (476,) (risque) a  (476,1)
+        imgPathes = imgPathes.reshape( imgPathes.shape[0], 1 )
 
         # Create data sets
-        dataset = DataSet( nbSamples, shape_X, shape_Y, x_orig, x, y, baseDirHome, imgDir, imgPathes, tags, weights )
+        dataset = DataSet( nbSamples, shape_X, shape_Y, x_orig, x, y, None, baseDirHome, imgDir, imgPathes, tags, weights )
 
         return dataset
 
