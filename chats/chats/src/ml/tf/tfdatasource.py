@@ -57,7 +57,7 @@ class TensorFlowDataSource( CatNormalizedDataSource ):
 
         dataInfo[ const.constants.KEY_IS_SUPPORT_BATCH_STREAMING ] = True
 
-        return ( datasetDev, datasetTrn, dataInfo )
+        return ( datasetTrn, datasetDev, dataInfo )
 
     read_features = {
         'X': tf.FixedLenFeature( [], dtype=tf.string ),

@@ -312,13 +312,11 @@ class AbstractTensorFlowMachine( AbstractMachine ):
 
             if ( self.isTensorboard ) :
                 #run without meta data
-                valX, valY, summary, _ , curCost = sess.run(
-                    [ self.X, self.Y, self.mergedSummaries, self.optimizer, self.cost ], feed_dict=feed_dict
+                summary, _ , curCost = sess.run(
+                    [ self.mergedSummaries, self.optimizer, self.cost ], feed_dict=feed_dict
                 )
-                print( valX.shape, valY.shape )
-                
                 self.trn_writer.add_summary( summary, iteration )
-                
+
             else :
                _ , curCost = sess.run(
                     [ self.optimizer, self.cost], feed_dict=feed_dict
@@ -646,6 +644,9 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
         # Convert to needed type
         image_X = tf.cast( image_X, X_type )
 
+        # normalize X
+        image_X = image_X / 255
+
         # Reshape label
         # Use ( -1, 1 ) instead of ( None, 1 )
         special_Y_Shape = [ -1 ] + Y_shape[ 1: ]
@@ -901,12 +902,13 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
         # Data set, minibatch_size slices
         self.tfDatasetTrn = self.tfDatasetTrn.batch( self.minibatch_size )
 
-        # Data set, repeat num_epochs
+        # Trn Data set, repeat num_epochs
         self.tfDatasetTrn = self.tfDatasetTrn.repeat( self.phTrnNumEpochs )
 
+        # Dev data set
         self.tfDatasetDev = tf.data.TFRecordDataset( self.datasetDev.XY )
 
-        # Data set, repeat num_epochs, minibatch_size slices
+        # Pre-fetch and, minibatch_size slices
         self.tfDatasetDev = self.tfDatasetDev.prefetch( self.minibatch_size * 16 ).batch( self.minibatch_size )
 
         trnIterator = self.tfDatasetTrn.make_initializable_iterator( shared_name="trnIterator" )
