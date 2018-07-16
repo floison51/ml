@@ -432,4 +432,4 @@ if __name__ == "__main__":
     #createTrainAndDevSets( "hand-made", ( "original", "flip", "rotate", ), TRAINING_TEST_SET_PC )
     createTrainAndDevSets( "hand-made", ( "original", ), TRAINING_TEST_SET_PC )
 
-    # createTrainAndDevSets( "contest", ( "original", ), 1 - 0.02 )
+    createTrainAndDevSets( "contest", ( "original", ), 1 - 0.02 )
