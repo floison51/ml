@@ -136,6 +136,7 @@ def buildDataSet( dataDir, what, baseDir, files, iStart, iEnd, size, outFileName
 
 # From first image to dev test set percentage of full list
 #for i in range( iEndTestSet ):
+
     for i in range( iStart, iEnd ):
 
         curImage = files[i]
@@ -165,7 +166,14 @@ def buildDataSet( dataDir, what, baseDir, files, iStart, iEnd, size, outFileName
         else:
 
             # normalize image
+            # mean
+            #mean = np.mean( resizedPix )
+            # standard deviation
+            #stddev = np.std( resizedPix )
+            #normalizedPix = ( resizedPix - mean ) / stddev
+
             normalizedPix = resizedPix / 255
+            
             imagesNumpyList.append( normalizedPix )
 
             yNumpyList.append( isCat )              # Image will be saved
@@ -431,7 +439,7 @@ if __name__ == "__main__":
     input( "Type enter to continue" )
 
     # Transformation have to be debugged: 25% of data, not 100%
-    #createTrainAndDevSets( "hand-made", ( "original", "flip", "rotate", ), TRAINING_TEST_SET_PC )
     createTrainAndDevSets( "hand-made", ( "original", ), TRAINING_TEST_SET_PC )
 
-    #createTrainAndDevSets( "contest", ( "original", ), 1 - 0.02 )
+    createTrainAndDevSets( "contest", ( "original", ), 1 - 0.02 )
+

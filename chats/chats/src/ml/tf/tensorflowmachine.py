@@ -965,6 +965,10 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
             tsTraceStart = tsStart
             secTrace = 60           #trace each 60 seconds
 
+            # Start input enqueue threads.
+            coord = tf.train.Coordinator()
+            threads = tf.train.start_queue_runners( sess=sess, coord=coord )
+            
             try :
                 while ( not self.interrupted and not finished ) :
 
@@ -1055,6 +1059,13 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
                 # walk finished
                 pass
 
+            finally :
+                # When done, ask the threads to stop.
+                coord.request_stop()
+                
+                            
+            # Wait for threads to finish.
+            coord.join( threads )
             self.modelOptimizeEnd( sess )
 
             if ( self.interrupted ) :

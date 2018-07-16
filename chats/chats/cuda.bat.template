@@ -1,0 +1,2 @@
+SET CUDA_HOME=D:\appli\cuda\v9.0
+set PATH=%CUDA_HOME%\cuda\bin;%CUDA_HOME%\cudnn-v7.0\bin;%CUDA_HOME%\cuda\extras\CUPTI\libx64;%PATH%
