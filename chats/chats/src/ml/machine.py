@@ -126,6 +126,11 @@ class AbstractMachine():
 
         # Start time
         tsGlobalStart = time.time()
+        
+        if tune:
+            # make sure seed is unique
+            seed = time.time
+            random.seed( seed )
 
         for j in range( 1, nbTuning + 1 ) :
 
