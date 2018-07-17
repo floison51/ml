@@ -18,8 +18,6 @@ import db.db as db
 
 # Abtract classes
 import abc
-from cmath import nan
-from _ast import Num
 
 # Abstract class
 class AbstractMachine():
@@ -565,7 +563,7 @@ class AbstractMachine():
         # performance index : per iEpoth - per samples
         if ( elapsedSeconds == 0 ) :
             #not available
-            perfIndex = nan
+            perfIndex = float('nan')
         else :
             perfIndex = 1 / ( elapsedSeconds / iEpoch / volume ) * 1e-6
 
