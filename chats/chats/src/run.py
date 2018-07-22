@@ -172,9 +172,10 @@ if __name__ == '__main__':
             hpDoer         = control.HyperParamsDoer ( conn )
             runsDoer       = control.RunsDoer        ( conn )
             startRunDoer   = control.StartRunDoer    ( conn, configMachinesForms )
+            analyzeDoer    = control.AnalyzeDoer     ( conn )
             predictRunDoer = control.StartPredictDoer( conn )
 
-            mainWindow = MainWindow( configDoer, hpDoer, runsDoer, startRunDoer, predictRunDoer )
+            mainWindow = MainWindow( configDoer, hpDoer, runsDoer, startRunDoer, analyzeDoer, predictRunDoer )
             ( datasetName, idConfig, buttonClicked, runParams, predictParams ) = mainWindow.showAndSelectConf( conn, datasets, selection )
         else :
             ( datasetName, idConfig, buttonClicked, runParams, predictParams ) = (

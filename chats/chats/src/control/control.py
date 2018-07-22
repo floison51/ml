@@ -3,6 +3,10 @@ from view.viewruns import ViewRunsWindow
 import db.db as db
 import const.constants as const
 
+import numpy as np
+from scipy.interpolate import griddata
+from math import log10
+
 class Doer:
     def __init__( self, conn ) :
         self.conn = conn
@@ -170,6 +174,93 @@ class ConfigDoer( Doer ):
 
         dialogShowStructure = view.TextModalWindow( fenetre, None )
         dialogShowStructure.run( config[ "structure" ], True )
+
+class AnalyzeDoer( Doer ):
+
+    def __init__( self, conn ) :
+        super().__init__( conn )
+
+    def analyze( self, fenetre, idConf ):
+
+        # get idDataset
+        nameDataset = fenetre.varDataset.get()
+        idDataset = db.getDatasetIdByName( self.conn, nameDataset )
+
+        # Get runs for config and dataset
+        runs = db.getRuns( self.conn, idDataset, idConf )
+
+        # Build list of ( keepProb, Beta ) -> DEV?
+        points = []
+        values = []
+
+        beta_min, beta_max = 99999.99 , -99999.99
+        keepProb_min, keepProb_max = 99999.99 , -99999.99
+
+        for run in runs :
+
+            # Get hyper params
+            idHp = run[ "idHyperParams" ]
+            hp = db.getHyperParamsById( self.conn, idHp )
+            
+            beta = hp[ "hyperParameters" ][ const.KEY_BETA ]
+            if ( beta == 0 ) :
+                continue
+            
+            beta = log10( beta )
+
+            beta_min = min( beta, beta_min )
+            beta_max = max( beta, beta_max )
+
+            keepProb = hp[ "hyperParameters" ][const.KEY_KEEP_PROB ]
+            keepProb_min = min( keepProb, keepProb_min )
+            keepProb_max = max( keepProb, keepProb_max )
+
+            devPC = run[ "dev_accuracy" ]
+
+            points.append( np.array( [ beta, keepProb ] ) )
+            values.append( devPC )
+
+        # Convert to numpy arrays
+        points = np.array( points )
+        values = np.array( values )
+        
+        # Create grid
+        grid_x, grid_y = np.mgrid[ beta_min:beta_max:0.01, keepProb_min:keepProb_max:0.01]
+
+        #method = "nearest"
+        method = "cubic"
+
+        grid_devPC = griddata( points, values, (grid_x, grid_y), method=method )
+
+        import matplotlib.pyplot as plt
+        import matplotlib.pyplot as plt
+        from mpl_toolkits.mplot3d import Axes3D
+
+        plt.title( "DEV% tuning" )
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+
+        ax.plot_wireframe( grid_x, grid_y, grid_devPC )
+        plt.show()
+
+    def doCreateOrUpdateHyperParams( self, fenetre, newHyperParams ):
+
+        print( "Result:", newHyperParams )
+
+        if ( newHyperParams == None ) :
+            ## Nothing to do
+            return
+
+        # get idDataset
+        nameDataset = fenetre.master.varDataset.get()
+        idDataset = db.getDatasetIdByName( self.conn, nameDataset )
+
+        # Get or create new hyper parameters
+        db.getOrCreateHyperParams( self.conn, idDataset, self.config[ "id" ], newHyperParams )
+
+        #commit
+        self.conn.commit()
+
 
 class RunsDoer( Doer ):
 

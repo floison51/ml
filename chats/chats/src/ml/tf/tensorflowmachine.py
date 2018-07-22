@@ -630,7 +630,7 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
         from functools import reduce
         X_shape_surface = reduce( lambda x, y: x*y, X_shape[ 1: ] )
         Y_shape_surface = reduce( lambda x, y: x*y, Y_shape[ 1: ] )
-        
+
         read_features = {
             'X': tf.FixedLenFeature( [ X_shape_surface], dtype=tf.float32 ),
             'Y': tf.FixedLenFeature( [ Y_shape_surface ], dtype=tf.int64 ),
@@ -865,8 +865,17 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
         self.num_epochs     = hyperParams[ const.KEY_NUM_EPOCHS ]
         self.minibatch_size = hyperParams[ const.KEY_MINIBATCH_SIZE ]
 
+        # Minibatch mode, non handled by data source
+        m = self.dataInfo[ const.KEY_TRN_X_SIZE ]              # m : number of examples in the train set)
+        num_minibatches = math.ceil( m / self.minibatch_size ) # number of minibatches of size minibatch_size in the train set
+
         self.start_learning_rate         = hyperParams[ const.KEY_START_LEARNING_RATE ]
-        self.learning_rate_decay_nb      = hyperParams[ const.KEY_LEARNING_RATE_DECAY_NB ]
+
+        # Decay per epoch NB
+        decayEpochNb = hyperParams[ const.KEY_LEARNING_RATE_DECAY_NB_EPOCH ]
+
+        # Multiply by nb mini-batches by epoch to get decay by epoch
+        self.learning_rate_decay_nb      = decayEpochNb * num_minibatches
         self.learning_rate_decay_percent = hyperParams[ const.KEY_LEARNING_RATE_DECAY_PERCENT ]
 
         self.useBatchNormalization = hyperParams[ const.KEY_USE_BATCH_NORMALIZATION ]
@@ -940,10 +949,6 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
             import signal
             # signal.signal( signal.SIGINT, self.signal_handler )
 
-            # Minibatch mode, non handled by data source
-            m = self.dataInfo[ const.KEY_TRN_X_SIZE ]              # m : number of examples in the train set)
-            num_minibatches = math.ceil( m / self.minibatch_size ) # number of minibatches of size minibatch_size in the train set
-
             # Do the training loop
             iEpoch = 0
             minibatch_cost = 0
@@ -968,7 +973,7 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
             # Start input enqueue threads.
             coord = tf.train.Coordinator()
             threads = tf.train.start_queue_runners( sess=sess, coord=coord )
-            
+
             try :
                 while ( not self.interrupted and not finished ) :
 
@@ -1062,8 +1067,8 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
             finally :
                 # When done, ask the threads to stop.
                 coord.request_stop()
-                
-                            
+
+
             # Wait for threads to finish.
             coord.join( threads )
             self.modelOptimizeEnd( sess )

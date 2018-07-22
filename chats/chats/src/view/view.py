@@ -15,14 +15,15 @@ buttonsToUpdate = []
 
 class MainWindow ( Tk ):
 
-    def __init__( self, configDoer, hpDoer, runsDoer, startRunDoer, predictRunDoer ) :
+    def __init__( self, configDoer, hpDoer, runsDoer, startRunDoer, analyzeDoer, predictRunDoer ) :
 
         Tk.__init__(self)
 
         self.configDoer = configDoer
         self.hpDoer = hpDoer
         self.runsDoer = runsDoer
-        self.startRunDoer = startRunDoer
+        self.startRunDoer   = startRunDoer
+        self.analyzeDoer    = analyzeDoer
         self.predictRunDoer = predictRunDoer
 
         # From conf radio-buttons
@@ -64,6 +65,14 @@ class MainWindow ( Tk ):
         )
         buttonTrain.pack( side="left", padx=40 )
         buttonsToUpdate.append( buttonTrain )
+
+        buttonAnalyse = Button(
+            frameButtons, text="Analyze",
+            command=lambda name="Analyze" : ( self.clickButton( name ) ),
+            state=DISABLED
+        )
+        buttonAnalyse.pack( side="left", padx=40 )
+        buttonsToUpdate.append( buttonAnalyse )
 
         buttonPredict = Button(
             frameButtons, text="Predict",
@@ -353,6 +362,8 @@ class MainWindow ( Tk ):
             self.startRunDoer.start( self, self.confSelected.get() )
         elif ( self.buttonClicked == "Predict" ) :
             self.predictRunDoer.start( self, self.confSelected.get() )
+        elif ( self.buttonClicked == "Analyze" ) :
+            self.analyzeDoer.analyze( self, self.confSelected.get() )
         else :
             self.destroy()
 
