@@ -666,8 +666,10 @@ class AbstractMachine():
             sys.exit( 1 )
 
         # Dump bad images
-        mapErrorNbByTag = self.dumpBadImages( oks, dataset.dataHome, dataset.imgDir, dataset.imgPathes, dataset.tags, errorsDir )
-
+        # TODO
+        #mapErrorNbByTag = self.dumpBadImages( oks, dataset.dataHome, dataset.imgDir, dataset.imgPathes, dataset.tags, errorsDir )
+        mapErrorNbByTag = {}
+        
         # Sort by value
         mapErrorNbByTagSorted = \
             OrderedDict(
