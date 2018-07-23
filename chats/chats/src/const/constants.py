@@ -6,7 +6,7 @@ Machine Learning pseudo-constants
 import os
 
 APP_KEY = "chats"
-APP_RUN_KEY = "chats"
+APP_RUN_KEY = "chats-debug"
 
 DB_DIR = os.getcwd().replace( "\\", "/" ) + "/run/db/" + APP_RUN_KEY
 

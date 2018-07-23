@@ -21,6 +21,7 @@ debugUseScreen = True
 debugDatasetName = "Hand-made original"
 debugIdConfig  = 1
 debugCommand   = "Train"
+debugIsTensorBord=False
 
 ## Logging
 logging.config.fileConfig( 'logging.conf' )
@@ -141,13 +142,13 @@ def prepareData( dataSource ):
     # Load data
     ( datasetTrn, datasetDev, dataInfo ) = dataSource.getDatasets( isLoadWeights = False );
 
-    print()
-    print ("number of training examples = " + strNone( dataInfo[ const.KEY_TRN_X_SIZE ] ) )
-    print ("number of dev test examples = " + strNone( dataInfo[ const.KEY_DEV_X_SIZE ] ) )
-    print ("X_train shape: " + strNone( dataInfo[ const.KEY_TRN_X_SHAPE ] ) )
-    print ("Y_train shape: " + strNone( dataInfo[ const.KEY_TRN_Y_SHAPE ] ) )
-    print ("X_dev  shape: "  + strNone( dataInfo[ const.KEY_DEV_X_SHAPE ] ) )
-    print ("Y_dev  shape: "  + strNone( dataInfo[ const.KEY_DEV_Y_SHAPE ] ) )
+    logger.info( "" )
+    logger.info("number of training examples = " + strNone( dataInfo[ const.KEY_TRN_X_SIZE ] ) )
+    logger.info("number of dev test examples = " + strNone( dataInfo[ const.KEY_DEV_X_SIZE ] ) )
+    logger.info("X_train shape: " + strNone( dataInfo[ const.KEY_TRN_X_SHAPE ] ) )
+    logger.info("Y_train shape: " + strNone( dataInfo[ const.KEY_TRN_Y_SHAPE ] ) )
+    logger.info("X_dev  shape: "  + strNone( dataInfo[ const.KEY_DEV_X_SHAPE ] ) )
+    logger.info("Y_dev  shape: "  + strNone( dataInfo[ const.KEY_DEV_Y_SHAPE ] ) )
 
 #     if ( hyperParams[ const.KEY_USE_WEIGHTS ] ) :
 #         print ( "  Weights_train shape :", WEIGHT_train.shape )
@@ -191,27 +192,27 @@ if __name__ == '__main__':
                 debugDatasetName,
                 debugIdConfig,
                 debugCommand,
-                { "comment": "", "tune": False, "showPlots": False, "nbTuning": 2, "isTensorboard": True, "isTensorboardFull": False },
+                { "comment": "", "tune": False, "showPlots": False, "nbTuning": 2, "isTensorboard": debugIsTensorBord, "isTensorboardFull": False },
                 { "choiceHyperParams" : 1, "choiceData" : 1 }
             )
 
         # cancel?
         if ( buttonClicked == "Cancel" ) :
-            print( "Operation cancelled by user" )
+            logger.info( "Operation cancelled by user" )
             sys.exit( 10 )
 
         # dataset
         idDataset = db.getDatasetIdByName( conn, datasetName )
         dataset = db.getDatasetById( conn, idDataset )
-        print( "Using dataset", dataset )
+        logger.info( "Using dataset {0}".format( dataset ) )
 
         # Read config
         config = db.getConfig( conn, idConfig );
         # get machine name
         machineName = db.getMachineNameById( conn, config[ "idMachine" ] )
 
-        print( "Structure:" )
-        print( config[ "structure" ] )
+        logger.info( "Structure:" )
+        logger.info( config[ "structure" ] )
 
         # get hyper parameters
         if ( buttonClicked == "Train" ) :
@@ -331,9 +332,9 @@ if __name__ == '__main__':
             nbTuning    = runParams[ "nbTuning" ]
             comment     = runParams[ "comment" ]
 
-            print( "Train machine", machineName )
+            logger.info( "Train machine " + machineName )
             ml.train( conn, dataset, config, comment, tune = tune, showPlots = showPlots )
 
         elif ( buttonClicked == "Predict" ) :
-            print( "Predict from machine", machineName )
+            logger.info( "Predict from machine " + machineName )
             ml.predict( conn, dataset, config, idRun, dataSource.imagePathes )

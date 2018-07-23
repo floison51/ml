@@ -3,6 +3,9 @@ Created on 25 mai 2018
 
 @author: frup82455
 '''
+import logging
+import logging.config
+
 import math
 import numpy as np
 import matplotlib.pyplot as plt
@@ -18,6 +21,11 @@ import db.db as db
 
 # Abtract classes
 import abc
+
+## Logging
+logging.config.fileConfig( 'logging.conf' )
+# create logger
+logger = logging.getLogger( 'ml' )
 
 # Abstract class
 class AbstractMachine():
@@ -115,12 +123,12 @@ class AbstractMachine():
             nbTuning = 1
 
         # Display hyper parameters info
-        print ("Start Learning rate :", str( runHyperParams[ const.KEY_START_LEARNING_RATE ] ) )
-        print ("Num epoch           :", str( runHyperParams[ const.KEY_NUM_EPOCHS ] ) )
-        print ("Minibatch size      :", str( runHyperParams[ const.KEY_MINIBATCH_SIZE ] ) )
-        print ("Beta                :", str( runHyperParams[ const.KEY_BETA ] ) )
-        print ("keep_prob           :", str( runHyperParams[ const.KEY_KEEP_PROB ] ) )
-        print ("isLoadWeights       :", runHyperParams[ const.KEY_USE_WEIGHTS ] )
+        logger.info( "Start Learning rate :", str( runHyperParams[ const.KEY_START_LEARNING_RATE ] ) )
+        logger.info( "Num epoch           :", str( runHyperParams[ const.KEY_NUM_EPOCHS ] ) )
+        logger.info( "Minibatch size      :", str( runHyperParams[ const.KEY_MINIBATCH_SIZE ] ) )
+        logger.info( "Beta                :", str( runHyperParams[ const.KEY_BETA ] ) )
+        logger.info( "keep_prob           :", str( runHyperParams[ const.KEY_KEEP_PROB ] ) )
+        logger.info( "isLoadWeights       :", runHyperParams[ const.KEY_USE_WEIGHTS ] )
 
         # Start time
         tsGlobalStart = time.time()
@@ -133,19 +141,19 @@ class AbstractMachine():
         for j in range( 1, nbTuning + 1 ) :
 
             if tune:
-                print( "*****************************" )
-                print( "Tune round", str( j ), "/", str( nbTuning ) )
-                print( "*****************************" )
+                logger.info( "*****************************" )
+                logger.info( "Tune round", str( j ), "/", str( nbTuning ) )
+                logger.info( "*****************************" )
 
                 # calculate beta
                 logBeta = random.uniform( math.log10( beta_min ), math.log10( beta_max ) )
                 beta = math.pow( 10, logBeta )
-                print( "Beta = " + str( beta ))
+                logger.info( "Beta = " + str( beta ))
 
                 # calculate keep_prob
                 logKeep_prob = random.uniform( math.log10( keep_prob_min ), math.log10( keep_prob_max ) )
                 keep_prob = math.pow( 10, logKeep_prob )
-                print( "keep_prob = " + str( keep_prob ))
+                logger.info( "keep_prob = " + str( keep_prob ))
 
                 # update hyper params
                 runHyperParams[ const.KEY_BETA         ] = beta
@@ -172,7 +180,7 @@ class AbstractMachine():
 
             # Print run
             run = db.getRun( conn, self.idRun )
-            print( "Run stored in DB:", str( run ) )
+            logger.info( "Run stored in DB:", str( run ) )
 
             if tune :
                 # Store results
@@ -197,23 +205,22 @@ class AbstractMachine():
                     conn.commit()
 
                 # print max
-                print( "Max DEV accuracy:", maxAccuracyDev )
-                print( "Max hyper params:" )
-                print( maxHyperParams )
-
+                logger.info( "Max DEV accuracy:", maxAccuracyDev )
+                logger.info( "Max hyper params:" )
+                logger.info( maxHyperParams )
 
         if tune :
             # Print tuning
-            print( "Tuning:" , tuning )
-            print()
-            print( "Max DEV accuracy      :", maxAccuracyDev )
-            print( "Max hyper params idRun:", maxIdRun )
+            logger.info( "Tuning:" , tuning )
+            logger.info( "" )
+            logger.info( "Max DEV accuracy      :", maxAccuracyDev )
+            logger.info( "Max hyper params idRun:", maxIdRun )
 
         # Start time
         tsGlobalEnd = time.time()
         globalElapsedSeconds = int( round( tsGlobalEnd - tsGlobalStart ) )
 
-        print( "Finished in", globalElapsedSeconds, "seconds" )
+        logger.info( "Finished in", globalElapsedSeconds, "seconds" )
 
     def predict( self, conn, dataset, config, idRun, imagePathes ):
         "Predict accuracy from trained model"
@@ -224,8 +231,8 @@ class AbstractMachine():
         runHyperParams = {}
         runHyperParams.update( confHyperParams[ "hyperParameters" ] )
 
-        print( "Hyper params from run ID:", idRun )
-        print( "Hyper params:", runHyperParams )
+        logger.info( "Hyper params from run ID:", idRun )
+        logger.info( "Hyper params:", runHyperParams )
         
         # Start time
         tsGlobalStart = time.time()
@@ -237,11 +244,11 @@ class AbstractMachine():
         tsGlobalEnd = time.time()
         globalElapsedSeconds = int( round( tsGlobalEnd - tsGlobalStart ) )
 
-        print( "Finished in", globalElapsedSeconds, "seconds" )
+        logger.info( "Finished in", globalElapsedSeconds, "seconds" )
 
     # Stuff to catch Ctrl-C
     def signal_handler( self, signal, frame ):
-        print( "Please, wait an epoch before training stops" )
+        logger.info( "Please, wait an epoch before training stops" )
         self.interrupted = True
 
     def initializeDataset( self, session, dataset ):
@@ -362,7 +369,7 @@ class AbstractMachine():
 
                         if ( print_cost and iteration == 0 ) :
                             # Display iteration 0 to allow verify cost calculation accross machines
-                            print ("TRACE : Current cost epoch %i; iteration %i; %f" % ( iEpoch, iteration, epoch_cost ) )
+                            logger.info( "Current cost epoch %i; iteration %i; %f" % ( iEpoch, iteration, epoch_cost ) )
 
                         # time to trace?
                         tsTraceNow = time.time()
@@ -372,21 +379,21 @@ class AbstractMachine():
                         if ( tsTraceElapsed >= 60 ) :
 
                             # Display iteration 0 to allow verify cost calculation accross machines
-                            print ( "TRACE : Current cost epoch %i; iteration %i; %f" % ( iEpoch, iteration, epoch_cost ) )
+                            logger.info( "Current cost epoch %i; iteration %i; %f" % ( iEpoch, iteration, epoch_cost ) )
                             # reset trace start
                             tsTraceStart = tsTraceNow
 
                 if print_cost and iEpoch % nbStatusEpoch == 0:
-                    print ( "Cost after epoch %i; iteration %i; %f" % ( iEpoch, iteration, epoch_cost ) )
+                    logger.info( "Cost after epoch %i; iteration %i; %f" % ( iEpoch, iteration, epoch_cost ) )
                     if ( iEpoch != 0 ) :
 
                         # Performance counters
                         curElapsedSeconds, curPerfIndex = self.getPerfCounters( tsStart, iEpoch, self.datasetTrn.X.shape )
-                        print( "  current: elapsedTime:", curElapsedSeconds, "perfIndex:", curPerfIndex )
+                        logger.info( "  current: elapsedTime:", curElapsedSeconds, "perfIndex:", curPerfIndex )
 
                         #  calculate DEV accuracy
                         DEV_accuracy = self.accuracyEval( ( self.datasetDev.X, self.datasetDev.Y ), "dev" )
-                        print( "  current: DEV accuracy: %f" % ( DEV_accuracy ) )
+                        logger.info( "  current: DEV accuracy: %f" % ( DEV_accuracy ) )
                         DEV_accuracies.append( DEV_accuracy )
 
                 if print_cost == True and iEpoch % 5 == 0:
@@ -406,7 +413,7 @@ class AbstractMachine():
                     # local overshoot?
                     if ( epoch_cost > minCost ) :
                         # Yes, run some extra epochs
-                        print( "WARNING: local cost overshoot detected, adding maximum 100 epochs to leave local cost overshoot" )
+                        logger.warn( "Local cost overshoot detected, adding maximum 100 epochs to leave local cost overshoot" )
                         current_num_epochs += 100
                         minCostFinalization = minCost
 
@@ -419,8 +426,8 @@ class AbstractMachine():
             self.modelOptimizeEnd( sess )
 
             if ( self.interrupted ) :
-                print( "Training has been interrupted by Ctrl-C" )
-                print( "Store current epoch number '" + str( iEpoch ) + "' in run hyper parameters" )
+                logger.info( "Training has been interrupted by Ctrl-C" )
+                logger.info( "Store current epoch number '" + str( iEpoch ) + "' in run hyper parameters" )
                 # Get runs and hps
                 run = db.getRun( conn, self.idRun )
                 idRunHps = run[ "idHyperParams" ]
@@ -432,14 +439,14 @@ class AbstractMachine():
 
             # Final cost
             print ("Parameters have been trained!")
-            print( "Final cost:", epoch_cost )
+            logger.info( "Final cost:", epoch_cost )
 
             ## Elapsed (seconds)
             elapsedSeconds, perfIndex = self.getPerfCounters( tsStart, iEpoch, self.datasetTrn.X.shape )
             perfInfo = {}
 
-            print( "Elapsed (s):", elapsedSeconds )
-            print( "Perf index :", perfIndex )
+            logger.info( "Elapsed (s):", elapsedSeconds )
+            logger.info( "Perf index :", perfIndex )
 
             self.persistModel( sess, idRun )
 
@@ -580,11 +587,11 @@ class AbstractMachine():
                 if os.path.isfile(file_path):
                     os.unlink( file_path )
             except Exception as e:
-                print(e)
+                logger.error( e )
 
         # check deleted
         if ( len( os.listdir( errorsDir ) ) != 0 ) :
-            print( "Dir", errorsDir, "not empty." )
+            logger.info( "Dir", errorsDir, "not empty." )
             sys.exit( 1 )
 
         # Dico of errors by label
@@ -651,11 +658,11 @@ class AbstractMachine():
                 if os.path.isfile(file_path):
                     os.unlink( file_path )
             except Exception as e:
-                print(e)
+                logger.error( e )
 
         # check deleted
         if ( len( os.listdir( errorsDir ) ) != 0 ) :
-            print( "Dir", errorsDir, "not empty." )
+            logger.info( "Dir", errorsDir, "not empty." )
             sys.exit( 1 )
 
         # Dump bad images
@@ -668,7 +675,7 @@ class AbstractMachine():
         )
 
         ## Error repartition by label
-        print( "Nb errors by tag for", key, ": ", mapErrorNbByTagSorted )
+        logger.info( "Nb errors by tag for", key, ": ", mapErrorNbByTagSorted )
 
         # Build %age map
         nbSamples = oks.shape[ 0 ]
@@ -687,7 +694,7 @@ class AbstractMachine():
         )
 
         ## Error repartition by label
-        print( "% errors by tag for", key, ": ", mapErrorPercentNbByTag )
+        logger.info( "% errors by tag for", key, ": ", mapErrorPercentNbByTag )
 
         ## Graph
         if ( show_plot ) :

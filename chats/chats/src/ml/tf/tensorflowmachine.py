@@ -3,6 +3,9 @@ Created on 27 mai 2018
 
 @author: fran
 '''
+import logging
+import logging.config
+
 import const.constants as const
 from ml.machine import AbstractMachine
 
@@ -31,7 +34,7 @@ from ml.tf.tfdatasource import TensorFlowDataSource
 ## Logging
 logging.config.fileConfig( 'logging.conf' )
 # create logger
-logger = logging.getLogger( 'tf' )
+logger = logging.getLogger( 'tfw' )
 
 TENSORFLOW_SAVE_DIR = os.getcwd().replace( "\\", "/" ) + "/run/tf-save/"  + AbstractMachine.APP_KEY_RUN
 TENSORBOARD_LOG_DIR = os.getcwd().replace( "\\", "/" ) + "/run/tf-board/" + AbstractMachine.APP_KEY_RUN
@@ -99,10 +102,6 @@ class AbstractTensorFlowMachine( AbstractMachine ):
 
             self.dev_writer = tf.summary.FileWriter( devFolder, sess.graph )
 
-        # Random seed
-        seed = 3 # to keep consistent results
-        tf.set_random_seed( seed )
-
         # Run the initialization
         init = tf.global_variables_initializer()
         sess.run( init )
@@ -116,8 +115,6 @@ class AbstractTensorFlowMachine( AbstractMachine ):
         return False
 
     def modelInit( self, strStructure, X_shape, X_type, Y_shape, Y_type, training ):
-
-        tf.set_random_seed( 1 )                             # to keep consistent results
 
         # parse structure
         self.structure = self.parseStructure( strStructure )
@@ -215,7 +212,7 @@ class AbstractTensorFlowMachine( AbstractMachine ):
             outputs={ "correct_prediction": self.correct_prediction }
         )
 
-        print( "Model saved in path: %s" % save_dir )
+        logger.info( "Model saved in path: %s" % save_dir )
 
     def restoreModel( self, idRun ):
 
@@ -226,7 +223,7 @@ class AbstractTensorFlowMachine( AbstractMachine ):
         tf.saved_model.loader.load( sess, [ "serve" ], saved_dir )
         graph = tf.get_default_graph()
 
-        print( "Model restored from path: %s" % saved_dir )
+        logger.info( "Model restored from path: %s" % saved_dir )
         return sess, graph
 
     def getAccuracyEvalFeedDict( self, inputData ) :
@@ -323,10 +320,21 @@ class AbstractTensorFlowMachine( AbstractMachine ):
                 self.trn_writer.add_summary( summary, iteration )
 
             else :
-               _ , curCost = sess.run(
-                    [ self.optimizer, self.cost], feed_dict=feed_dict
-                )
+                
+                # with debug option
+                if ( logger.isEnabledFor( logging.DEBUG ) ) :
 
+                    _ , curCost, curSum_X = sess.run(
+                        [ self.optimizer, self.cost, self.debugSum_X ], feed_dict=feed_dict
+                    )
+                    logger.debug( "Sum X: {0}".format( curSum_X ) )
+                    
+                else :
+                    # No debug
+                    _ , curCost = sess.run(
+                        [ self.optimizer, self.cost ], feed_dict=feed_dict
+                    )
+                    
         return curCost
 
     def variable_summaries( self, var ):
@@ -357,7 +365,7 @@ class AbstractTensorFlowMachine( AbstractMachine ):
             tf.saved_model.loader.load( sess, [ "serve" ], saved_dir )
             graph = tf.get_default_graph()
 
-            print( "Model restored." )
+            logger.info( "Model restored." )
 
             # Get handles
             self.ph_dsHandle  = graph.get_tensor_by_name( "ph_Dataset:0" )
@@ -392,15 +400,15 @@ class AbstractTensorFlowMachine( AbstractMachine ):
                 # calculate correct predictions
                 correct_predictions = sess.run( [ self.correct_prediction ] , self.getAccuracyEvalFeedDict( devHandle ) )
 
-                print( "Is a cat ???" )
+                logger.info( "Is a cat ???" )
                 for i in range( 0, len( imagePathes ) ) :
-                    print( "  " + imagePathes[ i ] + " :", correct_predictions[ i ] )
+                    logger.info( "  " + imagePathes[ i ] + " :", correct_predictions[ i ] )
 
             else :
                 # calculate accuracy
                 accuracy = self.accuracyEval( devHandle, "predict" )
 
-                print( "Predict accuracy : %f" % accuracy )
+                logger.info( "Predict accuracy : %f" % accuracy )
 
 #*****************************************************
 # Tensorflow basic machine : supports [48,24,1] fully connected hand-mad structure
@@ -445,8 +453,6 @@ class TensorFlowSimpleMachine( AbstractTensorFlowMachine ):
         Returns:
         parameters -- a dictionary of tensors containing W1, b1, W2, b2, W3, b3
         """
-
-        tf.set_random_seed(1)                   # so that your "random" numbers match ours
 
         ## Add Level 0 : X
         # example : 12228, 100, 24, 1
@@ -661,6 +667,10 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
         # X and Y vars
         ( self.X , self.Y ) = ( image_X, label_Y )
 
+        ## For debug
+        if ( logger.isEnabledFor( logging.DEBUG ) ) :
+            self.debugSum_X = tf.reduce_sum( self.X ) 
+
     def parseStructure( self, strStructure ):
         ## Normalize structure
         strStructure = strStructure.strip()
@@ -704,6 +714,17 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
                 # 2D convolution : conv2d( curInput, filters=32, kernel_size=[5, 5], padding="same",  activation=tf.nn.relu )
                 # Add tf prefix
                 line = "tf.layers." + line
+                
+                # Make sure there's a kernel initializer for repeatability
+                if ( line.startswith( "tf.layers.conv2d(" ) and not ( "kernel_initializer" in line ) ) :
+                    # get ) index
+                    iLastClosingParen = line.rfind( ')' )
+                    # insert initializer_kernel
+                    line = \
+                        line[:iLastClosingParen] + \
+                        ", kernel_initializer=tf.contrib.layers.xavier_initializer(seed = 1)" + \
+                        line[iLastClosingParen:]
+                    
                 result.append( ( "tensor", line ) )
 
             elif ( line == "flatten" ) :
@@ -861,8 +882,11 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
         print_cost = True, show_plot = True, extractImageErrors = True
     ):
 
-        costs = []                                     # To keep track of the cost
-        DEV_accuracies = []                            # for DEV accuracy graph
+        tf.reset_default_graph() # Forget the past
+        tf.set_random_seed( 1 )  # Repeatable operations
+
+        costs = []               # To keep track of the cost
+        DEV_accuracies = []      # for DEV accuracy graph
 
         # Get hyper parameters from dico
         self.beta           = hyperParams[ const.KEY_BETA ]
@@ -888,8 +912,6 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
         if ( self.minibatch_size < 0 ) :
             raise ValueError( "Mini-batch size is required" )
 
-        ops.reset_default_graph()                         # to be able to rerun the model without overwriting tf variables
-
         # Convert ( nbLines, dims... ) to ( None, dims... )
         X_shape = [ None ]
         X_shape.extend( self.dataInfo[ const.KEY_TRN_X_SHAPE ] )
@@ -907,7 +929,7 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
         self.tfDatasetTrn = tf.data.TFRecordDataset( self.datasetTrn.XY )
 
         # Shuffle data
-        self.tfDatasetTrn = self.tfDatasetTrn.shuffle( buffer_size=100000, reshuffle_each_iteration=True )
+        self.tfDatasetTrn = self.tfDatasetTrn.shuffle( buffer_size=100000, reshuffle_each_iteration=True, seed=1 )
 
         # Pre-fetch for performance
         self.tfDatasetTrn = self.tfDatasetTrn.prefetch( self.minibatch_size * 16 )
@@ -990,7 +1012,11 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
 
                     if ( print_cost and iteration == 0 ) :
                         # Display iteration 0 to allow verify cost calculation accross machines
-                        print ( "TRACE : Current cost epoch %i; iteration %i; %f" % ( iEpoch, iteration, epoch_cost ) )
+                        logger.info(  "Current cost epoch {0}; iteration {1}; {2}".format( iEpoch, iteration, epoch_cost ) )
+
+                    # Tracing
+                    if ( print_cost and logger.isEnabledFor( logging.DEBUG ) ) :
+                        logger.debug(  "Current cost epoch {0}; iteration {1}; {2}".format( iEpoch, iteration, epoch_cost ) )
 
                     # time to trace?
                     tsTraceNow = time.time()
@@ -1000,7 +1026,7 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
                     if ( tsTraceElapsed >= secTrace ) :
 
                         # Display iteration 0 to allow verify cost calculation accross machines
-                        print ( "TRACE : Current cost epoch %i; iteration %i; %f" % ( iEpoch, iteration, epoch_cost ) )
+                        logger.info(  "Current cost epoch {0}; iteration {1}; {2}".format( iEpoch, iteration, epoch_cost ) )
                         # reset trace start
                         tsTraceStart = tsTraceNow
 
@@ -1014,19 +1040,19 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
                         #print epoch cost
                         if print_cost and ( iteration != 0 ) and ( ( iEpoch % nbStatusEpoch ) == 0 or ( tsEpochStatusElapsed >= secStatusEpoch ) ) :
 
-                            print ("Cost after epoch %i; iteration %i; %f" % ( iEpoch, iteration, epoch_cost ) )
+                            logger.info( "Cost after epoch {0}; iteration {1}; {2}".format( iEpoch, iteration, epoch_cost ) )
 
                             if ( iEpoch != 0 ) :
 
                                 # Performance counters
                                 curElapsedSeconds, curPerfIndex = self.getPerfCounters( tsStart, iEpoch, X_real_shape )
-                                print( "  current: elapsedTime; %i; perfIndex; %f" % ( curElapsedSeconds, curPerfIndex ) )
+                                logger.info( "  current: elapsedTime; {0}; perfIndex; {1}".format( curElapsedSeconds, curPerfIndex ) )
 
                                 #  calculate DEV accuracy
                                 # Rewind DEV iterator
                                 sess.run( [ devIterator.initializer ] )
                                 DEV_accuracy = self.accuracyEval( devHandle, "dev" )
-                                print( "  current: DEV accuracy: %f" % ( DEV_accuracy ) )
+                                logger.info( "  current: DEV accuracy: {:.2%}".format( DEV_accuracy ) )
                                 DEV_accuracies.append( DEV_accuracy )
 
                             # Reset status epoch timer
@@ -1050,7 +1076,7 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
 #                         # local overshoot?
 #                         if ( epoch_cost > minCost ) :
 #                             # Yes, run some extra epochs
-#                             print( "WARNING: local cost overshoot detected, adding maximum 100 epochs to leave local cost overshoot" )
+#                             logger.info( "WARNING: local cost overshoot detected, adding maximum 100 epochs to leave local cost overshoot" )
 #                             current_num_epochs += 100
 #                             minCostFinalization = minCost
 #
@@ -1076,8 +1102,8 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
             self.modelOptimizeEnd( sess )
 
             if ( self.interrupted ) :
-                print( "Training has been interrupted by Ctrl-C" )
-                print( "Store current epoch number '" + str( iEpoch ) + "' in run hyper parameters" )
+                logger.info( "Training has been interrupted by Ctrl-C" )
+                logger.info( "Store current epoch number '" + str( iEpoch ) + "' in run hyper parameters" )
                 # Get runs and hps
                 run = db.getRun( conn, self.idRun )
                 idRunHps = run[ "idHyperParams" ]
@@ -1088,15 +1114,15 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
                 db.updateRun( conn, self.idRun, runHps )
 
             # Final cost
-            print ("Parameters have been trained!")
-            print( "Final cost:", epoch_cost )
+            logger.info( "Parameters have been trained!")
+            logger.info( "Final cost: {0}".format( epoch_cost ) )
 
             ## Elapsed (seconds)
             elapsedSeconds, perfIndex = self.getPerfCounters( tsStart, iEpoch, X_real_shape )
             perfInfo = {}
 
-            print( "Elapsed (s):", elapsedSeconds )
-            print( "Perf index :", perfIndex )
+            logger.info( "Elapsed (s): {0}".format( elapsedSeconds ) )
+            logger.info( "Perf index : {0}".format( perfIndex ) )
 
             self.persistModel( sess, idRun )
 
@@ -1104,10 +1130,10 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
             sess.run( [ trnIterator.initializer, devIterator.initializer ], { self.phTrnNumEpochs : 1 } )
 
             accuracyTrain = self.accuracyEval( trnHandle, "trn" )
-            print ( "Train Accuracy:", accuracyTrain )
+            logger.info(  "Train Accuracy: {:.2%}".format( accuracyTrain ) )
 
             accuracyDev = self.accuracyEval( devHandle, "dev" )
-            print ( "Dev Accuracy:", accuracyDev )
+            logger.info(  "Dev Accuracy: {:.2%}".format( accuracyDev ) )
 
             if ( show_plot ) :
                 # plot the cost
