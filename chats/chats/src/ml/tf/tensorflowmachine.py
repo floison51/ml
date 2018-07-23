@@ -28,6 +28,11 @@ import db.db as db
 import abc
 from ml.tf.tfdatasource import TensorFlowDataSource
 
+## Logging
+logging.config.fileConfig( 'logging.conf' )
+# create logger
+logger = logging.getLogger( 'tf' )
+
 TENSORFLOW_SAVE_DIR = os.getcwd().replace( "\\", "/" ) + "/run/tf-save/"  + AbstractMachine.APP_KEY_RUN
 TENSORBOARD_LOG_DIR = os.getcwd().replace( "\\", "/" ) + "/run/tf-board/" + AbstractMachine.APP_KEY_RUN
 
