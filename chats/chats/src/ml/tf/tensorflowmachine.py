@@ -514,7 +514,8 @@ class TensorFlowSimpleMachine( AbstractTensorFlowMachine ):
                 # apply DropOut to hidden layer
                 curInput_drop_out = curInput
                 if i < len( structure0 ) - 1 :
-                    curInput_drop_out = tf.nn.dropout( curInput, self.ph_KEEP_PROB )
+                    # Use seed to ensure repeatability
+                    curInput_drop_out = tf.nn.dropout( curInput, self.ph_KEEP_PROB, seed=10 )
 
                 ## Get W and b for current layer
                 W_layer = self.parameters[ "W" + str( i ) ]
@@ -788,7 +789,8 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
                     with tf.variable_scope( "fc" + str( iStructure ) ):
                         # filter input by keep prob if needed
                         if ( self.keep_prob != 1 and not lastLayer ) :
-                            curInput = tf.contrib.layers.dropout( curInput, self.ph_KEEP_PROB, scope="keepProb" + str( iLayer ) )
+                            # Use seed to ensure repeatability
+                            curInput = tf.contrib.layers.dropout( curInput, self.ph_KEEP_PROB, seed=10, scope="keepProb" + str( iLayer ) )
 
                         # Z function
                         Z0 = tf.contrib.layers.fully_connected( \
