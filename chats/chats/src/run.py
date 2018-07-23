@@ -1,3 +1,7 @@
+## Logging
+import logging
+import logging.config
+
 import db.db as db
 from view.view import MainWindow
 import control.control as control
@@ -17,6 +21,13 @@ debugUseScreen = True
 debugDatasetName = "Hand-made original"
 debugIdConfig  = 1
 debugCommand   = "Train"
+
+## Logging
+logging.config.fileConfig( 'logging.conf' )
+# create logger
+logger = logging.getLogger( 'run' )
+
+logger.info( "Application '" + const.APP_KEY + "', DB dir: '" + const.DB_DIR + "'" )
 
 def instantiateClass( classFqName, params ) :
     module_name, class_name = classFqName.rsplit(".", 1)
@@ -148,8 +159,6 @@ def prepareData( dataSource ):
 if __name__ == '__main__':
 
     # Init DB
-    print( "Db dir:", const.DB_DIR )
-
     with db.initDb( const.APP_KEY, const.DB_DIR ) as conn :
 
         # test (debug)
@@ -223,7 +232,7 @@ if __name__ == '__main__':
                 # Config hyper params
                 run = db.getRun( conn, idRun )
                 hyperParams = db.getHyperParamsById( conn, run[ "idHyperParams" ] )
-                
+
             elif ( choiceHp == 2 ) :
 
                 # Get best hyper parameters

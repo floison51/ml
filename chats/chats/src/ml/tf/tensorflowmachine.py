@@ -150,7 +150,8 @@ class AbstractTensorFlowMachine( AbstractMachine ):
         # Tensorboard summaries
         with tf.name_scope( 'LearningRate' ):
             if ( self.isTensorboard ) :
-                tf.summary.scalar( 'Num epoch', self.var_numEpoch )
+                tfNumEpoch = tf.floordiv( global_step, self.numMinibatches )
+                tf.summary.scalar( 'Num epoch', tfNumEpoch )
                 tf.summary.scalar( 'Step', global_step )
                 tf.summary.scalar( 'learning_rate', learning_rate )
 
@@ -276,7 +277,6 @@ class AbstractTensorFlowMachine( AbstractMachine ):
         # Training mode
         self.ph_TRN_MODE  = tf.placeholder( tf.bool, name = "TRN_MODE" )
 
-        self.var_numEpoch     = tf.get_variable( "NumEpoch"    , [] , dtype=tf.int32  , trainable=False )
         self.var_DEV_accuracy = tf.get_variable( "DEV_accuracy", [] , dtype=tf.float32, trainable=False )
 
     @abc.abstractmethod
@@ -867,7 +867,7 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
 
         # Minibatch mode, non handled by data source
         m = self.dataInfo[ const.KEY_TRN_X_SIZE ]              # m : number of examples in the train set)
-        num_minibatches = math.ceil( m / self.minibatch_size ) # number of minibatches of size minibatch_size in the train set
+        self.numMinibatches = math.ceil( m / self.minibatch_size ) # number of minibatches of size minibatch_size in the train set
 
         self.start_learning_rate         = hyperParams[ const.KEY_START_LEARNING_RATE ]
 
@@ -875,7 +875,7 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
         decayEpochNb = hyperParams[ const.KEY_LEARNING_RATE_DECAY_NB_EPOCH ]
 
         # Multiply by nb mini-batches by epoch to get decay by epoch
-        self.learning_rate_decay_nb      = decayEpochNb * num_minibatches
+        self.learning_rate_decay_nb      = decayEpochNb * self.numMinibatches
         self.learning_rate_decay_percent = hyperParams[ const.KEY_LEARNING_RATE_DECAY_PERCENT ]
 
         self.useBatchNormalization = hyperParams[ const.KEY_USE_BATCH_NORMALIZATION ]
@@ -978,10 +978,10 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
                 while ( not self.interrupted and not finished ) :
 
                     minibatch_cost = self.runIteration(
-                        sess, trnHandle, self.keep_prob, iteration, num_minibatches
+                        sess, trnHandle, self.keep_prob, iteration, self.numMinibatches
                     )
 
-                    epoch_cost += minibatch_cost / num_minibatches
+                    epoch_cost += minibatch_cost / self.numMinibatches
 
                     if ( print_cost and iteration == 0 ) :
                         # Display iteration 0 to allow verify cost calculation accross machines
@@ -1000,10 +1000,7 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
                         tsTraceStart = tsTraceNow
 
                     # Current epoch finished?
-                    if ( ( iteration + 1 ) % num_minibatches == 0 ) :
-
-                        # Load epoch in tensorboard
-                        self.var_numEpoch.load( iEpoch )
+                    if ( ( iteration + 1 ) % self.numMinibatches == 0 ) :
 
                         # time to status epoch?
                         tsEpochStatusNow = time.time()
