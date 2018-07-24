@@ -18,7 +18,11 @@ class DataSource():
         self.pathHome = None
         self.pathTrn = None
         self.pathDev = None
+        self.inMemory = False
     
+    def setInMemory( self, inMemory ):
+        self.inMemory = inMemory
+        
     def setPathHome( self, path ):
         self.pathHome = path
         

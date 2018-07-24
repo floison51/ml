@@ -86,11 +86,12 @@ class DatasetDico:
         "id"           : [ "int"    , None, None ],
         "name"         : [ "string" , None, None ],
         "displayOrder" : [ "string" , None, None ],
-        "pathHome"      : [ "string" , None, None ],
+        "inMemory"     : [ "boolean", None, None ],
+        "pathHome"     : [ "string" , None, None ],
         "pathTrn"      : [ "string" , None, None ],
         "pathDev"      : [ "string" , None, None ],
     }
-    OBJECT_FIELDS  = [ "id", "name", "displayOrder", "pathHome", "pathTrn", "pathDev" ]
+    OBJECT_FIELDS  = [ "id", "name", "displayOrder", "inMemory", "pathHome", "pathTrn", "pathDev" ]
     DISPLAY_FIELDS = OBJECT_FIELDS
 
 class ConfigsDico:

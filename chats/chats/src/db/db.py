@@ -53,7 +53,7 @@ def setSelection( conn, selection ):
         cursor.close()
 
 
-def createOrUpdateDataset( conn, name, order, pathHome, pathTrn, pathDev ) :
+def createOrUpdateDataset( conn, name, order, inMemory, pathHome, pathTrn, pathDev ) :
 
     cursor = conn.cursor();
 
@@ -71,11 +71,11 @@ def createOrUpdateDataset( conn, name, order, pathHome, pathTrn, pathDev ) :
 
         if ( idConfig < 0 ) :
             # None, create
-            idConfig = createDataset( conn, name, order, pathHome, pathTrn, pathDev )
+            idConfig = createDataset( conn, name, order, inMemory, pathHome, pathTrn, pathDev )
 
         else :
             # update data set
-            updateDataset( conn, idConfig, name, order, pathHome, pathTrn, pathDev )
+            updateDataset( conn, idConfig, name, order, inMemory, pathHome, pathTrn, pathDev )
 
     finally :
         cursor.close()
@@ -128,14 +128,14 @@ def getDatasetById( conn, idDataset ) :
 
     return result;
 
-def createDataset( conn, name, order, pathHome, pathTrn, pathDev ) :
+def createDataset( conn, name, order, inMemory, pathHome, pathTrn, pathDev ) :
 
     cursor = conn.cursor()
 
     try :
         cursor.execute(
-            "INSERT INTO datasets VALUES ( null, ?, ?, ?, ?, ? )",
-            ( name, order, pathHome, pathTrn, pathDev, )
+            "INSERT INTO datasets VALUES ( null, ?, ?, ?, ?, ?, ? )",
+            ( name, order, inMemory, pathHome, pathTrn, pathDev, )
         )
 
         idResult = cursor.lastrowid
@@ -145,14 +145,14 @@ def createDataset( conn, name, order, pathHome, pathTrn, pathDev ) :
 
     return idResult
 
-def updateDataset( conn, idDataset, name, order, pathHome, pathTrn, pathDev ) :
+def updateDataset( conn, idDataset, name, order, inMemory, pathHome, pathTrn, pathDev ) :
 
     cursor = conn.cursor()
 
     try :
         cursor.execute(
-            "UPDATE datasets set displayOrder=?, name=?, pathHome=?, pathTrn=?, pathDev=? where id=?",
-            ( order, name, pathHome, pathTrn, pathDev, idDataset, )
+            "UPDATE datasets set displayOrder=?, name=?, inMemory=?, pathHome=?, pathTrn=?, pathDev=? where id=?",
+            ( order, name, inMemory, pathHome, pathTrn, pathDev, idDataset, )
         )
 
         idResult = cursor.lastrowid
@@ -1017,6 +1017,7 @@ def initTables( cursor ) :
            id integer PRIMARY KEY AUTOINCREMENT,
            name text not null unique,
            displayOrder integer not null,
+           inMemory integer not null,
            pathHome text not null,
            pathTrn text not null,
            pathDev text not null

@@ -672,6 +672,19 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
         if ( logger.isEnabledFor( logging.DEBUG ) ) :
             self.debugSum_X = tf.reduce_sum( self.X ) 
 
+    def __addParameter( self, line, tensorPrefix, parameterName, parameterValue ):
+        "Add a parameter to line, if tensorPrefix is found, if parameterName doesn't exist"
+        if ( line.startswith( tensorPrefix + "(" ) and not ( parameterName in line ) ) :
+            # get ) index
+            iLastClosingParen = line.rfind( ')' )
+            # insert initializer_kernel
+            line = \
+                line[:iLastClosingParen] + \
+                ", " + parameterName + "=" + parameterValue + \
+                line[iLastClosingParen:]
+                
+        return line
+    
     def parseStructure( self, strStructure ):
         ## Normalize structure
         strStructure = strStructure.strip()
@@ -716,15 +729,17 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
                 # Add tf prefix
                 line = "tf.layers." + line
                 
-                # Make sure there's a kernel initializer for repeatability
-                if ( line.startswith( "tf.layers.conv2d(" ) and not ( "kernel_initializer" in line ) ) :
-                    # get ) index
-                    iLastClosingParen = line.rfind( ')' )
-                    # insert initializer_kernel
-                    line = \
-                        line[:iLastClosingParen] + \
-                        ", kernel_initializer=tf.contrib.layers.xavier_initializer(seed = 1)" + \
-                        line[iLastClosingParen:]
+                # Add weight regularizer
+                line = self.__addParameter( \
+                    line, \
+                    "tf.layers.conv2d", "kernel_regularizer", "regularizer_l2" \
+                )
+                
+                # Make sure there's a kernel initializer with known seed for repeatability
+                line = self.__addParameter( \
+                    line, \
+                    "tf.layers.conv2d", "kernel_initializer", "tf.contrib.layers.xavier_initializer(seed = 1)" \
+                )
                     
                 result.append( ( "tensor", line ) )
 

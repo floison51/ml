@@ -17,7 +17,7 @@ from ml.cats import cats
 from absl.testing.parameterized import parameters
 
 # For debug
-debugUseScreen = True
+debugUseScreen = False
 debugDatasetName = "Hand-made original"
 debugIdConfig  = 1
 debugCommand   = "Train"
@@ -61,12 +61,13 @@ def updateDatasets( conn, selection ):
             selectionOk = True
 
         order    = int( iniDatasets.get( section, "order" ) )
+        inMemory = iniDatasets.get( section, "inMemory" )
         pathHome = iniDatasets.get( section, "pathHome" )
         pathTrn  = iniDatasets.get( section, "pathTrn" )
         pathDev  = iniDatasets.get( section, "pathDev" )
 
         # Create dataset
-        db.createOrUpdateDataset( conn, name, order, pathHome, pathTrn, pathDev )
+        db.createOrUpdateDataset( conn, name, order, inMemory, pathHome, pathTrn, pathDev )
 
     # Clear selection if not existing
     if ( not selectionOk ) :
@@ -289,6 +290,9 @@ if __name__ == '__main__':
             # image chosen
             dataSource.setImagePathes( [ predictParams[ "imagePath" ] ] )
 
+        # Tell source inMemory flag
+        dataSource.setInMemory( dataset[ "inMemory" ] )
+        
         # Tell source where is data
         dataSource.setPathHome( dataset[ "pathHome" ] )
         dataSource.setPathTrn(  dataset[ "pathTrn" ] )
