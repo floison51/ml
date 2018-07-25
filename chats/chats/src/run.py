@@ -15,7 +15,7 @@ import platform
 import const.constants as const
 
 # For debug
-debugUseScreen = False
+debugUseScreen = True
 debugDatasetName = "Hand-made original"
 debugIdConfig  = 1
 debugCommand   = "Train"
