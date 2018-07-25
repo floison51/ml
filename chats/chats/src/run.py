@@ -15,7 +15,7 @@ import platform
 import const.constants as const
 
 # For debug
-debugUseScreen = True
+debugUseScreen = False
 debugDatasetName = "Hand-made original"
 debugIdConfig  = 1
 debugCommand   = "Train"
@@ -291,7 +291,7 @@ if __name__ == '__main__':
             dataSource.setImagePathes( [ predictParams[ "imagePath" ] ] )
 
         # Tell source inMemory flag
-        dataSource.setInMemory( dataset[ "inMemory" ] )
+        dataSource.setInMemory( dataset[ "inMemory" ] == "True" )
         
         # Tell source where is data
         dataSource.setPathHome( dataset[ "pathHome" ] )

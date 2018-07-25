@@ -43,15 +43,15 @@ class TensorFlowDataSource( CatRawDataSource ):
                 baseDirTrn  = os.getcwd() + "/" + self.pathTrn
                 baseDirDev  = os.getcwd() + "/" + self.pathDev
 
-                with h5py.File( baseDirTrn + "/train_chats-" + str( self.pxWidth ) + "-tfrecord-metadata.h5", "r" ) as trn_dataset_metadata :
-                    datasetTrn = self.getDataset( trn_dataset_metadata, isLoadWeights, inMemory=False )
+                with h5py.File( baseDirTrn + "/train_chats-" + str( self.pxWidth ) + "-metadata.h5", "r" ) as dataset_metadata :
+                    datasetTrn = self.getDataset( dataset_metadata, None, isLoadWeights, inMemory=False )
                     # Path to TFRecord files
-                    datasetTrn.XY = [ baseDirTrn + "/" + trn_dataset_metadata[ "XY_tfrecordPath" ].value.decode( 'utf-8' ) ]
+                    datasetTrn.XY = [ baseDirTrn + "/" + dataset_metadata[ "XY_tfrecordPath" ].value.decode( 'utf-8' ) ]
     
-                with h5py.File( baseDirDev + "/dev_chats-"   + str( self.pxWidth ) + "-tfrecord-metadata.h5", "r" ) as dev_dataset_metadata :
-                    datasetDev = self.getDataset( dev_dataset_metadata, isLoadWeights, inMemory=False )
+                with h5py.File( baseDirDev + "/dev_chats-"   + str( self.pxWidth ) + "-metadata.h5", "r" ) as dataset_metadata :
+                    datasetDev = self.getDataset( dataset_metadata, None, isLoadWeights, inMemory=False )
                     # Path to TFRecord files
-                    datasetDev.XY = [ baseDirDev + "/" + dev_dataset_metadata[ "XY_tfrecordPath" ].value.decode( 'utf-8' ) ]
+                    datasetDev.XY = [ baseDirDev + "/" + dataset_metadata[ "XY_tfrecordPath" ].value.decode( 'utf-8' ) ]
 
                 dataInfo = self.getDataInfo( datasetTrn, datasetDev )
         

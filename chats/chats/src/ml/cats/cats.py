@@ -20,7 +20,7 @@ class CatRawDataSource( DataSource ):
     def __init__( self, params = None ):
         super().__init__( params )
 
-    def getNumpyData( self, dataset_metadata, dataset_data, isLoadWeights, inMemory = True ) :
+    def getDataset( self, dataset_metadata, dataset_data, isLoadWeights, inMemory = True ) :
 
         # Base dir for cats and not cats images
         baseDirHome = os.getcwd() + "/" + self.pathHome
@@ -34,25 +34,30 @@ class CatRawDataSource( DataSource ):
         shape_X   = dataset_metadata.attrs[ "shape_X" ].tolist()
         shape_Y   = dataset_metadata.attrs[ "shape_Y" ].tolist()
 
-        x_orig = dataset_data.get( "X" )
         x = None
+        x_orig = None
+        
+        if ( dataset_data is not None ) :
+            x_orig = dataset_data.get( "X" )
+    
+            if ( x_orig is not None ) :
+                x = np.array( x_orig[:] )
+                x = x.astype( np.float32 )
 
-        if ( x_orig is not None ) :
-            x = np.array( x_orig[:] )
-            x = x.astype( np.float32 )
-
-        y_orig = dataset_data.get( "Y" )
         y = None
 
-        if ( y_orig is not None ) :
-
-            y = np.array( y_orig[:] ) # your train set labels
-            y = y.astype( np.float32 )
-
-            # passer de (476,) (risque) a  ( 476, 1 )
-            y = y.reshape( ( y.shape[ 0 ], 1 ) )
-            ## replace Boolean by (1,0) float values to be consistent with X
-            y = y.astype( np.float32 )
+        if ( dataset_data is not None ) :
+            y_orig = dataset_data.get( "Y" )
+    
+            if ( y_orig is not None ) :
+    
+                y = np.array( y_orig[:] ) # your train set labels
+                y = y.astype( np.float32 )
+    
+                # passer de (476,) (risque) a  ( 476, 1 )
+                y = y.reshape( ( y.shape[ 0 ], 1 ) )
+                ## replace Boolean by (1,0) float values to be consistent with X
+                y = y.astype( np.float32 )
 
         # Image tags
         tags = np.array( dataset_metadata[ "tags" ] ) # images tags
@@ -108,19 +113,19 @@ class CatRawDataSource( DataSource ):
             baseDirTrn  = os.getcwd() + "/" + self.pathTrn
             baseDirDev  = os.getcwd() + "/" + self.pathDev
  
-            with h5py.File( baseDirTrn + "/train_chats-" + str( self.pxWidth ) + ".h5", "r" ) as dataset_metadata :
+            with h5py.File( baseDirTrn + "/train_chats-" + str( self.pxWidth ) + "-metadata.h5", "r" ) as dataset_metadata :
 
                 # Get in memory numpy data
                 inMemoryDataFile = baseDirTrn + "/" + dataset_metadata[ "XY_inMemoryPath" ].value.decode( 'utf-8' )
                 with h5py.File( inMemoryDataFile, "r" ) as dataset_data :
-                    datasetTrn = self.getNumpyData( dataset_metadata, dataset_data, isLoadWeights, inMemory )
+                    datasetTrn = self.getDataset( dataset_metadata, dataset_data, isLoadWeights, inMemory )
  
-            with h5py.File( baseDirDev + "/dev_chats-" + str( self.pxWidth ) + ".h5", "r") as dataset_metadata :
+            with h5py.File( baseDirDev + "/dev_chats-" + str( self.pxWidth ) + "-metadata.h5", "r") as dataset_metadata :
 
                 # Get in memory numpy data
                 inMemoryDataFile = baseDirDev + "/" + dataset_metadata[ "XY_inMemoryPath" ].value.decode( 'utf-8' )
                 with h5py.File( inMemoryDataFile, "r" ) as dataset_data :
-                    datasetDev = self.getNumpyData( dataset_metadata, dataset_data, isLoadWeights, inMemory )
+                    datasetDev = self.getDataset( dataset_metadata, dataset_data, isLoadWeights, inMemory )
  
             # For tensor flow, we may need to transpose data
             self.transpose( datasetTrn )

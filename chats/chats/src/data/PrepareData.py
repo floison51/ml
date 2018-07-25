@@ -218,7 +218,7 @@ def buildDataSet( dataDir, what, baseDir, files, iStart, iEnd, size, outFileName
 
     # meta-data for everybody
 
-    absOutFileInMemory = absOutFileNoExt + ".inMemory.hd5"
+    absOutFileInMemory = absOutFileNoExt + ".inMemory.h5"
     absOutFileTfRecord = absOutFileNoExt + ".tfrecord"
 
     nbSamples = len( imagesNumpyList )
@@ -245,7 +245,7 @@ def buildDataSet( dataDir, what, baseDir, files, iStart, iEnd, size, outFileName
 
 def createMetadata( absOutFileNoExt, tags, pathes, nbSamples, shape_X, shape_Y, relImgDir, dico ) :
 
-    absOutFile = absOutFileNoExt + ".h5"
+    absOutFile = absOutFileNoExt + "-metadata.h5"
 
     with h5py.File( absOutFile, "w") as dataset:
 
