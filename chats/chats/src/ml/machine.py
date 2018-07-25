@@ -634,12 +634,12 @@ class AbstractMachine():
                 # str: b'truc'
                 numpy_imgRelPath = PATH[ i, 0 ]
                 # b'truc' -> 'truc'
-                imgRelPath = numpy_imgRelPath.decode( 'utf-8' )
+                imgAbsPath = numpy_imgRelPath.decode( 'utf-8' )
 
-                imgPath = imgBase + "/" + imgRelPath
+                #imgPath = imgBase + "/" + imgRelPath
 
-                toFile = errorsDir + "/" + label + "-" + str( i ) + "-" + os.path.basename( imgRelPath )
-                shutil.copyfile( imgPath, toFile )
+                toFile = errorsDir + "/" + label + "-" + str( i ) + "-" + os.path.basename( imgAbsPath )
+                shutil.copyfile( imgAbsPath, toFile )
 
         # return dico
         return mapErrorNbByTag

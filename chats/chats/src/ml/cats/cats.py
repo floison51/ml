@@ -20,7 +20,7 @@ class CatRawDataSource( DataSource ):
     def __init__( self, params = None ):
         super().__init__( params )
 
-    def getDataset( self, dataset_metadata, isLoadWeights ) :
+    def getNumpyData( self, dataset_metadata, dataset_data, isLoadWeights, inMemory = True ) :
 
         # Base dir for cats and not cats images
         baseDirHome = os.getcwd() + "/" + self.pathHome
@@ -34,20 +34,23 @@ class CatRawDataSource( DataSource ):
         shape_X   = dataset_metadata.attrs[ "shape_X" ].tolist()
         shape_Y   = dataset_metadata.attrs[ "shape_Y" ].tolist()
 
-        x_orig = dataset_metadata.get( "X" )
+        x_orig = dataset_data.get( "X" )
         x = None
 
         if ( x_orig is not None ) :
-            x = x_orig.astype( np.float32 )
+            x = np.array( x_orig[:] )
+            x = x.astype( np.float32 )
 
-        y = dataset_metadata.get( "Y" )
-        if ( y is not None ) :
+        y_orig = dataset_data.get( "Y" )
+        y = None
 
-            y = np.array( dataset_metadata[ "Y" ][:]) # your train set labels
+        if ( y_orig is not None ) :
+
+            y = np.array( y_orig[:] ) # your train set labels
             y = y.astype( np.float32 )
 
-            # passer de (476,) (risque) a  (1,476)
-            y = y.reshape( ( 1, y.shape[ 0 ] ) )
+            # passer de (476,) (risque) a  ( 476, 1 )
+            y = y.reshape( ( y.shape[ 0 ], 1 ) )
             ## replace Boolean by (1,0) float values to be consistent with X
             y = y.astype( np.float32 )
 
@@ -71,11 +74,11 @@ class CatRawDataSource( DataSource ):
         imgPathes = imgPathes.reshape( imgPathes.shape[0], 1 )
 
         # Create data sets
-        dataset = DataSet( nbSamples, shape_X, shape_Y, x_orig, x, y, None, baseDirHome, imgDir, imgPathes, tags, weights )
+        dataset = DataSet( nbSamples, shape_X, shape_Y, x_orig, x, y, None, baseDirHome, imgDir, imgPathes, tags, weights, inMemory )
 
         return dataset
 
-    def getDatasets( self, isLoadWeights ):
+    def getDatasets( self, isLoadWeights, inMemory = True ):
 
         if ( self.imagePathes != None ) :
 
@@ -95,24 +98,31 @@ class CatRawDataSource( DataSource ):
 
             # Create data sets
             datasetTrn = None
-            datasetDev = DataSet( dev_X, dev_X, None, None, self.imagePathes, None )
+            datasetDev = DataSet( dev_X, dev_X, None, None, self.imagePathes, None, True )
 
         else :
 
             # Load from h5py data sets
 
-            # Base dir for cats and not cats images
+#             # Base dir for cats and not cats images
             baseDirTrn  = os.getcwd() + "/" + self.pathTrn
             baseDirDev  = os.getcwd() + "/" + self.pathDev
+ 
+            with h5py.File( baseDirTrn + "/train_chats-" + str( self.pxWidth ) + ".h5", "r" ) as dataset_metadata :
 
-            with h5py.File( baseDirTrn + "/train_chats-" + str( self.pxWidth ) + ".h5", "r" ) as trn_dataset_metadata :
-                datasetTrn = self.super().getDataset( trn_dataset_metadata )
+                # Get in memory numpy data
+                inMemoryDataFile = baseDirTrn + "/" + dataset_metadata[ "XY_inMemoryPath" ].value.decode( 'utf-8' )
+                with h5py.File( inMemoryDataFile, "r" ) as dataset_data :
+                    datasetTrn = self.getNumpyData( dataset_metadata, dataset_data, isLoadWeights, inMemory )
+ 
+            with h5py.File( baseDirDev + "/dev_chats-" + str( self.pxWidth ) + ".h5", "r") as dataset_metadata :
 
-
-            with h5py.File( baseDirDev + "/dev_chats-" + str( self.pxWidth ) + ".h5", "r") as dev_dataset_metadata :
-                datasetDev = self.super().getDataset( dev_dataset_metadata )
-
-            # For tensor flow, we need to transpose data
+                # Get in memory numpy data
+                inMemoryDataFile = baseDirDev + "/" + dataset_metadata[ "XY_inMemoryPath" ].value.decode( 'utf-8' )
+                with h5py.File( inMemoryDataFile, "r" ) as dataset_data :
+                    datasetDev = self.getNumpyData( dataset_metadata, dataset_data, isLoadWeights, inMemory )
+ 
+            # For tensor flow, we may need to transpose data
             self.transpose( datasetTrn )
             self.transpose( datasetDev )
 

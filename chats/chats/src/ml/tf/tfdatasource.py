@@ -22,45 +22,44 @@ class TensorFlowDataSource( CatRawDataSource ):
     def isSupportBatchStreaming( self ) :
         return True
 
-    def getDatasets( self, isLoadWeights ):
+    def getDatasets( self, isLoadWeights, inMemory = False ):
 
+        # Case : images provided, not files
         if ( self.imagePathes != None ) :
 
-            self.getDatasets( isLoadWeights )
+            self.getDatasets( isLoadWeights, inMemory=True )
 
         else :
 
             # Load from h5py data sets
+            if ( self.inMemory ) :
+                # tell ancestor
+                ( datasetTrn, datasetDev, dataInfo ) = super().getDatasets( isLoadWeights, inMemory=True )
+            else :
 
-            # Base dir for cats and not cats images
-            baseDirTrn  = os.getcwd() + "/" + self.pathTrn
-            baseDirDev  = os.getcwd() + "/" + self.pathDev
+                # File based
 
-            # File based
-            with h5py.File( baseDirTrn + "/train_chats-" + str( self.pxWidth ) + "-tfrecord-metadata.h5", "r" ) as trn_dataset_metadata :
-                datasetTrn = self.getDataset( trn_dataset_metadata, isLoadWeights )
-                # In memory?
-                if ( not self.inMemory ) :
+                # Base dir for cats and not cats images
+                baseDirTrn  = os.getcwd() + "/" + self.pathTrn
+                baseDirDev  = os.getcwd() + "/" + self.pathDev
+
+                with h5py.File( baseDirTrn + "/train_chats-" + str( self.pxWidth ) + "-tfrecord-metadata.h5", "r" ) as trn_dataset_metadata :
+                    datasetTrn = self.getDataset( trn_dataset_metadata, isLoadWeights, inMemory=False )
                     # Path to TFRecord files
                     datasetTrn.XY = [ baseDirTrn + "/" + trn_dataset_metadata[ "XY_tfrecordPath" ].value.decode( 'utf-8' ) ]
     
-            with h5py.File( baseDirDev + "/dev_chats-"   + str( self.pxWidth ) + "-tfrecord-metadata.h5", "r" ) as dev_dataset_metadata :
-                datasetDev = self.getDataset( dev_dataset_metadata, isLoadWeights )
-                # In memory
-                if ( self.inMemory ) :
-                    # In memory data set
-                    datasetDev = super.getDataset( dev_dataset_metadata, isLoadWeights )
-                else :
+                with h5py.File( baseDirDev + "/dev_chats-"   + str( self.pxWidth ) + "-tfrecord-metadata.h5", "r" ) as dev_dataset_metadata :
+                    datasetDev = self.getDataset( dev_dataset_metadata, isLoadWeights, inMemory=False )
                     # Path to TFRecord files
                     datasetDev.XY = [ baseDirDev + "/" + dev_dataset_metadata[ "XY_tfrecordPath" ].value.decode( 'utf-8' ) ]
 
-        dataInfo = self.getDataInfo( datasetTrn, datasetDev )
+                dataInfo = self.getDataInfo( datasetTrn, datasetDev )
+        
+                dataInfo[ const.constants.KEY_IS_SUPPORT_BATCH_STREAMING ] = True
 
         # get batch size
         self.batchSize = self.params[ "hyperParameters" ][ const.constants.KEY_MINIBATCH_SIZE ]
-
-        dataInfo[ const.constants.KEY_IS_SUPPORT_BATCH_STREAMING ] = True
-
+        
         return ( datasetTrn, datasetDev, dataInfo )
 
     read_features = {

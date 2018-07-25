@@ -54,25 +54,13 @@ class DataSource():
     
     def transpose( self, dataset ):
         "Transpose dataset for tensorflow"
-
-        #
-        dataset.Y = dataset.Y.T
+        # Nothing to do
+        pass
     
-        # Transpose for tensorflow
-        if ( not ( dataset.imgPathes is None ) ) :
-            dataset.imgPathes = dataset.imgPathes.T
-    
-        if ( not ( dataset.tags is None ) ) :
-            dataset.tags = dataset.tags.T
-    
-        if ( not ( dataset.weights is None ) ) :
-            if ( type( dataset.weights ) != int ) :
-                dataset.weights = dataset.weights.T
-        
         
 class DataSet() :
     "Data set"
-    def __init__( self, nbSamples, shape_X, shape_Y, X_ori, X, Y, XY, dataHome, imgDir, imgPathes, tags = None, weights = None ):
+    def __init__( self, nbSamples, shape_X, shape_Y, X_ori, X, Y, XY, dataHome, imgDir, imgPathes, tags = None, weights = None, inMemory = True ):
         
         self.nbSamples = nbSamples
         self.shape_X = shape_X
@@ -89,5 +77,6 @@ class DataSet() :
         
         self.tags = tags;
         self.weights = weights
-        self.isSupportBatchStreaming = False
-           
+        
+        self.inMemory = inMemory
+        

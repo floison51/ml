@@ -5,7 +5,7 @@ import logging.config
 import db.db as db
 from view.view import MainWindow
 import control.control as control
-import os
+
 from six.moves import configparser
 import sys
 import importlib
@@ -13,11 +13,9 @@ import socket
 import platform
 
 import const.constants as const
-from ml.cats import cats
-from absl.testing.parameterized import parameters
 
 # For debug
-debugUseScreen = False
+debugUseScreen = True
 debugDatasetName = "Hand-made original"
 debugIdConfig  = 1
 debugCommand   = "Train"

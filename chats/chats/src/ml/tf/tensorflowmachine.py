@@ -320,7 +320,7 @@ class AbstractTensorFlowMachine( AbstractMachine ):
                 self.trn_writer.add_summary( summary, iteration )
 
             else :
-                
+
                 # with debug option
                 if ( logger.isEnabledFor( logging.DEBUG ) ) :
 
@@ -328,13 +328,13 @@ class AbstractTensorFlowMachine( AbstractMachine ):
                         [ self.optimizer, self.cost, self.debugSum_X ], feed_dict=feed_dict
                     )
                     logger.debug( "Sum X: {0}".format( curSum_X ) )
-                    
+
                 else :
                     # No debug
                     _ , curCost = sess.run(
                         [ self.optimizer, self.cost ], feed_dict=feed_dict
                     )
-                    
+
         return curCost
 
     def variable_summaries( self, var ):
@@ -626,51 +626,61 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
         # Data set handle (human identifier)
         self.ph_dsHandle = tf.placeholder(tf.string, shape=[], name="ph_Dataset" )
 
-        # Iterator (X,Y)
-        dsIterator = tf.data.Iterator.from_string_handle(
-            self.ph_dsHandle,
-            # When using in memory dataset
-            #output_types  = ( X_type , Y_type ),
-            #output_shapes = ( X_shape, Y_shape )
-            # When using TFRecordSet binary format: string serialization
-            output_types  = ( tf.string )
-        )
+        # Prepare iterators
+        if ( self.datasetTrn.inMemory ) :
+            # In memory readers
+            dsIterator = tf.data.Iterator.from_string_handle(
+                self.ph_dsHandle,
+                output_types  = ( X_type , Y_type ),
+                output_shapes = ( X_shape, Y_shape )
+            )
+            
+            # X and Y vars
+            ( self.X , self.Y ) = dsIterator.get_next( name = "XY" )
+            
+        else :
+            # Iterator (X,Y)
+            dsIterator = tf.data.Iterator.from_string_handle(
+                self.ph_dsHandle,
+                # When using TFRecordSet binary format: string serialization
+                output_types  = ( tf.string )
+            )
 
-        # X and Y raw vars
-        raw_XY = dsIterator.get_next()
-
-        from functools import reduce
-        X_shape_surface = reduce( lambda x, y: x*y, X_shape[ 1: ] )
-        Y_shape_surface = reduce( lambda x, y: x*y, Y_shape[ 1: ] )
-
-        read_features = {
-            'X': tf.FixedLenFeature( [ X_shape_surface], dtype=tf.float32 ),
-            'Y': tf.FixedLenFeature( [ Y_shape_surface ], dtype=tf.int64 ),
-        }
-
-        # Parse binary record
-        parsed_XY = tf.parse_example( serialized=raw_XY, features=read_features )
-
-        # Reshape image
-        # Use ( -1, xx, xx 3 ) instead of ( None, xx, xx )
-        special_X_Shape = [ -1 ] + X_shape[ 1: ]
-        image_X = tf.reshape( parsed_XY[ "X" ], special_X_Shape )
-        # Convert to needed type
-        image_X = tf.cast( image_X, X_type )
-
-        # Reshape label
-        # Use ( -1, 1 ) instead of ( None, 1 )
-        special_Y_Shape = [ -1 ] + Y_shape[ 1: ]
-        label_Y = tf.reshape( parsed_XY[ "Y" ], special_Y_Shape )
-        # Convert label
-        label_Y = tf.cast( label_Y, Y_type )
-
-        # X and Y vars
-        ( self.X , self.Y ) = ( image_X, label_Y )
+            # X and Y raw vars
+            raw_XY = dsIterator.get_next()
+    
+            from functools import reduce
+            X_shape_surface = reduce( lambda x, y: x*y, X_shape[ 1: ] )
+            Y_shape_surface = reduce( lambda x, y: x*y, Y_shape[ 1: ] )
+    
+            read_features = {
+                'X': tf.FixedLenFeature( [ X_shape_surface], dtype=tf.float32 ),
+                'Y': tf.FixedLenFeature( [ Y_shape_surface ], dtype=tf.int64 ),
+            }
+    
+            # Parse binary record
+            parsed_XY = tf.parse_example( serialized=raw_XY, features=read_features )
+    
+            # Reshape image
+            # Use ( -1, xx, xx 3 ) instead of ( None, xx, xx )
+            special_X_Shape = [ -1 ] + X_shape[ 1: ]
+            image_X = tf.reshape( parsed_XY[ "X" ], special_X_Shape )
+            # Convert to needed type
+            image_X = tf.cast( image_X, X_type )
+    
+            # Reshape label
+            # Use ( -1, 1 ) instead of ( None, 1 )
+            special_Y_Shape = [ -1 ] + Y_shape[ 1: ]
+            label_Y = tf.reshape( parsed_XY[ "Y" ], special_Y_Shape )
+            # Convert label
+            label_Y = tf.cast( label_Y, Y_type )
+    
+            # X and Y vars
+            ( self.X , self.Y ) = ( image_X, label_Y )
 
         ## For debug
         if ( logger.isEnabledFor( logging.DEBUG ) ) :
-            self.debugSum_X = tf.reduce_sum( self.X ) 
+            self.debugSum_X = tf.reduce_sum( self.X )
 
     def __addParameter( self, line, tensorPrefix, parameterName, parameterValue ):
         "Add a parameter to line, if tensorPrefix is found, if parameterName doesn't exist"
@@ -682,9 +692,9 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
                 line[:iLastClosingParen] + \
                 ", " + parameterName + "=" + parameterValue + \
                 line[iLastClosingParen:]
-                
+
         return line
-    
+
     def parseStructure( self, strStructure ):
         ## Normalize structure
         strStructure = strStructure.strip()
@@ -728,19 +738,19 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
                 # 2D convolution : conv2d( curInput, filters=32, kernel_size=[5, 5], padding="same",  activation=tf.nn.relu )
                 # Add tf prefix
                 line = "tf.layers." + line
-                
+
                 # Add weight regularizer
                 line = self.__addParameter( \
                     line, \
                     "tf.layers.conv2d", "kernel_regularizer", "regularizer_l2" \
                 )
-                
+
                 # Make sure there's a kernel initializer with known seed for repeatability
                 line = self.__addParameter( \
                     line, \
                     "tf.layers.conv2d", "kernel_initializer", "tf.contrib.layers.xavier_initializer(seed = 1)" \
                 )
-                    
+
                 result.append( ( "tensor", line ) )
 
             elif ( line == "flatten" ) :
@@ -941,9 +951,24 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
         Y_shape.extend( self.dataInfo[ const.KEY_TRN_Y_SHAPE ] )
         Y_type = tf.float32
 
+        # Init model
         self.modelInit( structure, X_shape, X_type, Y_shape, Y_type, training=True )
 
-        self.tfDatasetTrn = tf.data.TFRecordDataset( self.datasetTrn.XY )
+        # Prepare reader
+        if ( self.datasetTrn.inMemory ) :
+            # In memory readers
+            # Convert ( nbLines, dims... ) to ( None, dims... )
+            self.tfDatasetTrn = tf.data.Dataset.from_tensor_slices(
+                (
+                    self.datasetTrn.X,
+                    self.datasetTrn.Y,
+                )
+            )
+
+        else :
+
+            # TF record file based reader
+            self.tfDatasetTrn = tf.data.TFRecordDataset( self.datasetTrn.XY )
 
         # Shuffle data
         self.tfDatasetTrn = self.tfDatasetTrn.shuffle( buffer_size=100000, reshuffle_each_iteration=True, seed=1 )
@@ -957,9 +982,21 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
         # Trn Data set, repeat num_epochs
         self.tfDatasetTrn = self.tfDatasetTrn.repeat( self.phTrnNumEpochs )
 
-        # Dev data set
-        self.tfDatasetDev = tf.data.TFRecordDataset( self.datasetDev.XY )
+        # Prepare reader
+        if ( self.datasetDev.inMemory ) :
+            # In memory readers
+            # Convert ( nbLines, dims... ) to ( None, dims... )
+            self.tfDatasetDev = tf.data.Dataset.from_tensor_slices(
+                (
+                    self.datasetDev.X,
+                    self.datasetDev.Y
+                )
+            )
+        else :
 
+            # TF record file based reader
+            self.tfDatasetDev = tf.data.TFRecordDataset( self.datasetDev.XY )
+        
         # Pre-fetch and, minibatch_size slices
         self.tfDatasetDev = self.tfDatasetDev.prefetch( self.minibatch_size * 16 ).batch( self.minibatch_size )
 

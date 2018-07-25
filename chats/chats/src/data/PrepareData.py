@@ -30,6 +30,9 @@ import tensorflow as tf
 
 import shutil
 
+from tarfile import TarFile
+import tempfile as tempfile
+
 #from apiclient.discovery import build
 
 from argparse import ArgumentParser
@@ -139,12 +142,16 @@ def buildDataSet( dataDir, what, baseDir, files, iStart, iEnd, size, outFileName
 
     for i in range( iStart, iEnd ):
 
-        curImage = files[i]
+        curImagePath = files[ i ]
         # get rid of basedir
-        relCurImage = curImage[ len( baseDir ) + 1: ]
-        relCurImage = relCurImage.replace( '\\', '/' )
+        if ( curImagePath.startswith( baseDir ) ) :
+            relCurImagePath = curImagePath[ len( baseDir ) + 1: ]
+        else :
+            relCurImagePath = curImagePath
 
-        relCurImageSegments = relCurImage.split( "/" )
+        relCurImagePath = relCurImagePath.replace( '\\', '/' )
+
+        relCurImageSegments = relCurImagePath.split( "/" )
 
         # Cat?
         isCat = relCurImageSegments[ indexLabel ] == "cats"
@@ -153,7 +160,7 @@ def buildDataSet( dataDir, what, baseDir, files, iStart, iEnd, size, outFileName
         _tag = relCurImageSegments[ indexLabel + 1 ]
 
         # load image
-        img = Image.open( curImage )
+        img = Image.open( curImagePath )
         # Resize image
         resizedImg = img.resize( ( size, size ) )
 
@@ -161,29 +168,27 @@ def buildDataSet( dataDir, what, baseDir, files, iStart, iEnd, size, outFileName
         resizedPix = np.array( resizedImg )
         # pix.shape = (64, 64, 3 ) pour éviter les images monochromes
         if ( resizedPix.shape != ( size, size, 3 ) ):
-            print("Skipping image", curImage)
-            print("It's not a (NxNx3) image.")
+            print( "Skipping image", curImagePath )
+            print( "It's not a (NxNx3) image." )
         else:
 
             # normalize image
             # mean
-            #mean = np.mean( resizedPix )
+            mean = np.mean( resizedPix )
             # standard deviation
-            #stddev = np.std( resizedPix )
-            #normalizedPix = ( resizedPix - mean ) / stddev
+            stddev = np.std( resizedPix )
+            normalizedPix = ( resizedPix - mean ) / stddev
 
-            normalizedPix = resizedPix / 255
-            
+            # normalizedPix = resizedPix / 255
+
             imagesNumpyList.append( normalizedPix )
 
             yNumpyList.append( isCat )              # Image will be saved
 
             tags.append( np.string_( _tag ) )       # Label of image
 
-            # Image rel path from home
-            relHomeCurImage = curImage[ len( dataDir ) + 1: ]
-            relHomeCurImage = relHomeCurImage.replace( '\\', '/' )
-            pathes.append( np.string_( relHomeCurImage ) )
+            # Image path
+            pathes.append( np.string_( curImagePath ) )
 
 # Store as binary stuff
 
@@ -211,11 +216,32 @@ def buildDataSet( dataDir, what, baseDir, files, iStart, iEnd, size, outFileName
     # remove data dir
     relImgDir = baseDir[ len( dataDir ) + 1 : ]
 
+    # meta-data for everybody
+
+    absOutFileInMemory = absOutFileNoExt + ".inMemory.hd5"
+    absOutFileTfRecord = absOutFileNoExt + ".tfrecord"
+
+    nbSamples = len( imagesNumpyList )
+    # assert same number of samples in X and Y
+    assert( nbSamples == len( yNumpyList ) )
+
+    createMetadata(
+        absOutFileNoExt, tags, pathes,
+        # Shapes
+        nbSamples, ( size, size, 3 ), ( 1, ),
+        relImgDir,
+        # Specific data
+        {
+            "XY_inMemoryPath" : os.path.basename( absOutFileInMemory ).encode( 'utf-8' ),
+            "XY_tfrecordPath" : os.path.basename( absOutFileTfRecord ).encode( 'utf-8' )
+        }
+    )
+
     # Python h5 dataset
-    createH5PYdataset( absOutFileNoExt, ( size, size, 3 ), ( 1, ), imagesNumpyList, yNumpyList, tags_np, pathes_np, relImgDir )
+    createH5PYdataset( absOutFileInMemory, imagesNumpyList, yNumpyList )
 
     # Tensorflow TFRecord format
-    createTFRdataset( absOutFileNoExt, ( size, size, 3 ), ( 1, ), imagesNumpyList, yNumpyList, tags, pathes, relImgDir )
+    createTFRdataset( absOutFileTfRecord, imagesNumpyList, yNumpyList )
 
 def createMetadata( absOutFileNoExt, tags, pathes, nbSamples, shape_X, shape_Y, relImgDir, dico ) :
 
@@ -236,20 +262,12 @@ def createMetadata( absOutFileNoExt, tags, pathes, nbSamples, shape_X, shape_Y, 
         for key in dico :
             dataset[ key ] = dico[ key ]
 
-def createH5PYdataset( absOutFileNoExt, shape_X, shape_Y, imagesNumpyList, yNumpyList, tags, pathes, relImgDir ) :
+def createH5PYdataset( absOutFile, xNpList, yNpList ) :
 
-    nbSamples = len( imagesNumpyList )
-    # assert same number of samples in X and Y
-    assert( nbSamples == len( yNumpyList ) )
+    with h5py.File( absOutFile, "w") as dataset:
+        dataset[ "X" ] = xNpList
+        dataset[ "Y" ] = yNpList
 
-    createMetadata(
-        absOutFileNoExt, tags, pathes,
-        # Shapes
-        nbSamples, shape_X, shape_Y,
-        relImgDir,
-        # Specific data
-        { "X": imagesNumpyList, "Y": yNumpyList }
-    )
 
 def _floats_feature( values ):
     return tf.train.Feature( float_list = tf.train.FloatList( value=values ) )
@@ -263,25 +281,7 @@ def _ints64_feature( values ):
 def _bytes_feature( value ):
     return tf.train.Feature( bytes_list = tf.train.BytesList( value=[ value ] ) )
 
-def createTFRdataset( absOutFileNoExt, shape_X, shape_Y, xNpList, yNpList, tags, pathes, relImgDir ) :
-
-    # Meta-data
-    absOutFileMetadata = absOutFileNoExt + "-tfrecord-metadata"
-    absOutFile         = absOutFileNoExt + ".tfrecord"
-
-    nbSamples = len( xNpList )
-    # assert same number of samples in X and Y
-    assert( nbSamples == len( yNpList ) )
-
-    createMetadata(
-        absOutFileMetadata, tags, pathes,
-        # Shapes
-        nbSamples, shape_X, shape_Y,
-        relImgDir,
-        {
-            "XY_tfrecordPath": os.path.basename( absOutFile ).encode( 'utf-8' )
-        }
-    )
+def createTFRdataset( absOutFile, xNpList, yNpList ) :
 
     # Create TFRecords file
 
@@ -302,11 +302,11 @@ def createTFRdataset( absOutFileNoExt, shape_X, shape_Y, xNpList, yNpList, tags,
             tfRecordWriter.write( tfr.SerializeToString() )
 
 
-def createTrainAndDevSets( name, transformations, pc ):
+def createTrainAndDevSets( dataPath, relPath, archiveFileName, transformations, pc, nbImages ):
 
     # current dir for data
-    dataDir = os.getcwd().replace( "\\", "/" )
-    dataDir += "/" + name
+    dataDir = dataPath.replace( "\\", "/" )
+    dataDir += "/" + relPath
 
     # Clean target dirs
     transformedDir = dataDir + "/transformed"
@@ -320,24 +320,34 @@ def createTrainAndDevSets( name, transformations, pc ):
     # Base dir for cats and not cats images
     oriDir = dataDir + "/images"
 
+    # Extract tar file in temp location
+    oriExtractedDir = os.path.join( tempfile.gettempdir(), archiveFileName )
+    if ( not os.path.exists( oriExtractedDir ) ) :
+        # Extract archive
+        print( "Extracting image archive '" + archiveFileName + "' to dir '" + oriExtractedDir + "'" )
+        with TarFile( name = oriDir + "/" + archiveFileName, mode='r' ) as oriImagesArchive :
+
+            oriImagesArchive.extractall( oriExtractedDir )
+
     # get original images
-    oriFiles = glob.glob( oriDir + '/**/*.*', recursive=True)
+    oriFiles = glob.glob( oriExtractedDir + '/**/*.*', recursive=True)
 
     # Shuffle files
     random.shuffle( oriFiles )
 
-    # for debug : only 20 images
-    #oriFiles = oriFiles[ 0:20 ]
+    # If nbImages is specified
+    if ( nbImages > 0 ) :
+        oriFiles = oriFiles[ 0 : nbImages ]
 
     sizes = ( 64, 92, 128 )
 
-    print( "Build DEV data set" )
     iEndTrainingSet = int( len( oriFiles ) * pc );
 
     for size in sizes :
         ## Build DEV data set
+        print( "Build DEV data set - size", size, "length:", len( oriFiles ) - iEndTrainingSet )
         buildDataSet( \
-            dataDir, "dev", oriDir, oriFiles, \
+            dataDir, "dev", oriExtractedDir, oriFiles, \
             iEndTrainingSet, len( oriFiles ), \
             size, "dev_chats-" + str( size) \
         )
@@ -351,7 +361,7 @@ def createTrainAndDevSets( name, transformations, pc ):
     # transformations
     for transformation in transformations :
 
-        transformImages( oriDir, transformedDir, trnOriFiles, transformation )
+        transformImages( oriExtractedDir, transformedDir, trnOriFiles, transformation )
 
         targetFiles = glob.glob( transformedDir + '/' + transformation + '/**/*.*', recursive=True)
         buildTrnSet( dataDir, transformedDir, targetFiles, transformation, sizes )
@@ -375,7 +385,7 @@ def buildTrnSet( dataDir, transformedDir, targetFiles, what, sizes ):
     print( "Finished" );
 
 
-def main(argv=None): # IGNORE:C0111
+def main( argv=None ): # IGNORE:C0111
     '''Command line options.'''
 
     if argv is None:
@@ -407,17 +417,33 @@ USAGE
         parser = ArgumentParser(description=program_license, formatter_class=RawDescriptionHelpFormatter)
         parser.add_argument('-V', '--version', action='version', version=program_version_message)
 
-        parser.add_argument( "-command" );
+        parser.add_argument( "-dataPath" );
+        parser.add_argument( "-nbImages" );
 
         # Process arguments
         args = parser.parse_args()
 
         # check actions
-        command = args.command
-#         if ( "googleImage".equals( command ) ) :
-#             print( "XXX" )
-#             # get data
-#             getGoogleImageData()
+        dataPath = args.dataPath
+
+        if ( dataPath is None ) :
+            raise Exception( "-dataPath argument is required" )
+
+        strNbImages = args.nbImages
+        if ( strNbImages is None ) :
+            nbImages = -1;
+        else :
+            nbImages = int( strNbImages )
+
+        # Make sure random is repeatable
+        random.seed( 1 )
+
+        input( "Type enter to continue" )
+
+        # Transformation have to be debugged: 25% of data, not 100%
+        createTrainAndDevSets( dataPath, "hand-made", "hand-made-images.tar", ( "original", ), TRAINING_TEST_SET_PC, nbImages )
+
+        #createTrainAndDevSets( dataPath, "contest", ( "original", ), 1 - 0.02 )
 
 
     except KeyboardInterrupt:
@@ -432,14 +458,4 @@ USAGE
         return 2
 
 if __name__ == "__main__":
-
-    # Make sure random is repeatable
-    random.seed( 1 )
-
-    input( "Type enter to continue" )
-
-    # Transformation have to be debugged: 25% of data, not 100%
-    createTrainAndDevSets( "hand-made", ( "original", ), TRAINING_TEST_SET_PC )
-
-    createTrainAndDevSets( "contest", ( "original", ), 1 - 0.02 )
-
+    sys.exit( main() )
