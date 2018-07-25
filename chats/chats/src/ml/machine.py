@@ -555,7 +555,7 @@ class AbstractMachine():
 
         return mini_batches
 
-    def getPerfCounters( self, tsStart, iEpoch, X_real_shape ):
+    def getPerfCounters( self, tsStart, iEpoch, X_real_shape, nbSamples ):
 
         tsNow = time.time()
 
@@ -565,14 +565,14 @@ class AbstractMachine():
         # caculate volume : mutiply dimensions
         import operator
         import functools
-        volume = functools.reduce( operator.mul, X_real_shape, 1 )
+        volume = functools.reduce( operator.mul, X_real_shape, 1 ) * nbSamples
 
         # performance index : per iEpoth - per samples
         if ( elapsedSeconds == 0 ) :
             #not available
             perfIndex = float('nan')
         else :
-            perfIndex = 1 / ( elapsedSeconds / iEpoch / volume ) * 1e-6
+            perfIndex = 1 / ( elapsedSeconds / iEpoch / volume ) * 1e-8
 
         return elapsedSeconds, perfIndex
 

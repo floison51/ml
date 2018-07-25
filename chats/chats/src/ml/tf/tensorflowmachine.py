@@ -1098,9 +1098,9 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
 
                             if ( iEpoch != 0 ) :
 
-                                # Performance counters
-                                curElapsedSeconds, curPerfIndex = self.getPerfCounters( tsStart, iEpoch, X_real_shape )
-                                logger.info( "  current: elapsedTime; {0}; perfIndex; {1}".format( curElapsedSeconds, curPerfIndex ) )
+                                # Performance counters, for current batch, m data * nbStatus epochs
+                                curElapsedSeconds, curPerfIndex = self.getPerfCounters( tsStart, iEpoch, X_real_shape, m * nbStatusEpoch )
+                                logger.info( "  current: elapsedTime; {0}; perfIndex; {1:.2f}".format( curElapsedSeconds, curPerfIndex ) )
 
                                 #  calculate DEV accuracy
                                 # Rewind DEV iterator
@@ -1171,12 +1171,12 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
             logger.info( "Parameters have been trained!")
             logger.info( "Final cost: {0}".format( epoch_cost ) )
 
-            ## Elapsed (seconds)
-            elapsedSeconds, perfIndex = self.getPerfCounters( tsStart, iEpoch, X_real_shape )
+            ## Elapsed (seconds), for wholde data set * nb epochs
+            elapsedSeconds, perfIndex = self.getPerfCounters( tsStart, iEpoch, X_real_shape, m * self.num_epochs )
             perfInfo = {}
 
             logger.info( "Elapsed (s): {0}".format( elapsedSeconds ) )
-            logger.info( "Perf index : {0}".format( perfIndex ) )
+            logger.info( "Perf index : {0:.2f}".format( perfIndex ) )
 
             self.persistModel( sess, idRun )
 

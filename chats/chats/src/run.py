@@ -142,12 +142,14 @@ def prepareData( dataSource ):
     ( datasetTrn, datasetDev, dataInfo ) = dataSource.getDatasets( isLoadWeights = False );
 
     logger.info( "" )
-    logger.info("number of training examples = " + strNone( dataInfo[ const.KEY_TRN_X_SIZE ] ) )
-    logger.info("number of dev test examples = " + strNone( dataInfo[ const.KEY_DEV_X_SIZE ] ) )
-    logger.info("X_train shape: " + strNone( dataInfo[ const.KEY_TRN_X_SHAPE ] ) )
-    logger.info("Y_train shape: " + strNone( dataInfo[ const.KEY_TRN_Y_SHAPE ] ) )
-    logger.info("X_dev  shape: "  + strNone( dataInfo[ const.KEY_DEV_X_SHAPE ] ) )
-    logger.info("Y_dev  shape: "  + strNone( dataInfo[ const.KEY_DEV_Y_SHAPE ] ) )
+    logger.info( "in memory trn dataset  = " + str( datasetTrn.inMemory ) )
+    logger.info( "in memory dev dataset  = " + str( datasetDev.inMemory ) )
+    logger.info( "number of trn examples = " + strNone( dataInfo[ const.KEY_TRN_X_SIZE ] ) )
+    logger.info( "number of dev examples = " + strNone( dataInfo[ const.KEY_DEV_X_SIZE ] ) )
+    logger.info( "X_train shape: " + strNone( dataInfo[ const.KEY_TRN_X_SHAPE ] ) )
+    logger.info( "Y_train shape: " + strNone( dataInfo[ const.KEY_TRN_Y_SHAPE ] ) )
+    logger.info( "X_dev  shape: "  + strNone( dataInfo[ const.KEY_DEV_X_SHAPE ] ) )
+    logger.info( "Y_dev  shape: "  + strNone( dataInfo[ const.KEY_DEV_Y_SHAPE ] ) )
 
 #     if ( hyperParams[ const.KEY_USE_WEIGHTS ] ) :
 #         print ( "  Weights_train shape :", WEIGHT_train.shape )
