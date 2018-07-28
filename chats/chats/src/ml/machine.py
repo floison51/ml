@@ -25,7 +25,7 @@ import abc
 ## Logging
 logging.config.fileConfig( 'logging.conf' )
 # create logger
-logger = logging.getLogger( 'ml' )
+logger = logging.getLogger( 'mle' )
 
 # Abstract class
 class AbstractMachine():
@@ -114,7 +114,6 @@ class AbstractMachine():
             keep_prob_min = 0.5
             keep_prob_max = 1
 
-            nbTuning = 20
             tuning= {}
 
             maxAccuracyDev = -9999999999999
@@ -123,12 +122,12 @@ class AbstractMachine():
             nbTuning = 1
 
         # Display hyper parameters info
-        logger.info( "Start Learning rate :", str( runHyperParams[ const.KEY_START_LEARNING_RATE ] ) )
-        logger.info( "Num epoch           :", str( runHyperParams[ const.KEY_NUM_EPOCHS ] ) )
-        logger.info( "Minibatch size      :", str( runHyperParams[ const.KEY_MINIBATCH_SIZE ] ) )
-        logger.info( "Beta                :", str( runHyperParams[ const.KEY_BETA ] ) )
-        logger.info( "keep_prob           :", str( runHyperParams[ const.KEY_KEEP_PROB ] ) )
-        logger.info( "isLoadWeights       :", runHyperParams[ const.KEY_USE_WEIGHTS ] )
+        logger.info( "Start Learning rate : " + str( runHyperParams[ const.KEY_START_LEARNING_RATE ] ) )
+        logger.info( "Num epoch           : " + str( runHyperParams[ const.KEY_NUM_EPOCHS ] ) )
+        logger.info( "Minibatch size      : " + str( runHyperParams[ const.KEY_MINIBATCH_SIZE ] ) )
+        logger.info( "Beta                : " + str( runHyperParams[ const.KEY_BETA ] ) )
+        logger.info( "keep_prob           : " + str( runHyperParams[ const.KEY_KEEP_PROB ] ) )
+        logger.info( "isLoadWeights       : " + str( runHyperParams[ const.KEY_USE_WEIGHTS ] ) )
 
         # Start time
         tsGlobalStart = time.time()
@@ -142,7 +141,7 @@ class AbstractMachine():
 
             if tune:
                 logger.info( "*****************************" )
-                logger.info( "Tune round", str( j ), "/", str( nbTuning ) )
+                logger.info( "Tune round " + str( j ) + "/" + str( nbTuning ) )
                 logger.info( "*****************************" )
 
                 # calculate beta
@@ -180,7 +179,7 @@ class AbstractMachine():
 
             # Print run
             run = db.getRun( conn, self.idRun )
-            logger.info( "Run stored in DB:", str( run ) )
+            logger.info( "Run stored in DB: " + str( run ) )
 
             if tune :
                 # Store results
@@ -205,7 +204,7 @@ class AbstractMachine():
                     conn.commit()
 
                 # print max
-                logger.info( "Max DEV accuracy:", maxAccuracyDev )
+                logger.info( "Max DEV accuracy: " + str( maxAccuracyDev ) )
                 logger.info( "Max hyper params:" )
                 logger.info( maxHyperParams )
 
@@ -213,14 +212,14 @@ class AbstractMachine():
             # Print tuning
             logger.info( "Tuning:" , tuning )
             logger.info( "" )
-            logger.info( "Max DEV accuracy      :", maxAccuracyDev )
-            logger.info( "Max hyper params idRun:", maxIdRun )
+            logger.info( "Max DEV accuracy      : " + str( maxAccuracyDev ) )
+            logger.info( "Max hyper params idRun: " + str( maxIdRun ) )
 
         # Start time
         tsGlobalEnd = time.time()
         globalElapsedSeconds = int( round( tsGlobalEnd - tsGlobalStart ) )
 
-        logger.info( "Finished in", globalElapsedSeconds, "seconds" )
+        logger.info( "Finished in " + str( globalElapsedSeconds ) + " seconds" )
 
     def predict( self, conn, dataset, config, idRun, imagePathes ):
         "Predict accuracy from trained model"
@@ -244,7 +243,7 @@ class AbstractMachine():
         tsGlobalEnd = time.time()
         globalElapsedSeconds = int( round( tsGlobalEnd - tsGlobalStart ) )
 
-        logger.info( "Finished in", globalElapsedSeconds, "seconds" )
+        logger.info( "Finished in " + globalElapsedSeconds + "seconds" )
 
     # Stuff to catch Ctrl-C
     def signal_handler( self, signal, frame ):

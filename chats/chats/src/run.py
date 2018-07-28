@@ -337,7 +337,7 @@ if __name__ == '__main__':
             comment     = runParams[ "comment" ]
 
             logger.info( "Train machine " + machineName )
-            ml.train( conn, dataset, config, comment, tune = tune, showPlots = showPlots )
+            ml.train( conn, dataset, config, comment, tune = tune, showPlots = showPlots, nbTuning = nbTuning )
 
         elif ( buttonClicked == "Predict" ) :
             logger.info( "Predict from machine " + machineName )

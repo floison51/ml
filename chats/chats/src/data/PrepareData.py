@@ -31,7 +31,6 @@ import tensorflow as tf
 import shutil
 
 from tarfile import TarFile
-import tempfile as tempfile
 
 #from apiclient.discovery import build
 
@@ -302,7 +301,7 @@ def createTFRdataset( absOutFile, xNpList, yNpList ) :
             tfRecordWriter.write( tfr.SerializeToString() )
 
 
-def createTrainAndDevSets( dataPath, relPath, archiveFileName, transformations, pc, nbImages ):
+def createTrainAndDevSets( dataPath, tempDir, relPath, archiveFileName, transformations, pc, nbImages ):
 
     # current dir for data
     dataDir = dataPath.replace( "\\", "/" )
@@ -321,7 +320,7 @@ def createTrainAndDevSets( dataPath, relPath, archiveFileName, transformations, 
     oriDir = dataDir + "/images"
 
     # Extract tar file in temp location
-    oriExtractedDir = os.path.join( tempfile.gettempdir(), archiveFileName )
+    oriExtractedDir = os.path.join( tempDir, archiveFileName )
     if ( not os.path.exists( oriExtractedDir ) ) :
         # Extract archive
         print( "Extracting image archive '" + archiveFileName + "' to dir '" + oriExtractedDir + "'" )
@@ -418,6 +417,7 @@ USAGE
         parser.add_argument('-V', '--version', action='version', version=program_version_message)
 
         parser.add_argument( "-dataPath" );
+        parser.add_argument( "-tempDir" );
         parser.add_argument( "-nbImages" );
 
         # Process arguments
@@ -428,6 +428,12 @@ USAGE
 
         if ( dataPath is None ) :
             raise Exception( "-dataPath argument is required" )
+
+        # check actions
+        tempDir = args.tempDir
+
+        if ( tempDir is None ) :
+            raise Exception( "-tempDir argument is required" )
 
         strNbImages = args.nbImages
         if ( strNbImages is None ) :
@@ -441,9 +447,9 @@ USAGE
         input( "Type enter to continue" )
 
         # Transformation have to be debugged: 25% of data, not 100%
-        createTrainAndDevSets( dataPath, "hand-made", "hand-made-images.tar", ( "original", ), TRAINING_TEST_SET_PC, nbImages )
+        createTrainAndDevSets( dataPath, tempDir, "hand-made", "hand-made-images.tar", ( "original", ), TRAINING_TEST_SET_PC, nbImages )
 
-        #createTrainAndDevSets( dataPath, "contest", ( "original", ), 1 - 0.02 )
+        #createTrainAndDevSets( dataPath, tempDir, "contest", ( "original", ), 1 - 0.02 )
 
 
     except KeyboardInterrupt:

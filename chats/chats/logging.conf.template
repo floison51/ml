@@ -1,5 +1,5 @@
 [loggers]
-keys=root,run,tf
+keys=root,run,mle,tfw
 
 [handlers]
 keys=consoleHandler,fileHandler
@@ -17,10 +17,16 @@ handlers=consoleHandler,fileHandler
 qualname=run
 propagate=0
 
-[logger_tf]
+[logger_mle]
 level=INFO
 handlers=consoleHandler,fileHandler
-qualname=run
+qualname=mle
+propagate=0
+
+[logger_tfw]
+level=INFO
+handlers=consoleHandler,fileHandler
+qualname=tfw
 propagate=0
 
 [handler_consoleHandler]
