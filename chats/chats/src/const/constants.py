@@ -104,8 +104,8 @@ class ConfigsDico:
         "machine"         : [ "string" , None, None ],
         "imageSize"       : [ "int"    , 64  , None ],
         "structure"       : [ "string" , None, None ],
-        "bestDevAccuracy" : [ "float" ,  None, "{:.2f}" ],
-        "assoTrnAccuracy" : [ "float" ,  None, "{:.2f}" ],
+        "bestDevAccuracy" : [ "float" ,  None, "{:.3f}" ],
+        "assoTrnAccuracy" : [ "float" ,  None, "{:.3f}" ],
     }
     OBJECT_FIELDS  = [ "id", "name", "structure", "imageSize", "idMachine" ]
     DISPLAY_FIELDS = [ "id", "name", "machine", "imageSize", "structure", "bestDevAccuracy", "assoTrnAccuracy" ]
@@ -132,8 +132,8 @@ class RunsDico:
         "comment"               : [ "string"   , None, None     ],
         "perf_index"            : [ "float"    , None, "{:.1f}" ],
         "elapsed_second"        : [ "int"      , None, None ],
-        "train_accuracy"        : [ "float"    , None, "{:.2f}" ],
-        "dev_accuracy"          : [ "float"    , None, "{:.2f}" ],
+        "train_accuracy"        : [ "float"    , None, "{:.3f}" ],
+        "dev_accuracy"          : [ "float"    , None, "{:.3f}" ],
         "json_conf_saved_info"  : [ "json"     , None, None     ],
         "json_system_info"      : [ "json"     , None, None     ],
         "json_data_info"        : [ "json"     , None, None     ],

@@ -131,7 +131,7 @@ class AbstractMachine():
 
         # Start time
         tsGlobalStart = time.time()
-        
+
         if tune:
             # make sure seed is unique
             seed = time.time
@@ -215,6 +215,17 @@ class AbstractMachine():
             logger.info( "Max DEV accuracy      : " + str( maxAccuracyDev ) )
             logger.info( "Max hyper params idRun: " + str( maxIdRun ) )
 
+            # Change selected hyper-parameters
+
+            # Get max dev accuracy from all runs
+            ( _, absoluteMaxAccuracyDev, _ ) = db.getBestHyperParams( conn, dataset[ "id" ], config[ "id" ] )
+            # If our max dev accuracy is better, change current select hps
+            if ( absoluteMaxAccuracyDev <= maxAccuracyDev ) :
+                db.updateSelectedHyperparams( conn, dataset[ "id" ], config[ "id" ], idMaxHp )
+            
+            # Commit result
+            conn.commit()
+
         # Start time
         tsGlobalEnd = time.time()
         globalElapsedSeconds = int( round( tsGlobalEnd - tsGlobalStart ) )
@@ -232,7 +243,7 @@ class AbstractMachine():
 
         logger.info( "Hyper params from run ID:", idRun )
         logger.info( "Hyper params:", runHyperParams )
-        
+
         # Start time
         tsGlobalStart = time.time()
 
@@ -578,7 +589,7 @@ class AbstractMachine():
     def dumpBadImages( self, correct, dataHome, imgDir, PATH, TAG, errorsDir ):
 
         nbBadImages = 0
-        
+
         # Delete files in error dir
         for the_file in os.listdir( errorsDir ):
             file_path = os.path.join( errorsDir, the_file )
@@ -600,16 +611,16 @@ class AbstractMachine():
 
         # Extract errors
         for i in range( 0, correct.shape[ 0 ] ):
-            
+
             # Is an error?
             if ( not( correct[ i ] ) ) :
 
                 nbBadImages += 1
-                
+
                 # finished?
                 if ( nbBadImages > 100 ) :
                     break;
-                
+
                 # Add nb
                 numpy_label = TAG[ i, 0 ]
                 label = numpy_label.decode( 'utf-8' )
@@ -661,12 +672,12 @@ class AbstractMachine():
 
         # check deleted
         if ( len( os.listdir( errorsDir ) ) != 0 ) :
-            logger.info( "Dir", errorsDir, "not empty." )
+            logger.info( "Dir " + errorsDir + " not empty." )
             sys.exit( 1 )
 
         # Dump bad images
         mapErrorNbByTag = self.dumpBadImages( oks, dataset.dataHome, dataset.imgDir, dataset.imgPathes, dataset.tags, errorsDir )
-        
+
         # Sort by value
         mapErrorNbByTagSorted = \
             OrderedDict(
@@ -674,7 +685,7 @@ class AbstractMachine():
         )
 
         ## Error repartition by label
-        logger.info( "Nb errors by tag for", key, ": ", mapErrorNbByTagSorted )
+        logger.info( "Nb errors by tag for " + key + ": " + str( mapErrorNbByTagSorted ) )
 
         # Build %age map
         nbSamples = oks.shape[ 0 ]
@@ -693,7 +704,7 @@ class AbstractMachine():
         )
 
         ## Error repartition by label
-        logger.info( "% errors by tag for", key, ": ", mapErrorPercentNbByTag )
+        logger.info( "% errors by tag for " + key + ": " + str( mapErrorPercentNbByTag ) )
 
         ## Graph
         if ( show_plot ) :

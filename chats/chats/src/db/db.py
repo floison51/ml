@@ -398,6 +398,22 @@ def getOrCreateHyperParams( conn, idDataset, idConfig, hyper_params ) :
 
     return idHpResult;
 
+def updateSelectedHyperparams( conn, idDataset, idConfig, idHp ):
+    
+    cursor = conn.cursor();
+
+    try :
+        # update hp selector to assign new hps to (idDataset,idConf) tuple
+        cursor.execute(
+            "UPDATE hpSelector set idHp=? where idDataset=? and idConfig=?",
+            ( idHp, idDataset, idConfig, )
+        )
+
+    finally :
+        cursor.close()
+
+    
+
 def getConfig( conn, idConfig ) :
 
     from model.mlconfig import MlConfig
