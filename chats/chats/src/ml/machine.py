@@ -181,6 +181,10 @@ class AbstractMachine():
             run = db.getRun( conn, self.idRun )
             logger.info( "Run stored in DB: " + str( run ) )
 
+            # Update selected run
+            db.updateHpRunSelectorForRun( conn, dataset[ "id" ], config[ "id" ], run[ "id" ] )
+            conn.commit()
+              
             if tune :
                 # Store results
                 tuning[ j ] = {
@@ -195,11 +199,14 @@ class AbstractMachine():
                     maxIdRun = self.idRun
 
                     # get or create hyperparams
-                    idMaxHp = db.getOrCreateHyperParams( conn, dataset[ "id" ], config[ "id" ], runHyperParams )
+                    idMaxHp = db.getOrCreateHyperParams( conn, runHyperParams )
                     # Update config
                     config[ "idHyperParams" ] = idMaxHp
                     # save config
                     db.updateConfig( conn, config )
+                    # Update selected run
+                    db.updateHpRunSelectorForHp( conn, dataset[ "id" ], config[ "id" ], idMaxHp )
+                
                     # Commit result
                     conn.commit()
 
@@ -207,7 +214,7 @@ class AbstractMachine():
                 logger.info( "Max DEV accuracy: " + str( maxAccuracyDev ) )
                 logger.info( "Max hyper params:" )
                 logger.info( maxHyperParams )
-
+                
         if tune :
             # Print tuning
             logger.info( "Tuning:" , tuning )
@@ -223,8 +230,8 @@ class AbstractMachine():
             if ( absoluteMaxAccuracyDev <= maxAccuracyDev ) :
                 db.updateSelectedHyperparams( conn, dataset[ "id" ], config[ "id" ], idMaxHp )
             
-            # Commit result
-            conn.commit()
+        # Commit result
+        conn.commit()
 
         # Start time
         tsGlobalEnd = time.time()

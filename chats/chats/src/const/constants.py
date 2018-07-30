@@ -104,11 +104,16 @@ class ConfigsDico:
         "machine"         : [ "string" , None, None ],
         "imageSize"       : [ "int"    , 64  , None ],
         "structure"       : [ "string" , None, None ],
+        "idHp"            : [ "int"    , None, None ],
+        "json_hperParams" : [ "json" , None, None ],
         "bestDevAccuracy" : [ "float" ,  None, "{:.3f}" ],
         "assoTrnAccuracy" : [ "float" ,  None, "{:.3f}" ],
+        "idLastRun"       : [ "int"    , None, None ],
+        "lastRunDevAccuracy"     : [ "float" ,  None, "{:.3f}" ],
+        "lastRunAssoTrnAccuracy" : [ "float" ,  None, "{:.3f}" ],
     }
     OBJECT_FIELDS  = [ "id", "name", "structure", "imageSize", "idMachine" ]
-    DISPLAY_FIELDS = [ "id", "name", "machine", "imageSize", "structure", "bestDevAccuracy", "assoTrnAccuracy" ]
+    DISPLAY_FIELDS = [ "id", "name", "machine", "imageSize", "structure", "idHp", "json_hperParams", "bestDevAccuracy", "assoTrnAccuracy", "idLastRun", "lastRunDevAccuracy", "lastRunAssoTrnAccuracy" ]
 
 class MachinesDico:
 
@@ -143,4 +148,18 @@ class RunsDico:
     }
     OBJECT_FIELDS  = [ "id", "dateTime", "comment", "perf_index", "elapsed_second", "train_accuracy", "dev_accuracy", "json_conf_saved_info", "json_system_info", "json_data_info", "json_perf_info", "json_result_info" ]
     DISPLAY_FIELDS = [ "comment", "idDataset", "idConf", "idHyperParams", "train_accuracy", "dev_accuracy", "perf_index", "elapsed_second", "dateTime", "conf_saved_info", "system_info", "data_info", "perf_info", "result_info" ]
+
+class HpRunSelectorDico:
+
+    KEYS = { "id", "idDataset" }
+    CARAC = {
+        # Type, default value
+        "id"           : [ "int"    , None, None ],
+        "idDataset"    : [ "int"    , None, None ],
+        "idConf"       : [ "int"    , None, None ],
+        "idHp"         : [ "int"    , None, None ],
+        "idRun"        : [ "int"    , None, None ],
+    }
+    OBJECT_FIELDS  = [ "id", "idDataset", "idConf", "idHp", "idRun" ]
+    DISPLAY_FIELDS = OBJECT_FIELDS
 

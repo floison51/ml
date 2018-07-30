@@ -37,7 +37,7 @@ class HyperParamsDoer( Doer ):
 
         # launch view with callback
         viewHp.run( hyperParams, bestHyperParams, bestDevAccuracy )
-
+        
     def doCreateOrUpdateHyperParams( self, fenetre, newHyperParams ):
 
         print( "Result:", newHyperParams )
@@ -51,10 +51,16 @@ class HyperParamsDoer( Doer ):
         idDataset = db.getDatasetIdByName( self.conn, nameDataset )
 
         # Get or create new hyper parameters
-        db.getOrCreateHyperParams( self.conn, idDataset, self.config[ "id" ], newHyperParams )
+        idNewHyperParams = db.getOrCreateHyperParams( self.conn, newHyperParams )
+
+        # Update selected hyperparameters
+        db.updateHpRunSelectorForHp( self.conn, idDataset, self.config[ "id" ], idNewHyperParams );
 
         #commit
         self.conn.commit()
+        
+        # update main window
+        fenetre.master.updateRowConfigIdHp( idNewHyperParams )
 
 class ConfigDoer( Doer ):
 
@@ -201,11 +207,11 @@ class AnalyzeDoer( Doer ):
             # Get hyper params
             idHp = run[ "idHyperParams" ]
             hp = db.getHyperParamsById( self.conn, idHp )
-            
+
             beta = hp[ "hyperParameters" ][ const.KEY_BETA ]
             if ( beta == 0 ) :
                 continue
-            
+
             beta = log10( beta )
 
             beta_min = min( beta, beta_min )
@@ -223,7 +229,7 @@ class AnalyzeDoer( Doer ):
         # Convert to numpy arrays
         points = np.array( points )
         values = np.array( values )
-        
+
         # Create grid
         grid_x, grid_y = np.mgrid[ beta_min:beta_max:0.01, keepProb_min:keepProb_max:0.01]
 
@@ -256,7 +262,7 @@ class AnalyzeDoer( Doer ):
         idDataset = db.getDatasetIdByName( self.conn, nameDataset )
 
         # Get or create new hyper parameters
-        db.getOrCreateHyperParams( self.conn, idDataset, self.config[ "id" ], newHyperParams )
+        db.getOrCreateHyperParams( self.conn, newHyperParams )
 
         #commit
         self.conn.commit()

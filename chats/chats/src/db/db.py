@@ -213,16 +213,53 @@ def createConfig( conn, idDataset, name, structure, imageSize, machineName, hype
         # get hyparams
         idHyperParams = getOrCreateHyperParams( conn, idDataset, idConfig, hyper_params )
 
-        # create selector
-        cursor.execute(
-            "INSERT INTO hpSelector VALUES ( null, ?, ?, ? )",
-            ( idDataset, idConfig, idHyperParams, )
-        )
+        # create selector, no run yet
+        createHpRunSelector( conn, idDataset, idConfig, idHyperParams, None )
 
     finally :
         cursor.close();
 
     return idConfig
+
+def createHpRunSelector( conn, idDataset, idConfig, idHyperParams, idRun ):
+    cursor = conn.cursor()
+
+    try :
+
+        # create selector
+        cursor.execute(
+            "INSERT INTO hpRunSelector VALUES ( null, ?, ?, ?, ? )",
+            ( idDataset, idConfig, idHyperParams, idRun, )
+        )
+
+    finally :
+        cursor.close();
+
+def updateHpRunSelectorForHp( conn, idDataset, idConfig, idHp ):
+    cursor = conn.cursor()
+
+    try :
+
+        cursor.execute(
+            "UPDATE hpRunSelector set idHp=? where idDataset=? and idConfig=?",
+            ( idHp, idDataset, idConfig, )
+        )
+
+    finally :
+        cursor.close();
+
+def updateHpRunSelectorForRun( conn, idDataset, idConfig, idRun ):
+    cursor = conn.cursor()
+
+    try :
+
+        cursor.execute(
+            "UPDATE hpRunSelector set idRun=? where idDataset=? and idConfig=?",
+            ( idRun, idDataset, idConfig, )
+        )
+
+    finally :
+        cursor.close();
 
 def getHyperParamsFrowRow( row ) :
 
@@ -258,33 +295,35 @@ def getHyperParamsById( conn, idHp ) :
     return result
 
 
+def getHpRunSelector( conn, idDataset, idConfig ) :
+
+    cursor = conn.cursor()
+    result = {}
+
+    try :
+        # get hp selector to retrieve idHp
+        cursor.execute(
+            "select * from hpRunSelector where idDataset=? and idConfig=?",
+            ( idDataset, idConfig, )
+        )
+
+        for row in cursor :
+            for i in range( len( const.HpRunSelectorDico.OBJECT_FIELDS ) ) :
+                result[ const.HpRunSelectorDico.OBJECT_FIELDS[ i ] ] = row[ i ]
+
+    finally :
+        cursor.close();
+
+    return result
+
 def getHyperParams( conn, idDataset, idConfig ) :
 
     cursor = conn.cursor()
 
     try :
+
         # get hp selector to retrieve idHp
-        cursor.execute(
-            "select idHp from hpSelector where idDataset=? and idConfig=?",
-            ( idDataset, idConfig, )
-        )
-
-        # Default hp
-        idHyperParams = -1
-
-        for row in cursor :
-            idHyperParams = row[ 0 ]
-
-        # Create selector if needed
-        if ( idHyperParams < 0 ) :
-
-            # Default hp
-            idHyperParams = 1
-            cursor.execute(
-                '''INSERT INTO hpSelector ( idDataset, idConfig, idHp ) VALUES ( ?, ?, ? )''',
-                ( idDataset, idConfig, idHyperParams, )
-            )
-
+        idHyperParams = getSelectedIdHyperparam( conn, idDataset, idConfig )
 
         # get existing, if any
         cursor.execute(
@@ -338,26 +377,17 @@ def getBestHyperParams( conn, idDataSet, idConfig ) :
 def getSelectedIdHyperparam( conn, idDataset, idConf ):
     "Get hyper parameter selector given data set and conf"
 
-    cursor = conn.cursor()
-    try :
+    selector = getHpRunSelector( conn, idDataset, idConf )
 
-        # get existing, if any
-        cursor.execute(
-            "select idHyperparam from hpSelector where idDataset=? and idConf=?",
-            ( idDataset, idConf, )
-        )
+    # For some reason, cursor.rowcount is NOK, use another method
+    idHyperparam = None
+    if ( selector is not None ) :
+        idHyperparam = selector[ "idHp" ]
 
-        # For some reason, cursor.rowcount is NOK, use another method
-        idHyperparam = None
-        for ( hp ) in cursor:
-            idHyperparam = hp[ 0 ]
+    return idHyperparam
 
-        return idHyperparam
 
-    finally :
-        cursor.close()
-
-def getOrCreateHyperParams( conn, idDataset, idConfig, hyper_params ) :
+def getOrCreateHyperParams( conn, hyper_params ) :
 
     cursor = conn.cursor();
 
@@ -387,32 +417,10 @@ def getOrCreateHyperParams( conn, idDataset, idConfig, hyper_params ) :
 
             idHpResult = cursor.lastrowid
 
-        # update hp selector to assign new hps to (idDataset,idConf) tuple
-        cursor.execute(
-            "UPDATE hpSelector set idHp=? where idDataset=? and idConfig=?",
-            ( idHpResult, idDataset, idConfig, )
-        )
-
     finally :
         cursor.close()
 
     return idHpResult;
-
-def updateSelectedHyperparams( conn, idDataset, idConfig, idHp ):
-    
-    cursor = conn.cursor();
-
-    try :
-        # update hp selector to assign new hps to (idDataset,idConf) tuple
-        cursor.execute(
-            "UPDATE hpSelector set idHp=? where idDataset=? and idConfig=?",
-            ( idHp, idDataset, idConfig, )
-        )
-
-    finally :
-        cursor.close()
-
-    
 
 def getConfig( conn, idConfig ) :
 
@@ -536,18 +544,27 @@ def getConfigsWithMaxDevAccuracy( conn, idDataset, idConfig = None ) :
 
         results = []
 
+
         for row in cursor :
 
             result = MlConfig()
 
             iCol = 0
 
+            # Object fields
             for colName in const.ConfigsDico.DISPLAY_FIELDS :
-                
-                if ( ( colName != "bestDevAccuracy" ) and ( colName != "assoTrnAccuracy" ) ) :
+
+                if (
+                    ( colName != "bestDevAccuracy" ) and ( colName != "assoTrnAccuracy" ) and
+                    ( colName != "idHp" ) and ( colName != "json_hperParams" ) and
+                    ( colName != "idLastRun" ) and
+                    ( colName != "lastRunDevAccuracy" ) and ( colName != "lastRunAssoTrnAccuracy" )
+                ) :
                     result[ colName ] = row[ iCol ]
-                    
-                iCol += 1
+                    iCol += 1
+
+            # now we have idConf
+            curIdConf = result[ "id" ]
 
             # Append best DEV accuracy and TRN Accuracy
             statementRun = \
@@ -555,39 +572,63 @@ def getConfigsWithMaxDevAccuracy( conn, idDataset, idConfig = None ) :
                     "(select max( r2.dev_accuracy) from runs r2 where r2.idDataset=? and r2.idConf=? ) ) order by id desc;"
 
             # dataset id, config id
-            parameters = ( idDataset, result[ "id" ], idDataset, result[ "id" ], )
+            parameters = ( idDataset, curIdConf, idDataset, curIdConf, )
 
             cursorRun = conn.cursor()
-        
+
             try :
 
                 cursorRun.execute(
                     statementRun,
                     parameters
                 )
-    
+
                 bestDevAccuracy = None
                 assoTrnAccuracy = None
-    
+
                 # Get selected run
                 for row in cursorRun :
-    
+
                     idRun = row[ 0 ]
                     run = getRun( conn, idRun )
-    
+
                     bestDevAccuracy = run[ "dev_accuracy" ]
                     assoTrnAccuracy = run[ "train_accuracy" ]
-                    
+
                     # Read only first row
                     break
-    
+
                 # Add accuracies
                 result[ "bestDevAccuracy" ] = bestDevAccuracy
                 result[ "assoTrnAccuracy" ] = assoTrnAccuracy
-            
+
             finally :
                 cursorRun.close()
-                
+
+            # idHp and run tin
+            result[ "idHp" ] = None
+            result[ "json_hperParams" ] = None
+            result[ "idLastRun" ] = None
+            result[ "lastRunDevAccuracy" ] = None
+            result[ "lastRunAssoTrnAccuracy" ] = None
+
+            # get select hp and run
+            runSelector = getHpRunSelector( conn, idDataset, curIdConf )
+            idHp = runSelector[ "idHp" ]
+            result[ "idHp" ]      = idHp
+            if ( idHp is not None ) :
+                # Get hyper-parameters
+                hp = getHyperParamsById( conn, idHp )
+                result[ "json_hperParams" ] = hp
+
+            idLastRun = runSelector[ "idRun" ]
+            result[ "idLastRun" ] = idLastRun
+
+            if ( idLastRun is not None ) :
+                run = getRun( conn, idLastRun )
+                result[ "lastRunDevAccuracy" ]     = run[ "dev_accuracy" ]
+                result[ "lastRunAssoTrnAccuracy" ] = run[ "train_accuracy" ]
+
             # add result
             results.append( result )
 
@@ -713,7 +754,7 @@ def createRun( conn, idDataset, idConfig, runHyperParams ) :
         config = getConfig( conn, idConfig )
 
         # Get hyperparams
-        idRunHyperParams = getOrCreateHyperParams( conn, idDataset, idConfig, runHyperParams )
+        idRunHyperParams = getOrCreateHyperParams( conn, runHyperParams )
 
         # Save conf
         json_conf_saved = json.dumps( config )
@@ -1061,13 +1102,14 @@ def initTables( cursor ) :
          )'''
     )
 
-    # Create table - hyper-parmas selector
-    cursor.execute( '''CREATE TABLE IF NOT EXISTS hpSelector
+    # Create table - hyper-params and run selector
+    cursor.execute( '''CREATE TABLE IF NOT EXISTS hpRunSelector
         (
-           id integer PRIMARY KEY AUTOINCREMENT,
-           idDataset integer REFERENCES datasets( id ),
-           idConfig integer REFERENCES configs( id ),
-           idHp integer REFERENCES hyperparams( id )
+           id integer not null PRIMARY KEY AUTOINCREMENT,
+           idDataset integer not null REFERENCES datasets( id ),
+           idConfig integer not null REFERENCES configs( id ),
+           idHp integer not null REFERENCES hyperparams( id ),
+           idRun integer REFERENCES runs( id )
         )'''
     )
 
@@ -1106,8 +1148,8 @@ def initTables( cursor ) :
     cursor.execute( '''CREATE INDEX IF NOT EXISTS idx_configs_id on configs( id ) ''' )
     cursor.execute( '''CREATE INDEX IF NOT EXISTS idx_configs_structure on configs( structure ) ''' )
 
-    cursor.execute( '''CREATE INDEX IF NOT EXISTS idx_hpSelector_id on hpSelector( id ) ''' )
-    cursor.execute( '''CREATE UNIQUE INDEX IF NOT EXISTS idx_hpSelector_select on hpSelector( idDataset, idConfig )''' )
+    cursor.execute( '''CREATE INDEX IF NOT EXISTS idx_hpRunSelector_id on hpRunSelector( id ) ''' )
+    cursor.execute( '''CREATE UNIQUE INDEX IF NOT EXISTS idx_hpRunSelector_select on hpRunSelector( idDataset, idConfig )''' )
 
     cursor.execute( '''CREATE INDEX IF NOT EXISTS idx_hyperparams_id on hyperparams( id ) ''' )
     cursor.execute( '''CREATE INDEX IF NOT EXISTS idx_hyperparams_structure on hyperparams( id ) ''' )

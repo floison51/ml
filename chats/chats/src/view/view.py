@@ -184,7 +184,12 @@ class MainWindow ( Tk ):
         self.frameConfigsTable = LabelFrame( frameConfigs, padx=10, pady=10)
 
         # show window
-        labels = { 1: "", 2: "Id", 3: "Name", 4: "Machine", 5: "Image Size", 6 : "Structure", 7 : "Best DEV\nAccuracy", 8: "TRN\nAccuracy", 9: "Hyper Params", 10: "Runs" }
+        labels = {
+            1: "", 2: "Id", 3: "Name", 4: "Machine", 5: "Image Size", 6 : "Structure",
+            7 : "id Hp", 8: "Hyper Params",
+            9 : "Best DEV\nAccuracy", 10: "TRN\nAccuracy",
+            11: "last Id Run", 12: "last Run DEV\nAccuracy", 13: "last Run TRN\nAccuracy", 14: "Runs"
+        }
 
         for iCol in range( 1, len( labels ) + 1 ) :
             label = Label( self.frameConfigsTable, text=labels[ iCol ], borderwidth=1 ).grid( row=0, column=iCol, sticky=W, padx=10 )
@@ -268,6 +273,15 @@ class MainWindow ( Tk ):
                 cols.append( buttonShowStructure )
                 buttonShowStructure.grid( row=iRow, column=iCol )
 
+            elif ( colName == "json_hperParams" ) :
+                # Button to show hyper params
+                buttonShowHP = Button( \
+                    self.frameConfigsTable, text="Update", \
+                    command= lambda idConf=idConf : self.hpDoer.updateHyperParams( self, idConf )
+                )
+                cols.append( buttonShowHP )
+                buttonShowHP.grid( row=iRow, column=iCol )
+
             else :
                 ## We need a var of label values, to be able to modify labels
                 varLabel = getInputVar( const.ConfigsDico.CARAC, colName )
@@ -282,22 +296,13 @@ class MainWindow ( Tk ):
 
             iCol += 1
 
-        # Button to show hyper params
-        buttonShowHP = Button( \
-            self.frameConfigsTable, text="Update", \
-            command= lambda idConf=idConf : self.hpDoer.updateHyperParams( self, idConf )
-        )
-        cols.append( buttonShowHP )
-        buttonShowHP.grid( row=iRow, column=iCol )
-        iCol += 1
-
         # Button to show runs
         buttonShowRuns = Button( \
             self.frameConfigsTable, text="Show", \
             command= lambda idConf=idConf : self.runsDoer.showRuns( self, self.varDataset.get(), idConf )
         )
         cols.append( buttonShowRuns )
-        buttonShowRuns.grid( row=iRow, column=iCol )
+        buttonShowRuns.grid( row=iRow, column=14 )
 
         ## Declare row
         self.rows[ idConf ] = cols
@@ -317,7 +322,7 @@ class MainWindow ( Tk ):
         iCol = 0 # 1 = offset radio-button
         for colName in colNames:
 
-            if ( colName != "structure" ) :
+            if ( ( colName != "structure" ) and ( colName != "json_HyperParams" ) ):
                 # associated var
                 var = varLabels[ iCol ]
                 # get and set value
@@ -325,6 +330,19 @@ class MainWindow ( Tk ):
                 var.set( value )
 
                 iCol += 1
+
+    def updateRowConfigIdHp( self, idHp ) :
+
+        colNames = const.ConfigsDico.DISPLAY_FIELDS
+        idConf = self.confSelected.get()
+        varLabels = self.rowVarLabels[ idConf ]
+
+        # get index of idHp
+        colIdHp = colNames.index( "idHp" ) - 1 # -1 : radio button
+        # associated var
+        var = varLabels[ colIdHp ]
+        # get and set value
+        var.set( idHp )
 
     def deleteConfigGrid( self, idConfig ):
         cols = self.rows[ idConfig ]
