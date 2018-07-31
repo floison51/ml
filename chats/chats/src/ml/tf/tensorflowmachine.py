@@ -1119,7 +1119,7 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
                                 # Rewind DEV iterator
                                 sess.run( [ devIterator.initializer ] )
                                 DEV_accuracy = self.accuracyEval( devHandle, "dev" )
-                                logger.info( "  current: DEV accuracy: {:.2%}".format( DEV_accuracy ) )
+                                logger.info( "  current: DEV accuracy: {:.3%}".format( DEV_accuracy ) )
                                 DEV_accuracies.append( DEV_accuracy )
 
                                 # Update best epoch var
@@ -1208,14 +1208,14 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
             sess.run( [ trnIterator.initializer, devIterator.initializer ], { self.phTrnNumEpochs : 1 } )
 
             accuracyTrain = self.accuracyEval( trnHandle, "trn" )
-            logger.info(  "TRN Accuracy: {:.2%}".format( accuracyTrain ) )
+            logger.info(  "TRN Accuracy: {:.3%}".format( accuracyTrain ) )
 
             accuracyDev = self.accuracyEval( devHandle, "dev" )
-            logger.info(  "DEV Accuracy: {:.2%}".format( accuracyDev ) )
+            logger.info(  "DEV Accuracy: {:.3%}".format( accuracyDev ) )
 
             if ( isCalculateBestEpoch ) :
                 logger.info(  "Best DEV nb epochs: {0}".format( maxBestNbEpoch ) )
-                logger.info(  "Best DEV Accuracy : {:.2%}".format( maxBestAccuracyDevEpoch ) )
+                logger.info(  "Best DEV Accuracy : {:.3%}".format( maxBestAccuracyDevEpoch ) )
 
             if ( show_plot ) :
                 # plot the cost
