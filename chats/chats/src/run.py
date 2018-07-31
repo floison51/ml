@@ -71,7 +71,7 @@ def updateDatasets( conn, selection ):
     if ( not selectionOk ) :
         selection.pop( "selectedDatasetName", None )
         # save selection
-        db.setSelection( conn, selection )
+        db.setSelection( conn, const.Selections.KEY_MAIN, selection )
 
 def updateMachines( conn ):
 
@@ -167,7 +167,7 @@ if __name__ == '__main__':
         #db.test( conn )
 
         # Read selections
-        selection = db.getSelection( conn )
+        selection = db.getSelection( conn, const.Selections.KEY_MAIN )
 
         # update datasets
         updateDatasets( conn, selection )
@@ -331,13 +331,14 @@ if __name__ == '__main__':
             # set run params
             ml.setRunParams( runParams )
 
-            showPlots   = runParams[ "showPlots" ]
-            tune        = runParams[ "tune" ]
-            nbTuning    = runParams[ "nbTuning" ]
-            comment     = runParams[ "comment" ]
+            showPlots      = runParams[ "showPlots" ]
+            tune           = runParams[ "tune" ]
+            nbTuning       = runParams[ "nbTuning" ]
+            comment        = runParams[ "comment" ]
+            isUseBestEpoch = runParams[ "isUseBestEpoch" ]
 
             logger.info( "Train machine " + machineName )
-            ml.train( conn, dataset, config, comment, tune = tune, showPlots = showPlots, nbTuning = nbTuning )
+            ml.train( conn, dataset, config, comment, tune = tune, showPlots = showPlots, nbTuning = nbTuning, isUseBestEpoch=isUseBestEpoch )
 
         elif ( buttonClicked == "Predict" ) :
             logger.info( "Predict from machine " + machineName )

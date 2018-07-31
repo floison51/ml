@@ -294,7 +294,7 @@ class StartRunDoer( Doer ):
         super().__init__( conn )
         self.confMachinesForms = configMachinesForms
 
-    def start( self, fenetre, idConfig ) :
+    def start( self, fenetre, idDataset, idConfig ) :
         # Get form fields for machine
         config = db.getConfig( self.conn, idConfig )
 
@@ -302,11 +302,15 @@ class StartRunDoer( Doer ):
         machineName = db.getMachineNameById( self.conn, config[ "idMachine" ] )
         # Get fields
         machineFields = self.confMachinesForms[ machineName ]
+        
+        # Get default values
+        selectionKey =  "dataset=" + str( idDataset ) + ";config=" + str( idConfig )
+        machineFieldValues = db.getSelection( self.conn, selectionKey )
 
         # Launch run dialog
-        startTrainingDialog = view.StartTrainDialog( fenetre, fenetre.doRunTraining, machineFields )
+        startTrainingDialog = view.StartTrainDialog( fenetre, self.conn, selectionKey, fenetre.doRunTraining, machineFields, machineFieldValues )
         startTrainingDialog.run()
-
+        
 class StartPredictDoer( Doer ):
 
     def __init__( self, conn ) :

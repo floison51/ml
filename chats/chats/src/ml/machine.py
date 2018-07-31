@@ -96,7 +96,7 @@ class AbstractMachine():
         # Nothing to do
         pass
 
-    def train( self,  conn, dataset, config, comment, tune = False, nbTuning = 20, showPlots = True ):
+    def train( self,  conn, dataset, config, comment, isUseBestEpoch=True, tune = False, nbTuning = 20, showPlots = True ):
         "Train the model"
 
         # hyper parameters
@@ -105,6 +105,9 @@ class AbstractMachine():
         runHyperParams = {}
         runHyperParams.update( confHyperParams[ "hyperParameters" ] )
 
+        maxBestNbEpoch, maxBestAccuracyDevEpoch = -1, -1
+        initialNbEpoch = runHyperParams[ const.KEY_NUM_EPOCHS ]
+        
         ## Prepare hyper params
         if tune :
             # Tune params
@@ -137,7 +140,18 @@ class AbstractMachine():
             seed = time.time
             random.seed( seed )
 
-        for j in range( 1, nbTuning + 1 ) :
+        # Nb of pass to run
+        nbPass = nbTuning
+        
+        # Pass used to recalculate training with best epoch
+        bestEpochPass = -1
+        if ( isUseBestEpoch ) :
+            # Add one for best epoch rerun
+            nbPass += 1
+            # last pass
+            bestEpochPass = nbPass
+            
+        for j in range( 1, nbPass + 1 ) :
 
             if tune:
                 logger.info( "*****************************" )
@@ -158,6 +172,14 @@ class AbstractMachine():
                 runHyperParams[ const.KEY_BETA         ] = beta
                 runHyperParams[ const.KEY_KEEP_PROB    ] = keep_prob
 
+            # best epoch run
+            if ( j == bestEpochPass ) :
+                # select best epoch nb
+                runHyperParams[ const.KEY_NUM_EPOCHS   ] = maxBestNbEpoch
+                logger.info( "***************************************************************************" )
+                logger.info( "Running interrupted gradient descent, nb epochs={0}".format( maxBestNbEpoch ) )
+                logger.info( "***************************************************************************" )
+                
             # Create run
 
             self.idRun = db.createRun( conn, self.idDataset, config[ "id" ],  runHyperParams )
@@ -170,7 +192,7 @@ class AbstractMachine():
             )
 
             # Run model and update DB run with extra info
-            accuracyDev, accuracyTrain = self.optimizeModel(
+            accuracyDev, accuracyTrain, bestNbEpoch, bestAccuracyDevEpoch = self.optimizeModel(
                 conn, self.idRun,
                 config[ "structure" ],
                 runHyperParams,
@@ -184,7 +206,18 @@ class AbstractMachine():
             # Update selected run
             db.updateHpRunSelectorForRun( conn, dataset[ "id" ], config[ "id" ], run[ "id" ] )
             conn.commit()
-              
+
+            # Manage best epoch params
+            if ( 
+                # Using best epoch mode and not in best epoch finalization pass
+                isUseBestEpoch and ( j != bestEpochPass ) and
+                #  mex of best epoch dev accuracy
+                ( bestAccuracyDevEpoch > maxBestAccuracyDevEpoch ) 
+            ) :
+                # Store it
+                maxBestAccuracyDevEpoch = bestAccuracyDevEpoch
+                maxBestNbEpoch = bestNbEpoch
+
             if tune :
                 # Store results
                 tuning[ j ] = {
@@ -206,7 +239,7 @@ class AbstractMachine():
                     db.updateConfig( conn, config )
                     # Update selected run
                     db.updateHpRunSelectorForHp( conn, dataset[ "id" ], config[ "id" ], idMaxHp )
-                
+
                     # Commit result
                     conn.commit()
 
@@ -215,6 +248,15 @@ class AbstractMachine():
                 logger.info( "Max hyper params:" )
                 logger.info( maxHyperParams )
                 
+            else :
+                # Not in tuning mode
+                # if maxBestNbEpoch = nominal nbEpochs, stop last loop
+                if ( maxBestNbEpoch == initialNbEpoch ) :
+                    # Stop loop
+                    break
+
+
+        # End of loops
         if tune :
             # Print tuning
             logger.info( "Tuning:" , tuning )
@@ -228,11 +270,11 @@ class AbstractMachine():
             ( _, absoluteMaxAccuracyDev, _ ) = db.getBestHyperParams( conn, dataset[ "id" ], config[ "id" ] )
             # If our max dev accuracy is better, change current select hps
             if ( absoluteMaxAccuracyDev <= maxAccuracyDev ) :
-                db.updateSelectedHyperparams( conn, dataset[ "id" ], config[ "id" ], idMaxHp )
-            
+                db.updateHpRunSelectorForHp( conn, dataset[ "id" ], config[ "id" ], idMaxHp )
+
         # Commit result
         conn.commit()
-
+        
         # Start time
         tsGlobalEnd = time.time()
         globalElapsedSeconds = int( round( tsGlobalEnd - tsGlobalStart ) )
@@ -288,7 +330,7 @@ class AbstractMachine():
         self.minibatch_size = hyperParams[ const.KEY_MINIBATCH_SIZE ]
 
         self.start_learning_rate         = hyperParams[ const.KEY_START_LEARNING_RATE ]
-        self.learning_rate_decay_nb      = hyperParams[ const.KEY_LEARNING_RATE_DECAY_NB ]
+        self.learning_rate_decay_nb      = hyperParams[ const.KEY_LEARNING_RATE_DECAY_NB_EPOCH ]
         self.learning_rate_decay_percent = hyperParams[ const.KEY_LEARNING_RATE_DECAY_PERCENT ]
 
         self.useBatchNormalization = hyperParams[ const.KEY_USE_BATCH_NORMALIZATION ]

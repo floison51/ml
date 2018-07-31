@@ -1051,6 +1051,10 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
             tsTraceStart = tsStart
             secTrace = 60           #trace each 60 seconds
 
+            # Best epoch values
+            maxBestAccuracyDevEpoch = -1
+            maxBestNbEpoch = -1
+
             # Start input enqueue threads.
             coord = tf.train.Coordinator()
             threads = tf.train.start_queue_runners( sess=sess, coord=coord )
@@ -1108,6 +1112,13 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
                                 DEV_accuracy = self.accuracyEval( devHandle, "dev" )
                                 logger.info( "  current: DEV accuracy: {:.2%}".format( DEV_accuracy ) )
                                 DEV_accuracies.append( DEV_accuracy )
+                                
+                                # Update best epoch var
+                                if ( iEpoch > ( self.num_epochs / 2 ) ) :
+                                    # max reached?
+                                    if ( DEV_accuracy > maxBestAccuracyDevEpoch ) :
+                                        maxBestAccuracyDevEpoch = DEV_accuracy
+                                        maxBestNbEpoch = iEpoch
 
                             # Reset status epoch timer
                             tsStatusEpochStart = tsEpochStatusNow
@@ -1184,10 +1195,13 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
             sess.run( [ trnIterator.initializer, devIterator.initializer ], { self.phTrnNumEpochs : 1 } )
 
             accuracyTrain = self.accuracyEval( trnHandle, "trn" )
-            logger.info(  "Train Accuracy: {:.2%}".format( accuracyTrain ) )
+            logger.info(  "TRN Accuracy: {:.2%}".format( accuracyTrain ) )
 
             accuracyDev = self.accuracyEval( devHandle, "dev" )
-            logger.info(  "Dev Accuracy: {:.2%}".format( accuracyDev ) )
+            logger.info(  "DEV Accuracy: {:.2%}".format( accuracyDev ) )
+
+            logger.info(  "Best DEV nb epochs: {0}".format( maxBestNbEpoch ) )
+            logger.info(  "Best DEV Accuracy : {:.2%}".format( maxBestAccuracyDevEpoch ) )
 
             if ( show_plot ) :
                 # plot the cost
@@ -1235,5 +1249,5 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
                 dev_accuracy=accuracyDev.astype( float )
             )
 
-            return accuracyDev, accuracyTrain
+            return accuracyDev, accuracyTrain, maxBestNbEpoch, maxBestAccuracyDevEpoch
 

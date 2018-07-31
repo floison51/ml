@@ -163,3 +163,5 @@ class HpRunSelectorDico:
     OBJECT_FIELDS  = [ "id", "idDataset", "idConf", "idHp", "idRun" ]
     DISPLAY_FIELDS = OBJECT_FIELDS
 
+class Selections:
+    KEY_MAIN = "main"

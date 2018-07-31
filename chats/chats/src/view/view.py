@@ -101,8 +101,9 @@ class MainWindow ( Tk ):
             "selectedDatasetName" : self.varDataset.get(),
             "selectedIdConfig"    : self.confSelected.get()
         }
+        
         import db.db as db
-        db.setSelection( conn, selection )
+        db.setSelection( conn, const.Selections.KEY_MAIN, selection )
         # commit
         conn.commit()
 
@@ -377,7 +378,7 @@ class MainWindow ( Tk ):
 
         # Next dialog
         if ( self.buttonClicked == "Train" ) :
-            self.startRunDoer.start( self, self.confSelected.get() )
+            self.startRunDoer.start( self, self.varDataset.get(), self.confSelected.get() )
         elif ( self.buttonClicked == "Predict" ) :
             self.predictRunDoer.start( self, self.confSelected.get() )
         elif ( self.buttonClicked == "Analyze" ) :
@@ -665,9 +666,12 @@ class TextModalWindow ( MyDialog ) :
 
 class StartTrainDialog( MyDialog ):
 
-    def __init__( self, boss, callbackFct, machineFields, **options ) :
+    def __init__( self, boss, conn, keySelection, callbackFct, machineFields, machineFieldValues, **options ) :
         MyDialog.__init__( self, boss, callbackFct, **options )
+        self.conn = conn
+        self.keySelection = keySelection
         self.machineFields = machineFields
+        self.machineFieldValues = machineFieldValues
 
     def run( self ) :
 
@@ -687,23 +691,25 @@ class StartTrainDialog( MyDialog ):
 
         Label( frameForm, text="Run comment", borderwidth=1 ).grid( row=iRow, column=1, sticky=W, padx=10 )
         self.commentInputVar = getInputVar( const.RunsDico.CARAC, "comment" )
+        self.commentInputVar.set( self.machineFieldValues.get( "comment", "" ) )
         Entry( frameForm, textvariable=self.commentInputVar, width = 40 ).grid( row=iRow, column=2, sticky=W, padx=10 )
         iRow += 1
 
         Label( frameForm, text="Show plots", borderwidth=1 ).grid( row=iRow, column=1, sticky=W, padx=10 )
         self.showPlotsInputVar = BooleanVar()
-        self.showPlotsInputVar.set( True )
+        self.showPlotsInputVar.set( self.machineFieldValues.get( "showPlot", True ) )
         Checkbutton( frameForm, variable=self.showPlotsInputVar ).grid( row=iRow, column=2, sticky=W, padx=10 )
         iRow += 1
 
         Label( frameForm, text="Tune", borderwidth=1 ).grid( row=iRow, column=1, sticky=W, padx=10 )
         self.tuneInputVar = BooleanVar()
+        self.tuneInputVar.set( self.machineFieldValues.get( "tune", False ) )
         Checkbutton( frameForm, variable=self.tuneInputVar ).grid( row=iRow, column=2, sticky=W, padx=10 )
         iRow += 1
 
         Label( frameForm, text="Nb tuning cycles", borderwidth=1 ).grid( row=iRow, column=1, sticky=W, padx=10 )
         self.nbTuningInputVar = IntVar()
-        self.nbTuningInputVar.set( 20 )
+        self.nbTuningInputVar.set( self.machineFieldValues.get( "nbTuning", 20 ) )
         Entry( frameForm, textvariable=self.nbTuningInputVar ).grid( row=iRow, column=2, sticky=W, padx=10 )
         iRow += 1
 
@@ -719,7 +725,7 @@ class StartTrainDialog( MyDialog ):
             self.inputMachineFields[ key ] = inputVar
 
             # Default value
-            inputVar.set( machineField[ 2 ] )
+            inputVar.set( self.machineFieldValues.get( key, machineField[ 2 ] ) )
             # field
             if ( machineField[ 1 ] == "boolean" ) :
                 Checkbutton( frameForm, variable=inputVar ).grid( row=iRow, column=2, sticky=W, padx=10 )
@@ -732,6 +738,8 @@ class StartTrainDialog( MyDialog ):
 
         buttonRun.pack( side=LEFT, padx=40 )
         buttonCancel.pack( side=RIGHT, padx=40 )
+        
+        self.mainloop()
 
     def buttonRunClicked( self ) :
         # Give params to master
@@ -741,10 +749,18 @@ class StartTrainDialog( MyDialog ):
             "tune"      : self.tuneInputVar.get(),
             "nbTuning"  : self.nbTuningInputVar.get(),
         }
+
         #add machine specific fields
         for ( key, inputVar ) in self.inputMachineFields.items() :
             self.master.runParams[ key ] = inputVar.get()
 
+        # Save selection for next usage
+        # save selection DB
+        import db.db as db
+        db.setSelection( self.conn, self.keySelection, self.master.runParams )
+        # commit
+        self.conn.commit()
+        
         self.destroy()
         self.master.destroy()
 

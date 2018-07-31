@@ -16,15 +16,17 @@ import const.constants as const
 # Current DB version
 DB_VERSION = 1
 
-def getSelection( conn ):
+def getSelection( conn, key ):
 
     cursor = conn.cursor();
 
     try :
-        # get existing, if anay
+        # get existing, if any
         cursor.execute(
-            "select jsonSelection from selections where id=1"
+            "select jsonSelection from selections where key=?",
+            ( key, )
         )
+        
 
         result = None
 
@@ -32,21 +34,29 @@ def getSelection( conn ):
             resultJson = row[ 0 ]
             result = json.loads( resultJson )
 
+        # Never return None
+        if ( result is None ) :
+            cursor.execute(
+                "INSERT INTO selections VALUES ( null, ?, ? )",
+                ( key, "{}" )
+            )
+            result = getSelection( conn, key )
+        
     finally :
         cursor.close()
 
     return result
 
-def setSelection( conn, selection ):
+def setSelection( conn, key, selection ):
 
     jsonSelection = json.dumps( selection )
     cursor = conn.cursor();
 
     try :
-        # get existing, if anay
+        # get existing, if any
         cursor.execute(
-            "update selections set jSonSelection=?where id=1",
-            ( jsonSelection, )
+            "update selections set jSonSelection=? where key=?",
+            ( jsonSelection, key, )
         )
 
     finally :
@@ -211,7 +221,7 @@ def createConfig( conn, idDataset, name, structure, imageSize, machineName, hype
         idConfig = cursor.lastrowid
 
         # get hyparams
-        idHyperParams = getOrCreateHyperParams( conn, idDataset, idConfig, hyper_params )
+        idHyperParams = getOrCreateHyperParams( conn, hyper_params )
 
         # create selector, no run yet
         createHpRunSelector( conn, idDataset, idConfig, idHyperParams, None )
@@ -1054,11 +1064,10 @@ def initTables( cursor ) :
     cursor.execute( '''CREATE TABLE IF NOT EXISTS selections
         (
            id integer PRIMARY KEY AUTOINCREMENT,
+           key text not null unique,
            jsonSelection text not null
          )'''
     )
-    # Create default value
-    cursor.execute( "insert into selections values( null, '{}' )" )
 
     # Create table - machines
     cursor.execute( '''CREATE TABLE IF NOT EXISTS machines
@@ -1138,6 +1147,9 @@ def initTables( cursor ) :
     )
 
     # Indexes
+    cursor.execute( '''CREATE INDEX IF NOT EXISTS idx_selections_id on selections( id ) ''' )
+    cursor.execute( '''CREATE INDEX IF NOT EXISTS idx_selections_key on selections( key ) ''' )
+
     cursor.execute( '''CREATE INDEX IF NOT EXISTS idx_machines_id on machines( id ) ''' )
     cursor.execute( '''CREATE INDEX IF NOT EXISTS idx_machines_name on machines( name ) ''' )
 
