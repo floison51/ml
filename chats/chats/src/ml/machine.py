@@ -106,7 +106,9 @@ class AbstractMachine():
         runHyperParams.update( confHyperParams[ "hyperParameters" ] )
 
         maxBestNbEpoch, maxBestAccuracyDevEpoch = -1, -1
-        initialNbEpoch = runHyperParams[ const.KEY_NUM_EPOCHS ]
+        initialNbEpoch   = runHyperParams[ const.KEY_NUM_EPOCHS ]
+        maxBestBeta      = runHyperParams[ const.KEY_BETA ]
+        maxBestKeep_prob = runHyperParams[ const.KEY_KEEP_PROB ]
         
         ## Prepare hyper params
         if tune :
@@ -153,32 +155,37 @@ class AbstractMachine():
             
         for j in range( 1, nbPass + 1 ) :
 
-            if tune:
-                logger.info( "*****************************" )
-                logger.info( "Tune round " + str( j ) + "/" + str( nbTuning ) )
-                logger.info( "*****************************" )
-
-                # calculate beta
-                logBeta = random.uniform( math.log10( beta_min ), math.log10( beta_max ) )
-                beta = math.pow( 10, logBeta )
-                logger.info( "Beta = " + str( beta ))
-
-                # calculate keep_prob
-                logKeep_prob = random.uniform( math.log10( keep_prob_min ), math.log10( keep_prob_max ) )
-                keep_prob = math.pow( 10, logKeep_prob )
-                logger.info( "keep_prob = " + str( keep_prob ))
-
-                # update hyper params
-                runHyperParams[ const.KEY_BETA         ] = beta
-                runHyperParams[ const.KEY_KEEP_PROB    ] = keep_prob
-
             # best epoch run
             if ( j == bestEpochPass ) :
-                # select best epoch nb
-                runHyperParams[ const.KEY_NUM_EPOCHS   ] = maxBestNbEpoch
+                
                 logger.info( "***************************************************************************" )
                 logger.info( "Running interrupted gradient descent, nb epochs={0}".format( maxBestNbEpoch ) )
                 logger.info( "***************************************************************************" )
+
+                # select best epoch nb
+                runHyperParams[ const.KEY_BETA         ] = maxBestBeta
+                runHyperParams[ const.KEY_KEEP_PROB    ] = maxBestKeep_prob
+                
+            else :
+                if tune:
+                    logger.info( "*****************************" )
+                    logger.info( "Tune round " + str( j ) + "/" + str( nbTuning ) )
+                    logger.info( "*****************************" )
+    
+                    # calculate beta
+                    logBeta = random.uniform( math.log10( beta_min ), math.log10( beta_max ) )
+                    beta = math.pow( 10, logBeta )
+                    logger.info( "Beta = " + str( beta ))
+    
+                    # calculate keep_prob
+                    logKeep_prob = random.uniform( math.log10( keep_prob_min ), math.log10( keep_prob_max ) )
+                    keep_prob = math.pow( 10, logKeep_prob )
+                    logger.info( "keep_prob = " + str( keep_prob ))
+    
+                    # update hyper params
+                    runHyperParams[ const.KEY_BETA         ] = beta
+                    runHyperParams[ const.KEY_KEEP_PROB    ] = keep_prob
+
                 
             # Create run
 
@@ -191,11 +198,19 @@ class AbstractMachine():
                 system_info=self.systemInfo, data_info=self.dataInfo
             )
 
+            # Calculate real nb epochs
+            if ( isUseBestEpoch and ( j == bestEpochPass ) ) :
+                realNbEpochs = maxBestNbEpoch 
+            else : 
+                realNbEpochs = None
+                
             # Run model and update DB run with extra info
             accuracyDev, accuracyTrain, bestNbEpoch, bestAccuracyDevEpoch = self.optimizeModel(
                 conn, self.idRun,
                 config[ "structure" ],
                 runHyperParams,
+                realNbEpochs,
+                isCalculateBestEpoch = isUseBestEpoch and ( j != bestEpochPass ),
                 show_plot = showPlots and not tune, extractImageErrors = not tune
             )
 
@@ -216,7 +231,9 @@ class AbstractMachine():
             ) :
                 # Store it
                 maxBestAccuracyDevEpoch = bestAccuracyDevEpoch
-                maxBestNbEpoch = bestNbEpoch
+                maxBestNbEpoch   = bestNbEpoch
+                maxBestBeta      = runHyperParams[ const.KEY_BETA ]
+                maxBestKeep_prob = runHyperParams[ const.KEY_KEEP_PROB ]
 
             if tune :
                 # Store results
@@ -247,6 +264,8 @@ class AbstractMachine():
                 logger.info( "Max DEV accuracy: " + str( maxAccuracyDev ) )
                 logger.info( "Max hyper params:" )
                 logger.info( maxHyperParams )
+                logger.info( "Max Best epoch DEV accuracy : " + str( maxBestAccuracyDevEpoch ) )
+                logger.info( "Max Best epoch nb           : " + str( maxBestNbEpoch ) )
                 
             else :
                 # Not in tuning mode
@@ -261,7 +280,9 @@ class AbstractMachine():
             # Print tuning
             logger.info( "Tuning:" , tuning )
             logger.info( "" )
-            logger.info( "Max DEV accuracy      : " + str( maxAccuracyDev ) )
+            logger.info( "Max DEV accuracy            : " + str( maxAccuracyDev ) )
+            logger.info( "Max Best epoch DEV accuracy : " + str( maxBestAccuracyDevEpoch ) )
+            logger.info( "Max Best epoch nb           : " + str( maxBestNbEpoch ) )
             logger.info( "Max hyper params idRun: " + str( maxIdRun ) )
 
             # Change selected hyper-parameters

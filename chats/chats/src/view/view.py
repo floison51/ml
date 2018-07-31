@@ -697,7 +697,7 @@ class StartTrainDialog( MyDialog ):
 
         Label( frameForm, text="Show plots", borderwidth=1 ).grid( row=iRow, column=1, sticky=W, padx=10 )
         self.showPlotsInputVar = BooleanVar()
-        self.showPlotsInputVar.set( self.machineFieldValues.get( "showPlot", True ) )
+        self.showPlotsInputVar.set( self.machineFieldValues.get( "showPlots", True ) )
         Checkbutton( frameForm, variable=self.showPlotsInputVar ).grid( row=iRow, column=2, sticky=W, padx=10 )
         iRow += 1
 

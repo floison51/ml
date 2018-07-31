@@ -634,10 +634,10 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
                 output_types  = ( X_type , Y_type ),
                 output_shapes = ( X_shape, Y_shape )
             )
-            
+
             # X and Y vars
             ( self.X , self.Y ) = dsIterator.get_next( name = "XY" )
-            
+
         else :
             # Iterator (X,Y)
             dsIterator = tf.data.Iterator.from_string_handle(
@@ -648,33 +648,33 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
 
             # X and Y raw vars
             raw_XY = dsIterator.get_next()
-    
+
             from functools import reduce
             X_shape_surface = reduce( lambda x, y: x*y, X_shape[ 1: ] )
             Y_shape_surface = reduce( lambda x, y: x*y, Y_shape[ 1: ] )
-    
+
             read_features = {
                 'X': tf.FixedLenFeature( [ X_shape_surface], dtype=tf.float32 ),
                 'Y': tf.FixedLenFeature( [ Y_shape_surface ], dtype=tf.int64 ),
             }
-    
+
             # Parse binary record
             parsed_XY = tf.parse_example( serialized=raw_XY, features=read_features )
-    
+
             # Reshape image
             # Use ( -1, xx, xx 3 ) instead of ( None, xx, xx )
             special_X_Shape = [ -1 ] + X_shape[ 1: ]
             image_X = tf.reshape( parsed_XY[ "X" ], special_X_Shape )
             # Convert to needed type
             image_X = tf.cast( image_X, X_type )
-    
+
             # Reshape label
             # Use ( -1, 1 ) instead of ( None, 1 )
             special_Y_Shape = [ -1 ] + Y_shape[ 1: ]
             label_Y = tf.reshape( parsed_XY[ "Y" ], special_Y_Shape )
             # Convert label
             label_Y = tf.cast( label_Y, Y_type )
-    
+
             # X and Y vars
             ( self.X , self.Y ) = ( image_X, label_Y )
 
@@ -904,9 +904,9 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
 #*********************************************************************************************
     def optimizeModel(
         self, conn, idRun,
-        structure,
-        hyperParams,
-        print_cost = True, show_plot = True, extractImageErrors = True
+        structure, hyperParams,
+        num_epochs_stop,
+        print_cost = True, show_plot = True, extractImageErrors = True, isCalculateBestEpoch = False
     ):
 
         tf.reset_default_graph() # Forget the past
@@ -920,6 +920,15 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
         self.keep_prob      = hyperParams[ const.KEY_KEEP_PROB ]
         self.num_epochs     = hyperParams[ const.KEY_NUM_EPOCHS ]
         self.minibatch_size = hyperParams[ const.KEY_MINIBATCH_SIZE ]
+
+        ## Make sure num_epochs_stop is initialized
+        if ( num_epochs_stop is None ) :
+            num_epochs_stop = self.num_epochs
+
+        if ( ( num_epochs_stop <= 0 ) or ( num_epochs_stop > self.num_epochs ) ) :
+            raise ValueError(
+                "num_epochs_stop={0} is lower or equals than 0 or higher than num_epochs={1}".format( num_epochs_stop, self.num_epochs )
+            )
 
         # Minibatch mode, non handled by data source
         m = self.dataInfo[ const.KEY_TRN_X_SIZE ]              # m : number of examples in the train set)
@@ -996,7 +1005,7 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
 
             # TF record file based reader
             self.tfDatasetDev = tf.data.TFRecordDataset( self.datasetDev.XY )
-        
+
         # Pre-fetch and, minibatch_size slices
         self.tfDatasetDev = self.tfDatasetDev.prefetch( self.minibatch_size * 16 ).batch( self.minibatch_size )
 
@@ -1112,9 +1121,9 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
                                 DEV_accuracy = self.accuracyEval( devHandle, "dev" )
                                 logger.info( "  current: DEV accuracy: {:.2%}".format( DEV_accuracy ) )
                                 DEV_accuracies.append( DEV_accuracy )
-                                
+
                                 # Update best epoch var
-                                if ( iEpoch > ( self.num_epochs / 2 ) ) :
+                                if ( isCalculateBestEpoch and ( iEpoch > ( self.num_epochs / 2 ) ) ) :
                                     # max reached?
                                     if ( DEV_accuracy > maxBestAccuracyDevEpoch ) :
                                         maxBestAccuracyDevEpoch = DEV_accuracy
@@ -1130,9 +1139,13 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
                         # Record min cost
                         minCost = min( minCost, epoch_cost )
 
-                        # epoch changed
-                        iEpoch += 1
-                        epoch_cost = 0
+                        # finished
+                        if ( iEpoch >= num_epochs_stop ) :
+                            finished = True
+                        else :
+                            # epoch changed
+                            iEpoch += 1
+                            epoch_cost = 0
 
                     # Close to finish?
 #                     if ( not finalizationMode and ( iEpoch > current_num_epochs ) ) :
@@ -1182,7 +1195,7 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
             logger.info( "Parameters have been trained!")
             logger.info( "Final cost: {0}".format( epoch_cost ) )
 
-            ## Elapsed (seconds), for wholde data set * nb epochs
+            ## Elapsed (seconds), for whole data set * nb epochs
             elapsedSeconds, perfIndex = self.getPerfCounters( tsStart, iEpoch, X_real_shape, m * self.num_epochs )
             perfInfo = {}
 
@@ -1200,8 +1213,9 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
             accuracyDev = self.accuracyEval( devHandle, "dev" )
             logger.info(  "DEV Accuracy: {:.2%}".format( accuracyDev ) )
 
-            logger.info(  "Best DEV nb epochs: {0}".format( maxBestNbEpoch ) )
-            logger.info(  "Best DEV Accuracy : {:.2%}".format( maxBestAccuracyDevEpoch ) )
+            if ( isCalculateBestEpoch ) :
+                logger.info(  "Best DEV nb epochs: {0}".format( maxBestNbEpoch ) )
+                logger.info(  "Best DEV Accuracy : {:.2%}".format( maxBestAccuracyDevEpoch ) )
 
             if ( show_plot ) :
                 # plot the cost
