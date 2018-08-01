@@ -163,8 +163,9 @@ class AbstractMachine():
                 logger.info( "***************************************************************************" )
 
                 # select best epoch nb
-                runHyperParams[ const.KEY_BETA         ] = maxBestBeta
-                runHyperParams[ const.KEY_KEEP_PROB    ] = maxBestKeep_prob
+                runHyperParams[ const.KEY_BETA       ] = maxBestBeta
+                runHyperParams[ const.KEY_KEEP_PROB  ] = maxBestKeep_prob
+                runHyperParams[ const.KEY_NUM_EPOCHS ] = maxBestNbEpoch
                 
             else :
                 if tune:
@@ -198,18 +199,11 @@ class AbstractMachine():
                 system_info=self.systemInfo, data_info=self.dataInfo
             )
 
-            # Calculate real nb epochs
-            if ( isUseBestEpoch and ( j == bestEpochPass ) ) :
-                realNbEpochs = maxBestNbEpoch 
-            else : 
-                realNbEpochs = None
-                
             # Run model and update DB run with extra info
             accuracyDev, accuracyTrain, bestNbEpoch, bestAccuracyDevEpoch = self.optimizeModel(
                 conn, self.idRun,
                 config[ "structure" ],
                 runHyperParams,
-                realNbEpochs,
                 isCalculateBestEpoch = isUseBestEpoch and ( j != bestEpochPass ),
                 show_plot = showPlots and not tune, extractImageErrors = not tune
             )

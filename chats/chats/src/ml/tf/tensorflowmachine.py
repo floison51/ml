@@ -905,7 +905,6 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
     def optimizeModel(
         self, conn, idRun,
         structure, hyperParams,
-        num_epochs_stop,
         print_cost = True, show_plot = True, extractImageErrors = True, isCalculateBestEpoch = False
     ):
 
@@ -920,15 +919,6 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
         self.keep_prob      = hyperParams[ const.KEY_KEEP_PROB ]
         self.num_epochs     = hyperParams[ const.KEY_NUM_EPOCHS ]
         self.minibatch_size = hyperParams[ const.KEY_MINIBATCH_SIZE ]
-
-        ## Make sure num_epochs_stop is initialized
-        if ( num_epochs_stop is None ) :
-            num_epochs_stop = self.num_epochs
-
-        if ( ( num_epochs_stop <= 0 ) or ( num_epochs_stop > self.num_epochs ) ) :
-            raise ValueError(
-                "num_epochs_stop={0} is lower or equals than 0 or higher than num_epochs={1}".format( num_epochs_stop, self.num_epochs )
-            )
 
         # Minibatch mode, non handled by data source
         m = self.dataInfo[ const.KEY_TRN_X_SIZE ]              # m : number of examples in the train set)
@@ -1040,11 +1030,11 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
             # signal.signal( signal.SIGINT, self.signal_handler )
 
             # Do the training loop
-            iEpoch = 0
+            iEpoch = 1
             minibatch_cost = 0
             epoch_cost = 0.                       # Defines a cost related to an epoch
             # current iteration
-            iteration = 0
+            iteration = 1
 
             # Nb status epoch : if we reach it, calculate DEV efficiency
             nbStatusEpoch = math.ceil( self.num_epochs / 20 )
@@ -1068,6 +1058,8 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
             coord = tf.train.Coordinator()
             threads = tf.train.start_queue_runners( sess=sess, coord=coord )
 
+            lastEpochCost = 0
+            
             try :
                 while ( not self.interrupted and not finished ) :
 
@@ -1098,7 +1090,7 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
                         tsTraceStart = tsTraceNow
 
                     # Current epoch finished?
-                    if ( ( iteration + 1 ) % self.numMinibatches == 0 ) :
+                    if ( ( iteration % self.numMinibatches ) == 0 ) :
 
                         # time to status epoch?
                         tsEpochStatusNow = time.time()
@@ -1109,7 +1101,7 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
 
                             logger.info( "Cost after epoch {0}; iteration {1}; {2}".format( iEpoch, iteration, epoch_cost ) )
 
-                            if ( iEpoch != 0 ) :
+                            if ( iEpoch != 1 ) :
 
                                 # Performance counters, for current batch, m data * nbStatus epochs
                                 curElapsedSeconds, curPerfIndex = self.getPerfCounters( tsStart, iEpoch, X_real_shape, m * nbStatusEpoch )
@@ -1139,13 +1131,10 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
                         # Record min cost
                         minCost = min( minCost, epoch_cost )
 
-                        # finished
-                        if ( iEpoch >= num_epochs_stop ) :
-                            finished = True
-                        else :
-                            # epoch changed
-                            iEpoch += 1
-                            epoch_cost = 0
+                        # epoch changed
+                        iEpoch += 1
+                        lastEpochCost = epoch_cost
+                        epoch_cost = 0
 
                     # Close to finish?
 #                     if ( not finalizationMode and ( iEpoch > current_num_epochs ) ) :
@@ -1168,7 +1157,10 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
 
             except tf.errors.OutOfRangeError:
                 # walk finished
-                pass
+                # decrement iteration and epoch that didn't append
+                iteration -= 1
+                iEpoch -= 1
+                epoch_cost = lastEpochCost
 
             finally :
                 # When done, ask the threads to stop.
@@ -1193,7 +1185,7 @@ class TensorFlowFullMachine( AbstractTensorFlowMachine ):
 
             # Final cost
             logger.info( "Parameters have been trained!")
-            logger.info( "Final cost: {0}".format( epoch_cost ) )
+            logger.info( "Final cost after epoch {0}; iteration {1}; {2}".format( iEpoch, iteration, epoch_cost ) )
 
             ## Elapsed (seconds), for whole data set * nb epochs
             elapsedSeconds, perfIndex = self.getPerfCounters( tsStart, iEpoch, X_real_shape, m * self.num_epochs )
